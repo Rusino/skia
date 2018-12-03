@@ -153,7 +153,7 @@ public:
 
         // The required lifetime of utf16 isn't well documented.
         // It appears it isn't used after ubidi_setPara except through ubidi_getText.
-        ubidi_setPara(bidi.get(), utf16.getBuffer(), utf16.length(), level, nullptr, &status);
+        ubidi_setPara(bidi.get(), (const UChar*)utf16.getBuffer(), utf16.length(), level, nullptr, &status);
         if (U_FAILURE(status)) {
             SkDebugf("Bidi error: %s", u_errorName(status));
             return ret;
