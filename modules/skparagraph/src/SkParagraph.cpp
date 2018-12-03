@@ -30,27 +30,27 @@ SkParagraph::SkParagraph()
 
 SkParagraph::~SkParagraph() = default;
 
-double SkParagraph::Width() {
+double SkParagraph::GetMaxWidth() {
   return _width;
 }
 
-double SkParagraph::Height() {
+double SkParagraph::GetHeight() {
   return _height;
 }
 
-double SkParagraph::MinIntrinsicWidth() {
+double SkParagraph::GetMinIntrinsicWidth() {
   return _minIntrinsicWidth;
 }
 
-double SkParagraph::MaxIntrinsicWidth() {
+double SkParagraph::GetMaxIntrinsicWidth() {
   return _maxIntrinsicWidth;
 }
 
-double SkParagraph::AlphabeticBaseline() {
+double SkParagraph::GetAlphabeticBaseline() {
   return _alphabeticBaseline;
 }
 
-double SkParagraph::IdeographicBaseline() {
+double SkParagraph::GetIdeographicBaseline() {
   return _ideographicBaseline;
 }
 

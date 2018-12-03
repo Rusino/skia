@@ -156,6 +156,8 @@ config("skia_private") {
     "src/image",
     "src/images",
     "src/lazy",
+    "modules/skparagraph/include",
+    "modules/skshaper/include",
     "src/opts",
     "src/pathops",
     "src/pdf",

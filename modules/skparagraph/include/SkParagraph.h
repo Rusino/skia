@@ -19,17 +19,17 @@ class SkParagraph {
   SkParagraph();
   ~SkParagraph();
 
-  double Width();
+  double GetMaxWidth();
 
-  double Height();
+  double GetHeight();
 
-  double MinIntrinsicWidth();
+  double GetMinIntrinsicWidth();
 
-  double MaxIntrinsicWidth();
+  double GetMaxIntrinsicWidth();
 
-  double AlphabeticBaseline();
+  double GetAlphabeticBaseline();
 
-  double IdeographicBaseline();
+  double GetIdeographicBaseline();
 
   bool DidExceedMaxLines();
 

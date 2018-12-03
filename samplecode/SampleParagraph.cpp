@@ -89,7 +89,7 @@ protected:
 
             paragraph.Paint(canvas, margin, margin);
 
-            canvas->translate(0, paragraph.Height() + margin);
+            canvas->translate(0, paragraph.GetHeight() + margin);
         }
     }
 
