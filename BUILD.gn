@@ -1608,6 +1608,7 @@ if (skia_enable_tools) {
         "src/utils/SkLuaCanvas.cpp",
       ]
       deps = [
+        "modules/skparagraph",
         "modules/skshaper",
         "//third_party/lua",
       ]
@@ -1683,6 +1684,7 @@ if (skia_enable_tools) {
         ":experimental_svg_model",
         ":flags",
         ":xml",
+        "modules/skparagraph",
         "modules/skshaper",
       ]
 
@@ -1797,6 +1799,7 @@ if (skia_enable_tools) {
     ]
     deps = [
       ":skia",
+      "modules/skparagraph",
       "modules/skshaper",
     ]
   }
@@ -2237,6 +2240,7 @@ if (skia_enable_tools) {
       deps = [
         ":tool_utils",
         "modules/skottie",
+        "modules/skparagraph",
         "modules/skshaper",
       ]
     }

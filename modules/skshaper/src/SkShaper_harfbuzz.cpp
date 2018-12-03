@@ -386,52 +386,8 @@ private:
     SkTDPQueue<RunIterator*, CompareRunIterator> fRunIterators;
 };
 
-struct ShapedGlyph {
-    SkGlyphID fID;
-    uint32_t fCluster;
-    SkPoint fOffset;
-    SkVector fAdvance;
-    bool fMayLineBreakBefore;
-    bool fMustLineBreakBefore;
-    bool fHasVisual;
-};
-struct ShapedRun {
-    ShapedRun(const char* utf8Start, const char* utf8End, int numGlyphs, const SkFont& paint,
-              UBiDiLevel level, std::unique_ptr<ShapedGlyph[]> glyphs)
-        : fUtf8Start(utf8Start), fUtf8End(utf8End), fNumGlyphs(numGlyphs), fPaint(paint)
-        , fLevel(level), fGlyphs(std::move(glyphs))
-    {}
-
-    const char* fUtf8Start;
-    const char* fUtf8End;
-    int fNumGlyphs;
-    SkFont fPaint;
-    UBiDiLevel fLevel;
-    std::unique_ptr<ShapedGlyph[]> fGlyphs;
-};
-
 static constexpr bool is_LTR(UBiDiLevel level) {
     return (level & 1) == 0;
-}
-
-static void append(SkTextBlobBuilder* b, const ShapedRun& run, int start, int end, SkPoint* p) {
-    unsigned len = end - start;
-    SkPaint tmpPaint;
-    run.fPaint.LEGACY_applyToPaint(&tmpPaint);
-    auto runBuffer = SkTextBlobBuilderPriv::AllocRunTextPos(b, tmpPaint, len,
-            run.fUtf8End - run.fUtf8Start, SkString());
-    memcpy(runBuffer.utf8text, run.fUtf8Start, run.fUtf8End - run.fUtf8Start);
-
-    for (unsigned i = 0; i < len; i++) {
-        // Glyphs are in logical order, but output ltr since PDF readers seem to expect that.
-        const ShapedGlyph& glyph = run.fGlyphs[is_LTR(run.fLevel) ? start + i : end - 1 - i];
-        runBuffer.glyphs[i] = glyph.fID;
-        runBuffer.clusters[i] = glyph.fCluster;
-        reinterpret_cast<SkPoint*>(runBuffer.pos)[i] =
-                SkPoint::Make(p->fX + glyph.fOffset.fX, p->fY - glyph.fOffset.fY);
-        p->fX += glyph.fAdvance.fX;
-        p->fY += glyph.fAdvance.fY;
-    }
 }
 
 struct ShapedRunGlyphIterator {
@@ -524,257 +480,328 @@ SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
                         size_t utf8Bytes,
                         bool leftToRight,
                         SkPoint point,
-                        SkScalar width) const {
-    sk_sp<SkFontMgr> fontMgr = SkFontMgr::RefDefault();
-    SkASSERT(builder);
-    UBiDiLevel defaultLevel = leftToRight ? UBIDI_DEFAULT_LTR : UBIDI_DEFAULT_RTL;
-    //hb_script_t script = ...
+                        SkScalar width) {
 
-    SkTArray<ShapedRun> runs;
-{
-    RunIteratorQueue runSegmenter;
+  resetLayout();
+  resetLinebreaks();
 
-    SkTLazy<BiDiRunIterator> maybeBidi(BiDiRunIterator::Make(utf8, utf8Bytes, defaultLevel));
-    BiDiRunIterator* bidi = maybeBidi.getMaybeNull();
-    if (!bidi) {
-        return point;
-    }
-    runSegmenter.insert(bidi);
+  if (!generateGlyphs(srcPaint, utf8, utf8Bytes, leftToRight)) {
+    return point;
+  }
 
-    hb_unicode_funcs_t* hbUnicode = hb_buffer_get_unicode_funcs(fImpl->fBuffer.get());
-    SkTLazy<ScriptRunIterator> maybeScript(ScriptRunIterator::Make(utf8, utf8Bytes, hbUnicode));
-    ScriptRunIterator* script = maybeScript.getMaybeNull();
-    if (!script) {
-        return point;
-    }
-    runSegmenter.insert(script);
+  // Iterate over the glyphs in logical order to mark line endings.
+  generateLineBreaks(width);
 
-    SkTLazy<FontRunIterator> maybeFont(FontRunIterator::Make(utf8, utf8Bytes,
-                                                             fImpl->fTypeface,
-                                                             fImpl->fHarfBuzzFont.get(),
-                                                             std::move(fontMgr)));
-    FontRunIterator* font = maybeFont.getMaybeNull();
-    if (!font) {
-        return point;
-    }
-    runSegmenter.insert(font);
-
-    icu::BreakIterator& breakIterator = *fImpl->fBreakIterator;
-    {
-        UErrorCode status = U_ZERO_ERROR;
-        UText utf8UText = UTEXT_INITIALIZER;
-        utext_openUTF8(&utf8UText, utf8, utf8Bytes, &status);
-        std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> autoClose(&utf8UText);
-        if (U_FAILURE(status)) {
-            SkDebugf("Could not create utf8UText: %s", u_errorName(status));
-            return point;
-        }
-        breakIterator.setText(&utf8UText, status);
-        //utext_close(&utf8UText);
-        if (U_FAILURE(status)) {
-            SkDebugf("Could not setText on break iterator: %s", u_errorName(status));
-            return point;
-        }
-    }
-
-    const char* utf8Start = nullptr;
-    const char* utf8End = utf8;
-    while (runSegmenter.advanceRuns()) {
-        utf8Start = utf8End;
-        utf8End = runSegmenter.endOfCurrentRun();
-
-        hb_buffer_t* buffer = fImpl->fBuffer.get();
-        SkAutoTCallVProc<hb_buffer_t, hb_buffer_clear_contents> autoClearBuffer(buffer);
-        hb_buffer_set_content_type(buffer, HB_BUFFER_CONTENT_TYPE_UNICODE);
-        hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_CHARACTERS);
-
-        // Add precontext.
-        hb_buffer_add_utf8(buffer, utf8, utf8Start - utf8, utf8Start - utf8, 0);
-
-        // Populate the hb_buffer directly with utf8 cluster indexes.
-        const char* utf8Current = utf8Start;
-        while (utf8Current < utf8End) {
-            unsigned int cluster = utf8Current - utf8Start;
-            hb_codepoint_t u = utf8_next(&utf8Current, utf8End);
-            hb_buffer_add(buffer, u, cluster);
-        }
-
-        // Add postcontext.
-        hb_buffer_add_utf8(buffer, utf8Current, utf8 + utf8Bytes - utf8Current, 0, 0);
-
-        size_t utf8runLength = utf8End - utf8Start;
-        if (!SkTFitsIn<int>(utf8runLength)) {
-            SkDebugf("Shaping error: utf8 too long");
-            return point;
-        }
-        hb_buffer_set_script(buffer, script->currentScript());
-        hb_direction_t direction = is_LTR(bidi->currentLevel()) ? HB_DIRECTION_LTR:HB_DIRECTION_RTL;
-        hb_buffer_set_direction(buffer, direction);
-        // TODO: language
-        hb_buffer_guess_segment_properties(buffer);
-        // TODO: features
-        if (!font->currentHBFont()) {
-            continue;
-        }
-        hb_shape(font->currentHBFont(), buffer, nullptr, 0);
-        unsigned len = hb_buffer_get_length(buffer);
-        if (len == 0) {
-            continue;
-        }
-
-        if (direction == HB_DIRECTION_RTL) {
-            // Put the clusters back in logical order.
-            // Note that the advances remain ltr.
-            hb_buffer_reverse(buffer);
-        }
-        hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer, nullptr);
-        hb_glyph_position_t* pos = hb_buffer_get_glyph_positions(buffer, nullptr);
-
-        if (!SkTFitsIn<int>(len)) {
-            SkDebugf("Shaping error: too many glyphs");
-            return point;
-        }
-
-        SkFont paint(srcPaint);
-        paint.setTypeface(sk_ref_sp(font->currentTypeface()));
-        ShapedRun& run = runs.emplace_back(utf8Start, utf8End, len, paint, bidi->currentLevel(),
-                                           std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]));
-        int scaleX, scaleY;
-        hb_font_get_scale(font->currentHBFont(), &scaleX, &scaleY);
-        double textSizeY = run.fPaint.getSize() / scaleY;
-        double textSizeX = run.fPaint.getSize() / scaleX * run.fPaint.getScaleX();
-        for (unsigned i = 0; i < len; i++) {
-            ShapedGlyph& glyph = run.fGlyphs[i];
-            glyph.fID = info[i].codepoint;
-            glyph.fCluster = info[i].cluster;
-            glyph.fOffset.fX = pos[i].x_offset * textSizeX;
-            glyph.fOffset.fY = pos[i].y_offset * textSizeY;
-            glyph.fAdvance.fX = pos[i].x_advance * textSizeX;
-            glyph.fAdvance.fY = pos[i].y_advance * textSizeY;
-            glyph.fHasVisual = true; //!font->currentTypeface()->glyphBoundsAreZero(glyph.fID);
-            //info->mask safe_to_break;
-            glyph.fMustLineBreakBefore = false;
-        }
-
-        int32_t clusterOffset = utf8Start - utf8;
-        uint32_t previousCluster = 0xFFFFFFFF;
-        for (unsigned i = 0; i < len; ++i) {
-            ShapedGlyph& glyph = run.fGlyphs[i];
-            int32_t glyphCluster = glyph.fCluster + clusterOffset;
-            int32_t breakIteratorCurrent = breakIterator.current();
-            while (breakIteratorCurrent != icu::BreakIterator::DONE &&
-                   breakIteratorCurrent < glyphCluster)
-            {
-                breakIteratorCurrent = breakIterator.next();
-            }
-            glyph.fMayLineBreakBefore = glyph.fCluster != previousCluster &&
-                                        breakIteratorCurrent == glyphCluster;
-            previousCluster = glyph.fCluster;
-        }
-    }
+  // Reorder the runs and glyphs per line and write them out.
+  return  generateTextBlob(builder, point);
 }
 
-// Iterate over the glyphs in logical order to mark line endings.
-{
-    SkScalar widthSoFar = 0;
-    bool previousBreakValid = false; // Set when previousBreak is set to a valid candidate break.
-    bool canAddBreakNow = false; // Disallow line breaks before the first glyph of a run.
-    ShapedRunGlyphIterator previousBreak(runs);
-    ShapedRunGlyphIterator glyphIterator(runs);
-    while (ShapedGlyph* glyph = glyphIterator.current()) {
-        if (canAddBreakNow && glyph->fMayLineBreakBefore) {
-            previousBreakValid = true;
-            previousBreak = glyphIterator;
-        }
-        SkScalar glyphWidth = glyph->fAdvance.fX;
-        // TODO: if the glyph is non-visible it can be added.
-        if (widthSoFar + glyphWidth < width) {
-            widthSoFar += glyphWidth;
-            glyphIterator.next();
-            canAddBreakNow = true;
-            continue;
-        }
+bool SkShaper::generateGlyphs(const SkFont& srcPaint,
+                              const char* utf8,
+                              size_t utf8Bytes,
+                              bool leftToRight) {
 
-        // TODO: for both of these emergency break cases
-        // don't break grapheme clusters and pull in any zero width or non-visible
-        if (widthSoFar == 0) {
-            // Adding just this glyph is too much, just break with this glyph
-            glyphIterator.next();
-            previousBreak = glyphIterator;
-        } else if (!previousBreakValid) {
-            // No break opportunity found yet, just break without this glyph
-            previousBreak = glyphIterator;
-        }
-        glyphIterator = previousBreak;
-        glyph = glyphIterator.current();
-        if (glyph) {
-            glyph->fMustLineBreakBefore = true;
-        }
-        widthSoFar = 0;
-        previousBreakValid = false;
-        canAddBreakNow = false;
-    }
+  sk_sp<SkFontMgr> fontMgr = SkFontMgr::RefDefault();
+  UBiDiLevel defaultLevel = leftToRight ? UBIDI_DEFAULT_LTR : UBIDI_DEFAULT_RTL;
+  //hb_script_t script = ...
+
+  RunIteratorQueue runSegmenter;
+
+  SkTLazy<BiDiRunIterator> maybeBidi(BiDiRunIterator::Make(utf8, utf8Bytes, defaultLevel));
+  BiDiRunIterator* bidi = maybeBidi.getMaybeNull();
+  if (!bidi) {
+      return false;
+  }
+  runSegmenter.insert(bidi);
+
+  hb_unicode_funcs_t* hbUnicode = hb_buffer_get_unicode_funcs(fImpl->fBuffer.get());
+  SkTLazy<ScriptRunIterator> maybeScript(ScriptRunIterator::Make(utf8, utf8Bytes, hbUnicode));
+  ScriptRunIterator* script = maybeScript.getMaybeNull();
+  if (!script) {
+      return false;
+  }
+  runSegmenter.insert(script);
+
+  SkTLazy<FontRunIterator> maybeFont(FontRunIterator::Make(utf8, utf8Bytes,
+                                                           fImpl->fTypeface,
+                                                           fImpl->fHarfBuzzFont.get(),
+                                                           std::move(fontMgr)));
+  FontRunIterator* font = maybeFont.getMaybeNull();
+  if (!font) {
+      return false;
+  }
+  runSegmenter.insert(font);
+
+  icu::BreakIterator& breakIterator = *fImpl->fBreakIterator;
+  {
+      UErrorCode status = U_ZERO_ERROR;
+      UText utf8UText = UTEXT_INITIALIZER;
+      utext_openUTF8(&utf8UText, utf8, utf8Bytes, &status);
+      std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> autoClose(&utf8UText);
+      if (U_FAILURE(status)) {
+          SkDebugf("Could not create utf8UText: %s", u_errorName(status));
+          return false;
+      }
+      breakIterator.setText(&utf8UText, status);
+      //utext_close(&utf8UText);
+      if (U_FAILURE(status)) {
+          SkDebugf("Could not setText on break iterator: %s", u_errorName(status));
+          return false;
+      }
+  }
+
+  const char* utf8Start = nullptr;
+  const char* utf8End = utf8;
+  while (runSegmenter.advanceRuns()) {
+      utf8Start = utf8End;
+      utf8End = runSegmenter.endOfCurrentRun();
+
+      hb_buffer_t* buffer = fImpl->fBuffer.get();
+      SkAutoTCallVProc<hb_buffer_t, hb_buffer_clear_contents> autoClearBuffer(buffer);
+      hb_buffer_set_content_type(buffer, HB_BUFFER_CONTENT_TYPE_UNICODE);
+      hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_CHARACTERS);
+
+      // Add precontext.
+      hb_buffer_add_utf8(buffer, utf8, utf8Start - utf8, utf8Start - utf8, 0);
+
+      // Populate the hb_buffer directly with utf8 cluster indexes.
+      const char* utf8Current = utf8Start;
+      while (utf8Current < utf8End) {
+          unsigned int cluster = utf8Current - utf8Start;
+          hb_codepoint_t u = utf8_next(&utf8Current, utf8End);
+          hb_buffer_add(buffer, u, cluster);
+      }
+
+      // Add postcontext.
+      hb_buffer_add_utf8(buffer, utf8Current, utf8 + utf8Bytes - utf8Current, 0, 0);
+
+      size_t utf8runLength = utf8End - utf8Start;
+      if (!SkTFitsIn<int>(utf8runLength)) {
+          SkDebugf("Shaping error: utf8 too long");
+          return false;
+      }
+      hb_buffer_set_script(buffer, script->currentScript());
+      hb_direction_t direction = is_LTR(bidi->currentLevel()) ? HB_DIRECTION_LTR:HB_DIRECTION_RTL;
+      hb_buffer_set_direction(buffer, direction);
+      // TODO: language
+      hb_buffer_guess_segment_properties(buffer);
+      // TODO: features
+      if (!font->currentHBFont()) {
+          continue;
+      }
+      hb_shape(font->currentHBFont(), buffer, nullptr, 0);
+      unsigned len = hb_buffer_get_length(buffer);
+      if (len == 0) {
+          continue;
+      }
+
+      if (direction == HB_DIRECTION_RTL) {
+          // Put the clusters back in logical order.
+          // Note that the advances remain ltr.
+          hb_buffer_reverse(buffer);
+      }
+      hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer, nullptr);
+      hb_glyph_position_t* pos = hb_buffer_get_glyph_positions(buffer, nullptr);
+
+      if (!SkTFitsIn<int>(len)) {
+          SkDebugf("Shaping error: too many glyphs");
+          return false;
+      }
+
+      SkFont paint(srcPaint);
+      paint.setTypeface(sk_ref_sp(font->currentTypeface()));
+      ShapedRun& run = _runs.emplace_back(utf8Start, utf8End, len, paint, bidi->currentLevel(),
+                                         std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]));
+      int scaleX, scaleY;
+      hb_font_get_scale(font->currentHBFont(), &scaleX, &scaleY);
+      double textSizeY = run.fPaint.getSize() / scaleY;
+      double textSizeX = run.fPaint.getSize() / scaleX * run.fPaint.getScaleX();
+      for (unsigned i = 0; i < len; i++) {
+          ShapedGlyph& glyph = run.fGlyphs[i];
+          glyph.fID = info[i].codepoint;
+          glyph.fCluster = info[i].cluster;
+          glyph.fOffset.fX = pos[i].x_offset * textSizeX;
+          glyph.fOffset.fY = pos[i].y_offset * textSizeY;
+          glyph.fAdvance.fX = pos[i].x_advance * textSizeX;
+          glyph.fAdvance.fY = pos[i].y_advance * textSizeY;
+          glyph.fHasVisual = true; //!font->currentTypeface()->glyphBoundsAreZero(glyph.fID);
+          //info->mask safe_to_break;
+          glyph.fMustLineBreakBefore = false;
+      }
+
+      int32_t clusterOffset = utf8Start - utf8;
+      uint32_t previousCluster = 0xFFFFFFFF;
+      for (unsigned i = 0; i < len; ++i) {
+          ShapedGlyph& glyph = run.fGlyphs[i];
+          int32_t glyphCluster = glyph.fCluster + clusterOffset;
+          int32_t breakIteratorCurrent = breakIterator.current();
+          while (breakIteratorCurrent != icu::BreakIterator::DONE &&
+                 breakIteratorCurrent < glyphCluster)
+          {
+              breakIteratorCurrent = breakIterator.next();
+          }
+          glyph.fMayLineBreakBefore = glyph.fCluster != previousCluster &&
+                                      breakIteratorCurrent == glyphCluster;
+          previousCluster = glyph.fCluster;
+      }
+  }
+
+  return true;
+
 }
 
-// Reorder the runs and glyphs per line and write them out.
-    SkPoint currentPoint = point;
-{
-    ShapedRunGlyphIterator previousBreak(runs);
-    ShapedRunGlyphIterator glyphIterator(runs);
-    SkScalar maxAscent = 0;
-    SkScalar maxDescent = 0;
-    SkScalar maxLeading = 0;
-    int previousRunIndex = -1;
-    while (glyphIterator.current()) {
-        int runIndex = glyphIterator.fRunIndex;
-        int glyphIndex = glyphIterator.fGlyphIndex;
-        ShapedGlyph* nextGlyph = glyphIterator.next();
+void SkShaper::generateLineBreaks(SkScalar width) {
 
-        if (previousRunIndex != runIndex) {
-            SkFontMetrics metrics;
-            runs[runIndex].fPaint.getMetrics(&metrics);
-            maxAscent = SkTMin(maxAscent, metrics.fAscent);
-            maxDescent = SkTMax(maxDescent, metrics.fDescent);
-            maxLeading = SkTMax(maxLeading, metrics.fLeading);
-            previousRunIndex = runIndex;
-        }
+  SkScalar widthSoFar = 0;
+  bool previousBreakValid = false; // Set when previousBreak is set to a valid candidate break.
+  bool canAddBreakNow = false; // Disallow line breaks before the first glyph of a run.
+  ShapedRunGlyphIterator previousBreak(this->_runs);
+  ShapedRunGlyphIterator glyphIterator(this->_runs);
+  while (ShapedGlyph* glyph = glyphIterator.current()) {
+      if (canAddBreakNow && glyph->fMayLineBreakBefore) {
+          previousBreakValid = true;
+          previousBreak = glyphIterator;
+      }
+      SkScalar glyphWidth = glyph->fAdvance.fX;
+      // TODO: if the glyph is non-visible it can be added.
+      if (widthSoFar + glyphWidth < width) {
+          widthSoFar += glyphWidth;
+          glyphIterator.next();
+          canAddBreakNow = true;
+          continue;
+      }
 
-        // Nothing can be written until the baseline is known.
-        if (!(nextGlyph == nullptr || nextGlyph->fMustLineBreakBefore)) {
-            continue;
-        }
-
-        currentPoint.fY -= maxAscent;
-
-        int numRuns = runIndex - previousBreak.fRunIndex + 1;
-        SkAutoSTMalloc<4, UBiDiLevel> runLevels(numRuns);
-        for (int i = 0; i < numRuns; ++i) {
-            runLevels[i] = runs[previousBreak.fRunIndex + i].fLevel;
-        }
-        SkAutoSTMalloc<4, int32_t> logicalFromVisual(numRuns);
-        ubidi_reorderVisual(runLevels, numRuns, logicalFromVisual);
-
-        for (int i = 0; i < numRuns; ++i) {
-            int logicalIndex = previousBreak.fRunIndex + logicalFromVisual[i];
-
-            int startGlyphIndex = (logicalIndex == previousBreak.fRunIndex)
-                                ? previousBreak.fGlyphIndex
-                                : 0;
-            int endGlyphIndex = (logicalIndex == runIndex)
-                              ? glyphIndex + 1
-                              : runs[logicalIndex].fNumGlyphs;
-            append(builder, runs[logicalIndex], startGlyphIndex, endGlyphIndex, &currentPoint);
-        }
-
-        currentPoint.fY += maxDescent + maxLeading;
-        currentPoint.fX = point.fX;
-        maxAscent = 0;
-        maxDescent = 0;
-        maxLeading = 0;
-        previousRunIndex = -1;
-        previousBreak = glyphIterator;
-    }
+      // TODO: for both of these emergency break cases
+      // don't break grapheme clusters and pull in any zero width or non-visible
+      if (widthSoFar == 0) {
+          // Adding just this glyph is too much, just break with this glyph
+          glyphIterator.next();
+          previousBreak = glyphIterator;
+      } else if (!previousBreakValid) {
+          // No break opportunity found yet, just break without this glyph
+          previousBreak = glyphIterator;
+      }
+      glyphIterator = previousBreak;
+      glyph = glyphIterator.current();
+      if (glyph) {
+          glyph->fMustLineBreakBefore = true;
+      }
+      widthSoFar = 0;
+      previousBreakValid = false;
+      canAddBreakNow = false;
+  }
 }
 
-    return currentPoint;
+void SkShaper::append(SkTextBlobBuilder* builder, const ShapedRun& run, int start, int end, SkPoint* p) const {
+  unsigned len = end - start;
+  SkPaint tmpPaint;
+  run.fPaint.LEGACY_applyToPaint(&tmpPaint);
+  tmpPaint.setTextEncoding(SkPaint::kGlyphID_TextEncoding);
+
+  auto runBuffer = SkTextBlobBuilderPriv::AllocRunTextPos(builder, tmpPaint, len,
+                                                          run.fUtf8End - run.fUtf8Start, SkString());
+  memcpy(runBuffer.utf8text, run.fUtf8Start, run.fUtf8End - run.fUtf8Start);
+
+  for (unsigned i = 0; i < len; i++) {
+    // Glyphs are in logical order, but output ltr since PDF readers seem to expect that.
+    const ShapedGlyph& glyph = run.fGlyphs[is_LTR(run.fLevel) ? start + i : end - 1 - i];
+    runBuffer.glyphs[i] = glyph.fID;
+    runBuffer.clusters[i] = glyph.fCluster;
+    reinterpret_cast<SkPoint*>(runBuffer.pos)[i] =
+        SkPoint::Make(p->fX + glyph.fOffset.fX, p->fY - glyph.fOffset.fY);
+    p->fX += glyph.fAdvance.fX;
+    p->fY += glyph.fAdvance.fY;
+  }
+}
+
+SkPoint SkShaper::generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& point, LineBreaker lineBreaker, void* owner) const {
+
+  SkASSERT(builder);
+
+  SkPoint currentPoint = point;
+
+  ShapedRunGlyphIterator previousBreak(this->_runs);
+  ShapedRunGlyphIterator glyphIterator(this->_runs);
+  SkScalar maxAscent = 0;
+  SkScalar maxDescent = 0;
+  SkScalar maxLeading = 0;
+  int previousRunIndex = -1;
+  int line_number = 0;
+  while (glyphIterator.current()) {
+      int runIndex = glyphIterator.fRunIndex;
+      int glyphIndex = glyphIterator.fGlyphIndex;
+      ShapedGlyph* nextGlyph = glyphIterator.next();
+
+      if (previousRunIndex != runIndex) {
+          SkFontMetrics metrics;
+          this->_runs[runIndex].fPaint.getMetrics(&metrics);
+          maxAscent = SkTMin(maxAscent, metrics.fAscent);
+          maxDescent = SkTMax(maxDescent, metrics.fDescent);
+          maxLeading = SkTMax(maxLeading, metrics.fLeading);
+          previousRunIndex = runIndex;
+      }
+
+      // Nothing can be written until the baseline is known.
+      if (!(nextGlyph == nullptr || nextGlyph->fMustLineBreakBefore)) {
+          continue;
+      }
+
+      currentPoint.fY -= maxAscent;
+
+      int numRuns = runIndex - previousBreak.fRunIndex + 1;
+      SkAutoSTMalloc<4, UBiDiLevel> runLevels(numRuns);
+      for (int i = 0; i < numRuns; ++i) {
+          runLevels[i] = this->_runs[previousBreak.fRunIndex + i].fLevel;
+      }
+      SkAutoSTMalloc<4, int32_t> logicalFromVisual(numRuns);
+      ubidi_reorderVisual(runLevels, numRuns, logicalFromVisual);
+
+      for (int i = 0; i < numRuns; ++i) {
+          int logicalIndex = previousBreak.fRunIndex + logicalFromVisual[i];
+
+          int startGlyphIndex = (logicalIndex == previousBreak.fRunIndex)
+                              ? previousBreak.fGlyphIndex
+                              : 0;
+          int endGlyphIndex = (logicalIndex == runIndex)
+                            ? glyphIndex + 1
+                            : this->_runs[logicalIndex].fNumGlyphs;
+          append(builder, this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, &currentPoint);
+      }
+
+      // Callback to notify about one more line
+      ++line_number;
+      if (owner != nullptr) {
+        lineBreaker(owner,
+                    line_number,
+                    maxAscent,
+                    maxDescent,
+                    maxLeading,
+                    previousBreak.fRunIndex,
+                    runIndex,
+                    currentPoint);
+      }
+
+      currentPoint.fY += maxDescent + maxLeading;
+      currentPoint.fX = point.fX;
+      maxAscent = 0;
+      maxDescent = 0;
+      maxLeading = 0;
+      previousRunIndex = -1;
+      previousBreak = glyphIterator;
+  }
+
+  return currentPoint;
+}
+
+void SkShaper::resetLayout() {
+  _runs.reset();
+}
+
+void SkShaper::resetLinebreaks() {
+
+  ShapedRunGlyphIterator glyphIterator(this->_runs);
+  while (ShapedGlyph* glyph = glyphIterator.current()) {
+    glyph->fMustLineBreakBefore = false;
+    glyphIterator.next();
+  }
 }

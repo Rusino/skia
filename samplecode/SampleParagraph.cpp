@@ -1,5 +1,5 @@
 /*
- * Copyright 2011 Google Inc.
+ * Copyright 2018 Google Inc.
  *
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
@@ -18,7 +18,7 @@
 #include "SkRandom.h"
 #include "SkRegion.h"
 #include "SkShader.h"
-#include "SkShaper.h"
+#include "SkParagraph.h"
 #include "SkStream.h"
 #include "SkTextBlob.h"
 #include "SkTime.h"
@@ -39,9 +39,9 @@ static const char gText[] =
     "a decent respect to the opinions of mankind requires that they should "
     "declare the causes which impel them to the separation.";
 
-class TextBoxView : public Sample {
+class ParagraphView : public Sample {
 public:
-    TextBoxView() {
+    ParagraphView() {
 #if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
         LOGFONT lf;
         sk_bzero(&lf, sizeof(lf));
@@ -59,7 +59,7 @@ public:
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
-            Sample::TitleR(evt, "TextBox");
+            Sample::TitleR(evt, "Paragraph");
             return true;
         }
         return this->INHERITED::onQuery(evt);
@@ -71,8 +71,6 @@ protected:
         canvas->clipRect(SkRect::MakeWH(w, h));
         canvas->drawColor(bg);
 
-        SkShaper shaper(nullptr);
-
         SkScalar margin = 20;
 
         SkPaint paint;
@@ -80,16 +78,18 @@ protected:
         paint.setLCDRenderText(true);
         paint.setColor(fg);
 
+        SkParagraph paragraph;
+        paragraph.SetText(gText, strlen(gText));
         for (int i = 9; i < 24; i += 2) {
 
-            SkTextBlobBuilder builder;
             paint.setTextSize(SkIntToScalar(i));
             SkFont font = SkFont::LEGACY_ExtractFromPaint(paint);
-            SkPoint end = shaper.shape(&builder, font, gText, strlen(gText), true,
-                                       { margin, margin }, w - margin);
-            canvas->drawTextBlob(builder.make(), 0, 0, paint);
+            paragraph.SetParagraphStyle(fg, bg, i);
+            paragraph.Layout(w - margin);
 
-            canvas->translate(0, end.y());
+            paragraph.Paint(canvas, margin, margin);
+
+            canvas->translate(0, paragraph.Height() + margin);
         }
     }
 
@@ -110,4 +110,4 @@ private:
 
 //////////////////////////////////////////////////////////////////////////////
 
-DEF_SAMPLE( return new TextBoxView(); )
+DEF_SAMPLE( return new ParagraphView(); )
