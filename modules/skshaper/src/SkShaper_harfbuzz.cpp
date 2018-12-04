@@ -728,7 +728,7 @@ SkPoint SkShaper::generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& po
   SkScalar maxDescent = 0;
   SkScalar maxLeading = 0;
   int previousRunIndex = -1;
-  int line_number = 0;
+  size_t line_number = 0;
   while (glyphIterator.current()) {
     int runIndex = glyphIterator.fRunIndex;
     int glyphIndex = glyphIterator.fGlyphIndex;

@@ -59,19 +59,19 @@ class SkParagraph {
   void SetParagraphStyle(SkColor foreground = SK_ColorBLACK,
                          SkColor background = SK_ColorWHITE,
                          double fontSize = 14.0,
-                         std::string fontFamily = "",
+                         const std::string& fontFamily = "",
                          bool fontBold = false,
                          TextDirection dir = TextDirection::ltr,
                          size_t maxLines = std::numeric_limits<size_t>::max());
 
  private:
-  double _alphabeticBaseline;
-  double _height;
-  double _width;
-  double _ideographicBaseline;
-  double _maxIntrinsicWidth;
-  double _minIntrinsicWidth;
-  double _linesNumber;
+  SkScalar _alphabeticBaseline;
+  SkScalar _height;
+  SkScalar _width;
+  SkScalar _ideographicBaseline;
+  SkScalar _maxIntrinsicWidth;
+  SkScalar _minIntrinsicWidth;
+  size_t _linesNumber;
 
   SkShaper _shaper;
 
@@ -83,7 +83,7 @@ class SkParagraph {
   SkColor _foreground;
   SkColor _background;
   std::string _fontFamily;
-  double _fontSize;
+  SkScalar _fontSize;
   bool _fontBold;
 
   SkTextBlobBuilder _builder;
