@@ -17,7 +17,7 @@
 #include "GrVkUtil.h"
 
 #ifdef SK_TRACE_VK_RESOURCES
-uint32_t GrVkResource::fKeyCounter = 0;
+std::atomic<uint32_t> GrVkResource::fKeyCounter{0};
 #endif
 
 GrVkResourceProvider::GrVkResourceProvider(GrVkGpu* gpu)
@@ -197,9 +197,10 @@ GrVkSamplerYcbcrConversion* GrVkResourceProvider::findOrCreateCompatibleSamplerY
 }
 
 GrVkPipelineState* GrVkResourceProvider::findOrCreateCompatiblePipelineState(
-        const GrPipeline& pipeline, const GrPrimitiveProcessor& proc, GrPrimitiveType primitiveType,
+        const GrPipeline& pipeline, const GrPrimitiveProcessor& proc,
+        const GrTextureProxy* const primProcProxies[], GrPrimitiveType primitiveType,
         VkRenderPass compatibleRenderPass) {
-    return fPipelineStateCache->refPipelineState(proc, pipeline, primitiveType,
+    return fPipelineStateCache->refPipelineState(proc, primProcProxies, pipeline, primitiveType,
                                                  compatibleRenderPass);
 }
 
