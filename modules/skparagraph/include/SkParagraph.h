@@ -64,15 +64,6 @@ class SkParagraph {
                          TextDirection dir = TextDirection::ltr,
                          size_t maxLines = std::numeric_limits<size_t>::max());
 
-  void LineBreakerCallback(
-      int line_number,
-      SkScalar maxAscent,
-      SkScalar maxDescent,
-      SkScalar maxLeading,
-      int previousRunIndex,
-      int runIndex,
-      SkPoint point);
-
  private:
   double _alphabeticBaseline;
   double _height;
@@ -85,7 +76,7 @@ class SkParagraph {
   SkShaper _shaper;
 
   std::vector<uint16_t> _text16;
-  const char* _text;
+  char* _text;
   size_t _textLen;
   TextDirection _dir;
   size_t _maxLines;

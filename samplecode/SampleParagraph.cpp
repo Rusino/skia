@@ -31,6 +31,7 @@ extern void skia_set_text_gamma(float blackGamma, float whiteGamma);
 extern SkTypeface* SkCreateTypefaceFromLOGFONT(const LOGFONT&);
 #endif
 
+static const char gShort[] = "Short text";
 static const char gText[] =
     "When in the Course of human events it becomes necessary for one people "
     "to dissolve the political bands which have connected them with another "
@@ -79,7 +80,7 @@ protected:
         paint.setColor(fg);
 
         SkParagraph paragraph;
-        paragraph.SetText(gText, strlen(gText));
+        paragraph.SetText(gShort, strlen(gShort));
         for (int i = 9; i < 24; i += 2) {
 
             paint.setTextSize(SkIntToScalar(i));
