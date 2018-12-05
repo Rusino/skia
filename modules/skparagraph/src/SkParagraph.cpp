@@ -27,20 +27,20 @@ double SkParagraph::GetHeight() {
 }
 
 double SkParagraph::GetMinIntrinsicWidth() {
-  // TODO: return _minIntrinsicWidth;
-  return SkScalarToDouble(_width);
+  return SkScalarToDouble(_minIntrinsicWidth);
 }
 
 double SkParagraph::GetMaxIntrinsicWidth() {
-  // TODO: return _maxIntrinsicWidth;
-  return SkScalarToDouble(_width);
+  return SkScalarToDouble(_maxIntrinsicWidth);
 }
 
 double SkParagraph::GetAlphabeticBaseline() {
+  // TODO: implement
   return SkScalarToDouble(_alphabeticBaseline);
 }
 
 double SkParagraph::GetIdeographicBaseline() {
+  // TODO: implement
   return SkScalarToDouble(_ideographicBaseline);
 }
 
@@ -89,7 +89,7 @@ void SkParagraph::Layout(double width) {
   _width = 0;
   _ideographicBaseline = 0;
   _maxIntrinsicWidth = 0;
-  _minIntrinsicWidth = std::numeric_limits<float>::max();
+  _minIntrinsicWidth = 0;
   _linesNumber = 0;
 
   if (Shape()) {

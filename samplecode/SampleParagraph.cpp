@@ -88,6 +88,8 @@ protected:
             paragraph.SetParagraphStyle(fg, bg, i);
             paragraph.Layout(w - margin);
 
+            SkDebugf("%g:%g %g-%g\n", paragraph.GetMaxWidth(), paragraph.GetHeight(), paragraph.GetMinIntrinsicWidth(), paragraph.GetMaxIntrinsicWidth());
+
             paragraph.Paint(canvas, margin, margin);
 
             canvas->translate(0, paragraph.GetHeight() + margin);
