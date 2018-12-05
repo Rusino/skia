@@ -71,7 +71,7 @@ class SkParagraph {
   SkScalar _ideographicBaseline;
   SkScalar _maxIntrinsicWidth;
   SkScalar _minIntrinsicWidth;
-  size_t _linesNumber;
+  size_t   _linesNumber;
 
   SkShaper _shaper;
 

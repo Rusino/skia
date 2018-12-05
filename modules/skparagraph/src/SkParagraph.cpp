@@ -19,39 +19,32 @@ SkParagraph::SkParagraph()
 SkParagraph::~SkParagraph() = default;
 
 double SkParagraph::GetMaxWidth() {
-  SkDebugf("GetMaxWidth:%g\n", _width);
   return SkScalarToDouble(_width);
 }
 
 double SkParagraph::GetHeight() {
-  SkDebugf("GetHeight:%g\n", _height);
   return SkScalarToDouble(_height);
 }
 
 double SkParagraph::GetMinIntrinsicWidth() {
-  SkDebugf("GetMinIntrinsicWidth:%g\n", _minIntrinsicWidth);
   // TODO: return _minIntrinsicWidth;
   return SkScalarToDouble(_width);
 }
 
 double SkParagraph::GetMaxIntrinsicWidth() {
-  SkDebugf("GetMaxIntrinsicWidth:%g\n", _maxIntrinsicWidth);
   // TODO: return _maxIntrinsicWidth;
   return SkScalarToDouble(_width);
 }
 
 double SkParagraph::GetAlphabeticBaseline() {
-  SkDebugf("GetAlphabeticBaseline:%g\n", _alphabeticBaseline);
   return SkScalarToDouble(_alphabeticBaseline);
 }
 
 double SkParagraph::GetIdeographicBaseline() {
-  SkDebugf("GetIdeographicBaseline:%g\n", _ideographicBaseline);
   return SkScalarToDouble(_ideographicBaseline);
 }
 
 bool SkParagraph::DidExceedMaxLines() {
-  SkDebugf("DidExceedMaxLines:%d > %d\n", _linesNumber, _maxLines);
   return _linesNumber > _maxLines;
 }
 
@@ -64,7 +57,6 @@ void SkParagraph::SetText(std::vector<uint16_t> utf16text) {
   _textLen = utf16text.size();
   _text = new char[_textLen];
   strncpy(_text, str.c_str(), _textLen);
-  SkDebugf("Text1:'%s' (%d)\n", _text, _textLen);
 }
 
 void SkParagraph::SetText(const char* utf8text, size_t textBytes) {
@@ -72,7 +64,6 @@ void SkParagraph::SetText(const char* utf8text, size_t textBytes) {
   _textLen = textBytes;
   _text = new char[_textLen];
   strncpy(_text, utf8text, textBytes);
-  SkDebugf("Text2:'%s' (%d)\n", _text, _textLen);
 }
 
 void SkParagraph::SetParagraphStyle(SkColor foreground,
@@ -93,7 +84,6 @@ void SkParagraph::SetParagraphStyle(SkColor foreground,
 
 void SkParagraph::Layout(double width) {
 
-  SkDebugf("Layout\n");
   _alphabeticBaseline = 0;
   _height = 0;
   _width = 0;
@@ -109,7 +99,6 @@ void SkParagraph::Layout(double width) {
 
 bool SkParagraph::Shape() {
 
-  SkDebugf("Shaping\n");
   _shaper.resetLayout();
   _shaper.resetLinebreaks();
 
@@ -131,7 +120,6 @@ bool SkParagraph::Shape() {
 
 void SkParagraph::BreakLines(double width) {
 
-  SkDebugf("Breaking\n");
   _shaper.resetLinebreaks();
   // Iterate over the glyphs in logical order to mark line endings.
   _shaper.generateLineBreaks(SkDoubleToScalar(width));
@@ -144,7 +132,7 @@ void SkParagraph::BreakLines(double width) {
                                                      int previousRunIndex,
                                                      int runIndex,
                                                      SkPoint point) {
-    SkDebugf("Line break1 %d (%g, %g)\n", line_number, point.fX, point.fY);
+    //SkDebugf("Line break1 %d (%g, %g)\n", line_number, point.fX, point.fY);
     this->_linesNumber = line_number;
     if (this->_height < point.fY) {
       this->_height = point.fY;
@@ -152,14 +140,11 @@ void SkParagraph::BreakLines(double width) {
     if (this->_width < point.fX) {
       this->_width = point.fX;
     }
-    SkDebugf("Line break2 %d (%g, %g)\n", this->_linesNumber, this->_width, this->_height);
   });
-  SkDebugf("Line break3 %d (%g, %g)\n", this->_linesNumber, this->_width, this->_height);
 }
 
 void SkParagraph::Paint(SkCanvas* canvas, double x, double y) {
 
-  SkDebugf("Painting\n");
   SkPaint paint;
   paint.setAntiAlias(true);
   paint.setLCDRenderText(true);
@@ -170,7 +155,6 @@ void SkParagraph::Paint(SkCanvas* canvas, double x, double y) {
 
 void SkParagraph::Reset() {
 
-  SkDebugf("Reset\n");
   _shaper.resetLayout();
   _shaper.resetLinebreaks();
 
@@ -183,7 +167,6 @@ std::vector<TextBox> SkParagraph::GetRectsForRange(
     RectWidthStyle rect_width_style) {
   // TODO: implement
   SkASSERT(false);
-  SkDebugf("GetRectsForRange\n");
   std::vector<TextBox> result;
   return result;
 }
@@ -191,14 +174,12 @@ std::vector<TextBox> SkParagraph::GetRectsForRange(
 PositionWithAffinity SkParagraph::GetGlyphPositionAtCoordinate(double dx, double dy) const {
   // TODO: implement
   SkASSERT(false);
-  SkDebugf("GetGlyphPositionAtCoordinate\n");
   return PositionWithAffinity(0, Affinity::UPSTREAM);
 }
 
 Range<size_t> SkParagraph::GetWordBoundary(unsigned offset) {
   // TODO: implement
   SkASSERT(false);
-  SkDebugf("GetWordBoundary\n");
   Range<size_t> result;
   return result;
 }
