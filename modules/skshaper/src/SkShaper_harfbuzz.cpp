@@ -652,14 +652,18 @@ bool SkShaper::generateGlyphs(const SkFont& srcPaint,
 
 }
 
-void SkShaper::generateLineBreaks(SkScalar width) {
+bool SkShaper::generateLineBreaks(SkScalar width) {
 
+  bool breakable = false;
   SkScalar widthSoFar = 0;
   bool previousBreakValid = false; // Set when previousBreak is set to a valid candidate break.
   bool canAddBreakNow = false; // Disallow line breaks before the first glyph of a run.
   ShapedRunGlyphIterator previousBreak(this->_runs);
   ShapedRunGlyphIterator glyphIterator(this->_runs);
   while (ShapedGlyph* glyph = glyphIterator.current()) {
+    if (glyph->fMayLineBreakBefore) {
+      breakable = true;
+    }
     if (canAddBreakNow && glyph->fMayLineBreakBefore) {
       previousBreakValid = true;
       previousBreak = glyphIterator;
@@ -692,6 +696,8 @@ void SkShaper::generateLineBreaks(SkScalar width) {
     previousBreakValid = false;
     canAddBreakNow = false;
   }
+
+  return breakable;
 }
 
 void SkShaper::append(SkTextBlobBuilder* builder, const ShapedRun& run, int start, int end, SkPoint* p) const {
@@ -773,12 +779,9 @@ SkPoint SkShaper::generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& po
     // Callback to notify about one more line
     ++line_number;
     lineBreaker(line_number,
-                maxAscent,
-                maxDescent,
-                maxLeading,
+                SkSize::Make(currentPoint.fX - point.fX, currentPoint.fY + maxDescent + maxLeading - point.fY),
                 previousBreak.fRunIndex,
-                runIndex,
-                currentPoint);
+                runIndex);
 
     currentPoint.fY += maxDescent + maxLeading;
     currentPoint.fX = point.fX;
@@ -790,6 +793,80 @@ SkPoint SkShaper::generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& po
   }
 
   return currentPoint;
+}
+
+SkSize SkShaper::breakIntoWords(WordBreaker wordBreaker) const {
+
+  SkTextBlobBuilder builder;
+  SkPoint currentPoint = SkPoint::Make(0, 0);
+  SkSize size = SkSize::Make(0, 0);
+
+  ShapedRunGlyphIterator previousBreak(this->_runs);
+  ShapedRunGlyphIterator glyphIterator(this->_runs);
+  SkScalar maxAscent = 0;
+  SkScalar maxDescent = 0;
+  SkScalar maxLeading = 0;
+  int previousRunIndex = -1;
+  while (glyphIterator.current()) {
+    int runIndex = glyphIterator.fRunIndex;
+    int glyphIndex = glyphIterator.fGlyphIndex;
+    ShapedGlyph* nextGlyph = glyphIterator.next();
+
+    if (previousRunIndex != runIndex) {
+      SkFontMetrics metrics;
+      this->_runs[runIndex].fPaint.getMetrics(&metrics);
+      maxAscent = SkTMin(maxAscent, metrics.fAscent);
+      maxDescent = SkTMax(maxDescent, metrics.fDescent);
+      maxLeading = SkTMax(maxLeading, metrics.fLeading);
+      previousRunIndex = runIndex;
+    }
+
+    // Nothing can be written until the baseline is known.
+    if (!(nextGlyph == nullptr || nextGlyph->fMayLineBreakBefore)) {
+      continue;
+    }
+
+    currentPoint.fY -= maxAscent;
+
+    int numRuns = runIndex - previousBreak.fRunIndex + 1;
+    SkAutoSTMalloc<4, UBiDiLevel> runLevels(numRuns);
+    for (int i = 0; i < numRuns; ++i) {
+      runLevels[i] = this->_runs[previousBreak.fRunIndex + i].fLevel;
+    }
+    SkAutoSTMalloc<4, int32_t> logicalFromVisual(numRuns);
+    ubidi_reorderVisual(runLevels, numRuns, logicalFromVisual);
+
+    for (int i = 0; i < numRuns; ++i) {
+      int logicalIndex = previousBreak.fRunIndex + logicalFromVisual[i];
+
+      int startGlyphIndex = (logicalIndex == previousBreak.fRunIndex)
+                            ? previousBreak.fGlyphIndex
+                            : 0;
+      int endGlyphIndex = (logicalIndex == runIndex)
+                          ? glyphIndex + 1
+                          : this->_runs[logicalIndex].fNumGlyphs;
+      append(&builder, this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, &currentPoint);
+    }
+
+    // Callback to notify about one more line
+    currentPoint.fY += maxDescent + maxLeading;
+
+    wordBreaker(SkSize::Make(currentPoint.fX, currentPoint.fY - size.fHeight),
+                previousBreak.fRunIndex,
+                runIndex);
+
+    size.fWidth = SkMaxScalar(size.fWidth, currentPoint.fX);
+    size.fHeight = currentPoint.fY;
+
+    currentPoint.fX = 0;
+    maxAscent = 0;
+    maxDescent = 0;
+    maxLeading = 0;
+    previousRunIndex = -1;
+    previousBreak = glyphIterator;
+  }
+
+  return size;
 }
 
 void SkShaper::resetLayout() {

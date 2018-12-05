@@ -122,25 +122,25 @@ void SkParagraph::BreakLines(double width) {
 
   _shaper.resetLinebreaks();
   // Iterate over the glyphs in logical order to mark line endings.
-  _shaper.generateLineBreaks(SkDoubleToScalar(width));
+  bool breakable = _shaper.generateLineBreaks(SkDoubleToScalar(width));
 
   // Reorder the runs and glyphs per line and write them out.
   _shaper.generateTextBlob(&_builder, {0, 0}, [this](size_t line_number,
-                                                     SkScalar maxAscent,
-                                                     SkScalar maxDescent,
-                                                     SkScalar maxLeading,
+                                                     SkSize size,
                                                      int previousRunIndex,
-                                                     int runIndex,
-                                                     SkPoint point) {
+                                                     int runIndex) {
     //SkDebugf("Line break1 %d (%g, %g)\n", line_number, point.fX, point.fY);
-    this->_linesNumber = line_number;
-    if (this->_height < point.fY) {
-      this->_height = point.fY;
-    }
-    if (this->_width < point.fX) {
-      this->_width = point.fX;
-    }
+    _linesNumber = line_number;
+    _height = SkMaxScalar(_height, size.fHeight);
+    _width = SkMaxScalar(_width, size.fWidth);
+    _maxIntrinsicWidth += size.fWidth;
   });
+
+  if (breakable) {
+    _shaper.breakIntoWords([this](SkSize size, int startIndex, int nextStartIndex) {
+      _minIntrinsicWidth = SkMaxScalar(_minIntrinsicWidth, size.fWidth);
+    });
+  }
 }
 
 void SkParagraph::Paint(SkCanvas* canvas, double x, double y) {

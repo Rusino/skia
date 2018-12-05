@@ -80,7 +80,7 @@ protected:
         paint.setColor(fg);
 
         SkParagraph paragraph;
-        paragraph.SetText(gShort, strlen(gShort));
+        paragraph.SetText(gText, strlen(gText));
         for (int i = 9; i < 24; i += 2) {
 
             paint.setTextSize(SkIntToScalar(i));

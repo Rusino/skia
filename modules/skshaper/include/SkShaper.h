@@ -57,7 +57,8 @@ public:
   SkShaper(sk_sp<SkTypeface> face);
   ~SkShaper();
 
-  typedef std::function<void(size_t line_number, SkScalar maxAscent, SkScalar maxDescent, SkScalar maxLeading, int previousRunIndex, int runIndex, SkPoint point)> LineBreaker;
+  typedef std::function<void(size_t line_number, SkSize size, int startIndex, int nextStartIndex)> LineBreaker;
+  typedef std::function<void(SkSize size, int startIndex, int nextStartIndex)> WordBreaker;
 
   bool good() const;
     SkPoint shape(SkTextBlobBuilder* dest,
@@ -70,9 +71,11 @@ public:
 
   bool generateGlyphs(const SkFont& srcPaint, const char* utf8text, size_t textBytes, bool leftToRight);
 
-  void generateLineBreaks(SkScalar width);
+  bool generateLineBreaks(SkScalar width);
 
   SkPoint generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& point, LineBreaker lineBreaker = {}) const;
+
+  SkSize breakIntoWords(WordBreaker wordBreaker = {}) const;
 
   void append(SkTextBlobBuilder* builder, const ShapedRun& run, int start, int end, SkPoint* p) const;
 
