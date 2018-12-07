@@ -55,15 +55,22 @@ void SkParagraph::SetText(std::vector<uint16_t> utf16text) {
   utf16.toUTF8String(str);
 
   _textLen = utf16text.size();
-  _text = new char[_textLen];
-  strncpy(_text, str.c_str(), _textLen);
+  //_text8 = new char[_textLen + 1];
+  //strncpy(_text8, str.c_str(), _textLen);
+
+  _text16 = new uint16_t[_textLen + 1];
+  memcpy(_text16, utf16text.data(), _textLen * sizeof(uint16_t));
 }
 
 void SkParagraph::SetText(const char* utf8text, size_t textBytes) {
 
+  icu::UnicodeString utf16 = icu::UnicodeString::fromUTF8(icu::StringPiece(utf8text, textBytes));
+  std::string str;
+  utf16.toUTF8String(str);
+
   _textLen = textBytes;
-  _text = new char[_textLen];
-  strncpy(_text, utf8text, textBytes);
+  _text16 = new uint16_t[_textLen + 1];
+  memcpy(_text16, utf16.getBuffer(), _textLen * sizeof(uint16_t));
 }
 
 void SkParagraph::SetParagraphStyle(SkColor foreground,
@@ -110,7 +117,7 @@ bool SkParagraph::Shape() {
   paint.setTypeface(SkTypeface::MakeFromName(_fontFamily.data(), _fontBold ? SkFontStyle::Bold() : SkFontStyle()));
 
   SkFont font = SkFont::LEGACY_ExtractFromPaint(paint);
-  if (!_shaper.generateGlyphs(font, _text, _textLen, _dir == TextDirection::ltr)) {
+  if (!_shaper.generateGlyphs(font, _text16, _textLen, _dir == TextDirection::ltr)) {
     SkDebugf("Error shaping\n");
     return false;
   }

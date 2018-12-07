@@ -31,16 +31,16 @@ struct ShapedGlyph {
 
 struct ShapedRun {
 
-  ShapedRun(const char* utf8Start, const char* utf8End, int numGlyphs, const SkFont& paint,
+  ShapedRun(const UChar* utf16Start, const UChar* utf16End, int numGlyphs, const SkFont& paint,
             UBiDiLevel level, std::unique_ptr<ShapedGlyph[]> glyphs)
-      : fUtf8Start(utf8Start), fUtf8End(utf8End), fNumGlyphs(numGlyphs), fPaint(paint)
+      : fUtf16Start(utf16Start), fUtf16End(utf16End), fNumGlyphs(numGlyphs), fPaint(paint)
       , fLevel(level), fGlyphs(std::move(glyphs))
   {
 
   }
 
-  const char* fUtf8Start;
-  const char* fUtf8End;
+  const UChar* fUtf16Start;
+  const UChar* fUtf16End;
   int fNumGlyphs;
   SkFont fPaint;
   UBiDiLevel fLevel;
@@ -63,13 +63,21 @@ public:
   bool good() const;
     SkPoint shape(SkTextBlobBuilder* dest,
                   const SkFont& srcPaint,
-                  const char* utf8text,
-                  size_t textBytes,
+                  const UChar* utf16,
+                  size_t utf16Bytes,
                   bool leftToRight,
                   SkPoint point,
                   SkScalar width);
 
-  bool generateGlyphs(const SkFont& srcPaint, const char* utf8text, size_t textBytes, bool leftToRight);
+  SkPoint shape(SkTextBlobBuilder* dest,
+                const SkFont& srcPaint,
+                const char* utf8,
+                size_t utf8Bytes,
+                bool leftToRight,
+                SkPoint point,
+                SkScalar width);
+
+  bool generateGlyphs(const SkFont& srcPaint, const UChar* utf16, size_t utf16Bytes, bool leftToRight);
 
   bool generateLineBreaks(SkScalar width);
 

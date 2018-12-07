@@ -75,8 +75,8 @@ class SkParagraph {
 
   SkShaper _shaper;
 
-  std::vector<uint16_t> _text16;
-  char* _text;
+  uint16_t* _text16;
+  //char* _text8;
   size_t _textLen;
   TextDirection _dir;
   size_t _maxLines;
