@@ -180,7 +180,7 @@ std::vector<TextBox> SkParagraph::GetRectsForRange(
 
 PositionWithAffinity SkParagraph::GetGlyphPositionAtCoordinate(double dx, double dy) const {
   // TODO: implement
-  SkASSERT(false);
+  //SkASSERT(false);
   return PositionWithAffinity(0, Affinity::UPSTREAM);
 }
 
