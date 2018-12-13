@@ -16,7 +16,7 @@
 class SkCanvas;
 class SkParagraph {
  public:
-  SkParagraph();
+  SkParagraph(sk_sp<SkTypeface> typeface);
   ~SkParagraph();
 
   double GetMaxWidth();
@@ -60,7 +60,7 @@ class SkParagraph {
                          SkColor background = SK_ColorWHITE,
                          double fontSize = 14.0,
                          const std::string& fontFamily = "",
-                         bool fontBold = false,
+                         SkFontStyle::Weight weight = SkFontStyle::kNormal_Weight,
                          TextDirection dir = TextDirection::ltr,
                          size_t maxLines = std::numeric_limits<size_t>::max());
 
@@ -76,7 +76,6 @@ class SkParagraph {
   SkShaper _shaper;
 
   uint16_t* _text16;
-  //char* _text8;
   size_t _textLen;
   TextDirection _dir;
   size_t _maxLines;
@@ -84,7 +83,7 @@ class SkParagraph {
   SkColor _background;
   std::string _fontFamily;
   SkScalar _fontSize;
-  bool _fontBold;
+  SkFontStyle::Weight _weight;
 
-  SkTextBlobBuilder _builder;
+  sk_sp<SkTextBlob> _blob;
 };

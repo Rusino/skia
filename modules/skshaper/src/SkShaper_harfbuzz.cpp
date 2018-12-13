@@ -482,7 +482,7 @@ SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
                         SkPoint point,
                         SkScalar width) {
   icu::UnicodeString utf16 = icu::UnicodeString::fromUTF8(icu::StringPiece(utf8, utf8Bytes));
-  return shape(builder, srcPaint, utf16.getBuffer(), utf16.length(), leftToRight, point, width);
+  return shape(builder, srcPaint, (UChar*) utf16.getBuffer(), utf16.length(), leftToRight, point, width);
 }
 
 SkPoint SkShaper::shape(SkTextBlobBuilder* builder,

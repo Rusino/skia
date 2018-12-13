@@ -12,8 +12,8 @@
 #include "SkCanvas.h"
 #include "SkSize.h"
 
-SkParagraph::SkParagraph()
-    : _shaper(nullptr) {
+SkParagraph::SkParagraph(sk_sp<SkTypeface> typeface)
+    : _shaper(typeface) {
 }
 
 SkParagraph::~SkParagraph() = default;
@@ -49,15 +49,13 @@ bool SkParagraph::DidExceedMaxLines() {
 }
 
 void SkParagraph::SetText(std::vector<uint16_t> utf16text) {
-
+/*
   icu::UnicodeString utf16 = icu::UnicodeString(utf16text.data(), utf16text.size());
   std::string str;
   utf16.toUTF8String(str);
-
+  SkDebugf("Draw paragraph: %s", str.c_str());
+*/
   _textLen = utf16text.size();
-  //_text8 = new char[_textLen + 1];
-  //strncpy(_text8, str.c_str(), _textLen);
-
   _text16 = new uint16_t[_textLen + 1];
   memcpy(_text16, utf16text.data(), _textLen * sizeof(uint16_t));
 }
@@ -77,7 +75,7 @@ void SkParagraph::SetParagraphStyle(SkColor foreground,
                                     SkColor background,
                                     double fontSize,
                                     const std::string& fontFamily,
-                                    bool fontBold,
+                                    SkFontStyle::Weight weight,
                                     TextDirection dir,
                                     size_t maxLines) {
   _dir = dir;
@@ -86,7 +84,7 @@ void SkParagraph::SetParagraphStyle(SkColor foreground,
   _background = background;
   _fontFamily = fontFamily;
   _fontSize = SkDoubleToScalar(fontSize);
-  _fontBold = fontBold;
+  _weight = weight;
 }
 
 void SkParagraph::Layout(double width) {
@@ -102,6 +100,7 @@ void SkParagraph::Layout(double width) {
   if (Shape()) {
     BreakLines(width);
   }
+
 }
 
 bool SkParagraph::Shape() {
@@ -114,9 +113,10 @@ bool SkParagraph::Shape() {
   paint.setAntiAlias(true);
   paint.setLCDRenderText(true);
   paint.setTextSize(_fontSize);
-  paint.setTypeface(SkTypeface::MakeFromName(_fontFamily.data(), _fontBold ? SkFontStyle::Bold() : SkFontStyle()));
+  paint.setTypeface(SkTypeface::MakeFromName(_fontFamily.data(), SkFontStyle(_weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant)));
 
   SkFont font = SkFont::LEGACY_ExtractFromPaint(paint);
+
   if (!_shaper.generateGlyphs(font, _text16, _textLen, _dir == TextDirection::ltr)) {
     SkDebugf("Error shaping\n");
     return false;
@@ -126,13 +126,20 @@ bool SkParagraph::Shape() {
 }
 
 void SkParagraph::BreakLines(double width) {
+  /*
+  icu::UnicodeString utf16 = icu::UnicodeString(_text16, _textLen);
+  std::string str;
+  utf16.toUTF8String(str);
+  SkDebugf("Generate textblob: %s\n", str.c_str());
+  */
 
   _shaper.resetLinebreaks();
   // Iterate over the glyphs in logical order to mark line endings.
   bool breakable = _shaper.generateLineBreaks(SkDoubleToScalar(width));
 
   // Reorder the runs and glyphs per line and write them out.
-  _shaper.generateTextBlob(&_builder, {0, 0}, [this](size_t line_number,
+  SkTextBlobBuilder builder;
+  _shaper.generateTextBlob(&builder, {0, 0}, [this](size_t line_number,
                                                      SkSize size,
                                                      int previousRunIndex,
                                                      int runIndex) {
@@ -148,16 +155,23 @@ void SkParagraph::BreakLines(double width) {
       _minIntrinsicWidth = SkMaxScalar(_minIntrinsicWidth, size.fWidth);
     });
   }
+
+  _blob = builder.make();
 }
 
 void SkParagraph::Paint(SkCanvas* canvas, double x, double y) {
-
+/*
+  icu::UnicodeString utf16 = icu::UnicodeString(_text16, _textLen);
+  std::string str;
+  utf16.toUTF8String(str);
+  SkDebugf("Draw paragraph: %s\n", str.c_str());
+*/
   SkPaint paint;
   paint.setAntiAlias(true);
   paint.setLCDRenderText(true);
   paint.setColor(_foreground);
 
-  canvas->drawTextBlob(_builder.make(), SkDoubleToScalar(x), SkDoubleToScalar(y), paint);
+  canvas->drawTextBlob(_blob, SkDoubleToScalar(x), SkDoubleToScalar(y), paint);
 }
 
 void SkParagraph::Reset() {
