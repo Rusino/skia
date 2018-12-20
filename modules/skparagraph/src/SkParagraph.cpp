@@ -406,26 +406,26 @@ void SkParagraph::PaintShadow(SkCanvas* canvas,
   }
 }
 
-std::vector<TextBox> SkParagraph::GetRectsForRange(
+std::vector<SkTextBox> SkParagraph::GetRectsForRange(
     unsigned start,
     unsigned end,
     RectHeightStyle rect_height_style,
     RectWidthStyle rect_width_style) {
   // TODO: implement
   SkASSERT(false);
-  std::vector<TextBox> result;
+  std::vector<SkTextBox> result;
   return result;
 }
 
-PositionWithAffinity SkParagraph::GetGlyphPositionAtCoordinate(double dx, double dy) const {
+SkPositionWithAffinity SkParagraph::GetGlyphPositionAtCoordinate(double dx, double dy) const {
   // TODO: implement
   //SkASSERT(false);
-  return PositionWithAffinity(0, Affinity::UPSTREAM);
+  return SkPositionWithAffinity(0, Affinity::UPSTREAM);
 }
 
-Range<size_t> SkParagraph::GetWordBoundary(unsigned offset) {
+SkRange<size_t> SkParagraph::GetWordBoundary(unsigned offset) {
   // TODO: implement
   SkASSERT(false);
-  Range<size_t> result;
+  SkRange<size_t> result;
   return result;
 }

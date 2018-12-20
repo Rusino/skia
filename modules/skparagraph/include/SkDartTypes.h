@@ -57,28 +57,28 @@ enum class SkTextDirection {
   ltr,
 };
 
-struct PositionWithAffinity {
+struct SkPositionWithAffinity {
   const size_t position;
   const Affinity affinity;
 
-  PositionWithAffinity(size_t p, Affinity a) : position(p), affinity(a) {}
+  SkPositionWithAffinity(size_t p, Affinity a) : position(p), affinity(a) {}
 };
 
-struct TextBox {
+struct SkTextBox {
   SkRect rect;
   SkTextDirection direction;
 
-  TextBox(SkRect r, SkTextDirection d) : rect(r), direction(d) {}
+  SkTextBox(SkRect r, SkTextDirection d) : rect(r), direction(d) {}
 };
 
 template <typename T>
-struct Range {
-  Range() : start(), end() {}
-  Range(T s, T e) : start(s), end(e) {}
+struct SkRange {
+  SkRange() : start(), end() {}
+  SkRange(T s, T e) : start(s), end(e) {}
 
   T start, end;
 
-  bool operator==(const Range<T>& other) const {
+  bool operator==(const SkRange<T>& other) const {
     return start == other.start && end == other.end;
   }
 

@@ -11,6 +11,9 @@ config("public_config") {
   if (skia_enable_skshaper) {
     include_dirs = [ "include",
        "../../third_party/icu",
+       "../../src/utils",
+       "../../src/core",
+       "../../include/private",
      ]
   }
 }

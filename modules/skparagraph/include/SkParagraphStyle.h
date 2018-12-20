@@ -38,6 +38,10 @@ class SkParagraphStyle {
   void setTextStyle(SkTextStyle textStyle) {
     _textStyle = textStyle;
   }
+  void setTextAlign(SkTextAlign align) { _textAlign = align; }
+  void setTextDirection(SkTextDirection direction) { _textDirection = direction; }
+  void setMaxLines(size_t maxLines) { _maxLines = maxLines; }
+  void setEllipsis(const std::u16string& ellipsis) { _ellipsis = ellipsis; }
 
   bool unlimited_lines() const;
   bool ellipsized() const;

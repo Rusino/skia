@@ -59,15 +59,15 @@ class SkParagraph {
 
   void Paint(SkCanvas* canvas, double x, double y) const;
 
-  std::vector<TextBox> GetRectsForRange(
+  std::vector<SkTextBox> GetRectsForRange(
       unsigned start,
       unsigned end,
       RectHeightStyle rect_height_style,
       RectWidthStyle rect_width_style);
 
-  PositionWithAffinity GetGlyphPositionAtCoordinate(double dx, double dy) const;
+  SkPositionWithAffinity GetGlyphPositionAtCoordinate(double dx, double dy) const;
 
-  Range<size_t> GetWordBoundary(unsigned offset);
+  SkRange<size_t> GetWordBoundary(unsigned offset);
 
   void SetText(std::vector<uint16_t> utf16text);
   void SetText(const char* utf8text, size_t textBytes);

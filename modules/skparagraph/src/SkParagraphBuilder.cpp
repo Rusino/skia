@@ -41,6 +41,14 @@ void SkParagraphBuilder::PushStyle(const SkTextStyle& style) {
   _runs.emplace_back(_text.size(),_text.size(), style);
 }
 
+SkTextStyle SkParagraphBuilder::PeekStyle() {
+  EndRunIfNeeded();
+  if (_styles.empty()) {
+    return _style.getTextStyle();
+  }
+  return _styles.top();
+}
+
 void SkParagraphBuilder::Pop() {
 
   EndRunIfNeeded();

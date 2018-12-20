@@ -41,6 +41,17 @@ class SkTextStyle {
   SkPaint getBackground() { return _background; }
   SkColor getColor() { return _color; }
 
+  void setColor(SkColor color) { _color = color; }
+  void setForegroundColor(SkPaint paint) {
+    _hasForeground = true;
+    _foreground = paint;
+  }
+  void setBackgroundColor(SkColor color) {
+    _hasBackground = true;
+    _background = SkPaint();
+    _background.setColor(color);
+  }
+
   // Decorations
   SkTextDecoration getDecoration() { return _decoration; }
   SkColor getDecorationColor() { return _decorationColor; }
@@ -59,6 +70,7 @@ class SkTextStyle {
   size_t getShadowNumber() { return _textShadows.size(); }
   std::vector<SkTextShadow> getShadows() { return _textShadows; }
   void addShadow(SkTextShadow shadow) { _textShadows.emplace_back(shadow); }
+  void resetShadows() { _textShadows.clear(); }
 
   void getFontMetrics(SkFontMetrics& metrics) { _font.getMetrics(&metrics); }
 
@@ -68,18 +80,12 @@ class SkTextStyle {
   std::string getFontFamily() { return _fontFamily; };
   void setFontFamily(const std::string& family) { _fontFamily = family; }
 
-  sk_sp<SkTypeface> getTypeface();
-  
-  void setForegroundColor(SkPaint paint) {
-    _hasForeground = true;
-    _foreground = paint;
-  }
+  void setHeight(SkScalar height) { _height = height; }
+  void setLetterSpacing(SkScalar letterSpacing) { _letterSpacing = letterSpacing; }
+  void setWordSpacing(SkScalar wordSpacing) { _wordSpacing = wordSpacing; }
 
-  void setbackgroundColor(SkColor color) {
-    _hasBackground = true;
-    _background = SkPaint();
-    _background.setColor(color);
-  }
+  sk_sp<SkTypeface> getTypeface();
+
 
  private:
   SkTextDecoration _decoration;
