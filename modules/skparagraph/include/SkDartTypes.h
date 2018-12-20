@@ -43,7 +43,7 @@ enum class RectWidthStyle {
       kMax
 };
 
-enum class TextAlign {
+enum class SkTextAlign {
   left,
   right,
   center,
@@ -52,7 +52,7 @@ enum class TextAlign {
   end,
 };
 
-enum class TextDirection {
+enum class SkTextDirection {
   rtl,
   ltr,
 };
@@ -66,9 +66,9 @@ struct PositionWithAffinity {
 
 struct TextBox {
   SkRect rect;
-  TextDirection direction;
+  SkTextDirection direction;
 
-  TextBox(SkRect r, TextDirection d) : rect(r), direction(d) {}
+  TextBox(SkRect r, SkTextDirection d) : rect(r), direction(d) {}
 };
 
 template <typename T>
@@ -89,3 +89,14 @@ struct Range {
     end += delta;
   }
 };
+
+// Multiple decorations can be applied at once. Ex: Underline and overline is
+// (0x1 | 0x2)
+enum SkTextDecoration {
+  kNone = 0x0,
+  kUnderline = 0x1,
+  kOverline = 0x2,
+  kLineThrough = 0x4,
+};
+
+enum SkTextDecorationStyle { kSolid, kDouble, kDotted, kDashed, kWavy };

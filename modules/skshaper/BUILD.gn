@@ -18,7 +18,10 @@ config("public_config") {
 source_set("skshaper") {
   if (skia_enable_skshaper) {
     public_configs = [ ":public_config" ]
-    public = [ "include/SkShaper.h" ]
+    public = [
+              "include/SkShaper.h",
+              "include/SkIterators.h",
+            ]
     deps = [
       "../..:skia",
     ]
@@ -29,6 +32,7 @@ source_set("skshaper") {
     } else {
       sources = [
         "src/SkShaper_harfbuzz.cpp",
+        "src/SkIterators.cpp",
       ]
       deps += [
         "//third_party/harfbuzz",

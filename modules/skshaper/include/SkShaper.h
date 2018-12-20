@@ -5,8 +5,7 @@
  * found in the LICENSE file.
  */
 
-#ifndef SkShaper_DEFINED
-#define SkShaper_DEFINED
+#pragma once
 
 #include <memory>
 #include <unicode/ubidi.h>
@@ -14,9 +13,15 @@
 #include "SkPoint.h"
 #include "SkFont.h"
 #include "SkTypeface.h"
+#include "SkUTF.h"
+#include "SkTextStyle.h"
+#include "SkParagraphStyle.h"
+#include "SkPicture.h"
+#include "SkIterators.h"
 
 class SkFont;
 class SkTextBlobBuilder;
+class SkTextBlob;
 
 struct ShapedGlyph {
   ShapedGlyph() { }
@@ -31,9 +36,9 @@ struct ShapedGlyph {
 
 struct ShapedRun {
 
-  ShapedRun(const UChar* utf16Start, const UChar* utf16End, int numGlyphs, const SkFont& paint,
+  ShapedRun(const UChar* utf16Start, const UChar* utf16End, int numGlyphs, const SkFont& font,
             UBiDiLevel level, std::unique_ptr<ShapedGlyph[]> glyphs)
-      : fUtf16Start(utf16Start), fUtf16End(utf16End), fNumGlyphs(numGlyphs), fPaint(paint)
+      : fUtf16Start(utf16Start), fUtf16End(utf16End), fNumGlyphs(numGlyphs), fFont(font)
       , fLevel(level), fGlyphs(std::move(glyphs))
   {
 
@@ -42,11 +47,10 @@ struct ShapedRun {
   const UChar* fUtf16Start;
   const UChar* fUtf16End;
   int fNumGlyphs;
-  SkFont fPaint;
+  SkFont fFont;
   UBiDiLevel fLevel;
   std::unique_ptr<ShapedGlyph[]> fGlyphs;
 };
-
 
 /**
    Shapes text using HarfBuzz and places the shaped text into a TextBlob.
@@ -54,38 +58,38 @@ struct ShapedRun {
  */
 class SkShaper {
 public:
-  SkShaper(sk_sp<SkTypeface> face);
+  SkShaper(const UChar* utf16, size_t utf16Bytes,
+            std::vector<StyledText>::iterator begin,
+            std::vector<StyledText>::iterator end,
+            SkTextStyle defaultStyle);
   ~SkShaper();
 
   typedef std::function<void(size_t line_number, SkSize size, int startIndex, int nextStartIndex)> LineBreaker;
   typedef std::function<void(SkSize size, int startIndex, int nextStartIndex)> WordBreaker;
+  typedef std::function<void(const ShapedRun& run, int start, int end, SkPoint point, SkRect background)> RunBreaker;
 
   bool good() const;
-    SkPoint shape(SkTextBlobBuilder* dest,
-                  const SkFont& srcPaint,
-                  const UChar* utf16,
-                  size_t utf16Bytes,
-                  bool leftToRight,
-                  SkPoint point,
-                  SkScalar width);
+  static SkPoint shape(SkTextBlobBuilder* builder,
+                       const char* utf8,
+                       size_t utf8Bytes,
+                       const SkFont& srcPaint,
+                       bool leftToRight,
+                       SkPoint point,
+                       SkScalar width);
 
-  SkPoint shape(SkTextBlobBuilder* dest,
-                const SkFont& srcPaint,
-                const char* utf8,
-                size_t utf8Bytes,
-                bool leftToRight,
-                SkPoint point,
-                SkScalar width);
-
-  bool generateGlyphs(const SkFont& srcPaint, const UChar* utf16, size_t utf16Bytes, bool leftToRight);
+  bool generateGlyphs();
 
   bool generateLineBreaks(SkScalar width);
 
-  SkPoint generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& point, LineBreaker lineBreaker = {}) const;
+  SkPoint refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& point, RunBreaker runBreaker = {}, LineBreaker lineBreaker = {}) const;
 
   SkSize breakIntoWords(WordBreaker wordBreaker = {}) const;
 
-  void append(SkTextBlobBuilder* builder, const ShapedRun& run, int start, int end, SkPoint* p) const;
+  void append(SkTextBlobBuilder* builder, const ShapedRun& run, size_t start, size_t end, SkPoint* p) const;
+
+ protected:
+
+  bool initialize();
 
   void resetLayout();
 
@@ -95,10 +99,16 @@ private:
   SkShaper(const SkShaper&) = delete;
   SkShaper& operator=(const SkShaper&) = delete;
 
-  struct Impl;
-  std::unique_ptr<Impl> fImpl;
+  const UChar* fUtf16;
+  size_t fUtf16Bytes;
 
   SkTArray<ShapedRun> _runs;
+  SkParagraphStyle fDefaultStyle;
+
+  SkTLazy<BiDiRunIterator> fBidiIterator;
+  SkTLazy<ScriptRunIterator> fScriptIterator;
+  SkTLazy<FontRunIterator> fFontIterator;
+  std::unique_ptr<icu::BreakIterator> fBreakIterator;
+  RunIteratorQueue fIteratorQueue;
 };
 
-#endif  // SkShaper_DEFINED

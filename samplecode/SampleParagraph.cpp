@@ -4,6 +4,9 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
+
+#include <vector>
+#include "SkParagraphBuilder.h"
 #include "Sample.h"
 
 #include "SkBlurMaskFilter.h"
@@ -40,6 +43,14 @@ static const char gText[] =
     "a decent respect to the opinions of mankind requires that they should "
     "declare the causes which impel them to the separation.";
 
+static const std::vector<std::tuple<std::string, bool, bool, int, SkColor, SkColor, bool, SkTextDecorationStyle>> gParagraph = {
+    { "monospace", true, false, 14, SK_ColorWHITE, SK_ColorRED, true, SkTextDecorationStyle::kDashed},
+    { "Helvetica Neue", false, false, 20, SK_ColorWHITE, SK_ColorBLUE, false, SkTextDecorationStyle::kDotted},
+    { "serif", true, true, 10, SK_ColorWHITE, SK_ColorRED, true, SkTextDecorationStyle::kDouble},
+    { "Arial", false, true, 16, SK_ColorGRAY, SK_ColorWHITE, true, SkTextDecorationStyle::kSolid},
+    { "sans-serif", false,  false, 8, SK_ColorWHITE, SK_ColorRED, false, SkTextDecorationStyle::kWavy}
+};
+
 class ParagraphView : public Sample {
 public:
     ParagraphView() {
@@ -70,7 +81,7 @@ protected:
         SkAutoCanvasRestore acr(canvas, true);
 
         canvas->clipRect(SkRect::MakeWH(w, h));
-        canvas->drawColor(bg);
+        canvas->drawColor(SK_ColorWHITE);
 
         SkScalar margin = 20;
 
@@ -79,24 +90,134 @@ protected:
         paint.setLCDRenderText(true);
         paint.setColor(fg);
 
-        SkParagraph paragraph;
-        paragraph.SetText(gText, strlen(gText));
-        for (int i = 9; i < 24; i += 2) {
+        SkTextStyle style;
+        style.setbackgroundColor(SK_ColorBLUE);
+        style.setForegroundColor(paint);
+        SkParagraphStyle paraStyle;
+        paraStyle.setTextStyle(style);
 
-            paint.setTextSize(SkIntToScalar(i));
-            SkFont font = SkFont::LEGACY_ExtractFromPaint(paint);
-            paragraph.SetParagraphStyle(fg, bg, i);
-            paragraph.Layout(w - margin);
+        for (auto i = 1; i < 5; ++ i) {
+          paraStyle.getTextStyle().setFontSize(24 * i);
+          SkParagraphBuilder builder(paraStyle, nullptr);
+          builder.AddText("Paragraph:");
+          for (auto para : gParagraph) {
+            SkTextStyle style;
+            style.setbackgroundColor(bg);
+            style.setForegroundColor(paint);
+            style.setFontFamily(std::get<0>(para));
+            SkFontStyle fontStyle(
+                std::get<1>(para) ? SkFontStyle::Weight::kBold_Weight : SkFontStyle::Weight::kNormal_Weight,
+                SkFontStyle::Width::kNormal_Width,
+                std::get<2>(para) ? SkFontStyle::Slant::kItalic_Slant : SkFontStyle::Slant::kUpright_Slant);
+            style.setFontStyle(fontStyle);
+            style.setFontSize(std::get<3>(para) * i);
+            style.setbackgroundColor(std::get<4>(para));
+            SkPaint foreground;
+            foreground.setColor(std::get<5>(para));
+            style.setForegroundColor(foreground);
+            if (std::get<6>(para)) {
+              style.addShadow(SkTextShadow(SK_ColorBLACK, SkPoint::Make(5, 5), 2));
+            }
 
-            SkDebugf("%g:%g %g-%g\n", paragraph.GetMaxWidth(), paragraph.GetHeight(), paragraph.GetMinIntrinsicWidth(), paragraph.GetMaxIntrinsicWidth());
+            auto decoration = (i % 4);
+            if (decoration == 3) { decoration = 4; }
 
-            paragraph.Paint(canvas, margin, margin);
+            bool test = (SkTextDecoration)decoration != SkTextDecoration::kNone;
+            if (test) {
+              style.setDecoration((SkTextDecoration)decoration);
+              style.setDecorationStyle(std::get<7>(para));
+              style.setDecorationColor(std::get<5>(para));
+              style.setDecorationThicknessMultiplier(4);
+            }
+            builder.PushStyle(style);
+            std::string name = " " +
+                std::get<0>(para) +
+                (std::get<1>(para) ? ", bold" : "") +
+                (std::get<2>(para) ? ", italic" : "") + " " +
+                std::to_string(std::get<3>(para) * i) +
+                (std::get<4>(para) != bg ? ", background" : "") +
+                (std::get<5>(para) != fg ? ", foreground" : "") +
+                (std::get<6>(para) ? ", shadow" : "") +
+                (test ? ", decorations " : "") +
+                ";";
+            builder.AddText(name);
+            builder.Pop();
+          }
 
-            canvas->translate(0, paragraph.GetHeight() + margin);
+          auto paragraph = builder.Build();
+          paragraph->Layout(w - margin);
+
+          paragraph->Paint(canvas, margin, margin);
+
+          canvas->translate(0, paragraph->GetHeight() + margin);
         }
     }
 
+    void drawSimpleTest(SkCanvas* canvas, SkScalar w, SkScalar h,
+                        SkColor fg = SK_ColorDKGRAY,
+                        SkColor bg = SK_ColorWHITE,
+                        std::string ff = "sans-serif",
+                        SkScalar fs = 100,
+                        bool shadow = false,
+                        bool decoration = true
+                        ) {
+    SkAutoCanvasRestore acr(canvas, true);
+
+    canvas->clipRect(SkRect::MakeWH(w, h));
+    canvas->drawColor(bg);
+
+    SkScalar margin = 20;
+
+    SkPaint paint;
+    paint.setAntiAlias(true);
+    paint.setLCDRenderText(true);
+    paint.setColor(fg);
+
+    SkTextStyle style;
+    style.setbackgroundColor(SK_ColorBLUE);
+    style.setForegroundColor(paint);
+    SkParagraphStyle paraStyle;
+    paraStyle.setTextStyle(style);
+
+    paraStyle.getTextStyle().setFontSize(10);
+    SkParagraphBuilder builder(paraStyle, nullptr);
+
+    style.setbackgroundColor(bg);
+    style.setForegroundColor(paint);
+    style.setFontFamily(ff);
+    style.setFontStyle(SkFontStyle());
+    style.setFontSize(fs);
+    style.setbackgroundColor(bg);
+    SkPaint foreground;
+    foreground.setColor(fg);
+    style.setForegroundColor(foreground);
+
+    if (shadow) {
+      style.addShadow(SkTextShadow(SK_ColorBLACK, SkPoint::Make(5, 5), 2));
+    }
+
+    if (decoration) {
+      style.setDecoration(SkTextDecoration::kOverline);
+      style.setDecorationStyle(SkTextDecorationStyle::kWavy);
+      style.setDecorationColor(SK_ColorBLACK);
+      style.setDecorationThicknessMultiplier(4);
+    }
+    builder.PushStyle(style);
+    builder.AddText(gText);
+    builder.Pop();
+
+    auto paragraph = builder.Build();
+    paragraph->Layout(w - margin);
+
+    paragraph->Paint(canvas, margin, margin);
+
+    canvas->translate(0, paragraph->GetHeight() + margin);
+  }
+
     void onDrawContent(SkCanvas* canvas) override {
+      //drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
+      //drawSimpleTest(canvas, this->width(), this->height());
+
         SkScalar width = this->width() / 3;
         drawTest(canvas, width, this->height(), SK_ColorBLACK, SK_ColorWHITE);
         canvas->translate(width, 0);
@@ -105,6 +226,7 @@ protected:
         drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorWHITE);
         canvas->translate(0, this->height()/2);
         drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
+
     }
 
 private:

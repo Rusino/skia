@@ -12,11 +12,31 @@
 #include "SkDartTypes.h"
 #include "SkShaper.h"
 #include "SkTextBlob.h"
+#include "SkTLazy.h"
+#include "SkTextStyle.h"
+#include "SkParagraphStyle.h"
+#include "SkFontCollection.h"
+
+
+// Comes as a result of shaping (broken down by lines and styles)
+struct StyledRun {
+  StyledRun(size_t start, size_t end, sk_sp<SkTextBlob> blob, SkRect rect, SkTextStyle style)
+      : start(start)
+      , end(end)
+      , blob(blob)
+      , rect(rect)
+      , textStyle(style) {}
+  size_t start;
+  size_t end;
+  sk_sp<SkTextBlob> blob;
+  SkRect rect;
+  SkTextStyle textStyle;
+};
 
 class SkCanvas;
 class SkParagraph {
  public:
-  SkParagraph(sk_sp<SkTypeface> typeface);
+  SkParagraph();
   ~SkParagraph();
 
   double GetMaxWidth();
@@ -33,13 +53,11 @@ class SkParagraph {
 
   bool DidExceedMaxLines();
 
-  void Layout(double width);
+  std::vector<uint16_t>& getText() { return _text16; }
 
-  bool Shape();
+  bool Layout(double width);
 
-  void BreakLines(double width);
-
-  void Paint(SkCanvas* canvas, double x, double y);
+  void Paint(SkCanvas* canvas, double x, double y) const;
 
   std::vector<TextBox> GetRectsForRange(
       unsigned start,
@@ -54,17 +72,25 @@ class SkParagraph {
   void SetText(std::vector<uint16_t> utf16text);
   void SetText(const char* utf8text, size_t textBytes);
 
-  void Reset();
-
-  void SetParagraphStyle(SkColor foreground = SK_ColorBLACK,
-                         SkColor background = SK_ColorWHITE,
-                         double fontSize = 14.0,
-                         const std::string& fontFamily = "",
-                         SkFontStyle::Weight weight = SkFontStyle::kNormal_Weight,
-                         TextDirection dir = TextDirection::ltr,
-                         size_t maxLines = std::numeric_limits<size_t>::max());
+  void SetStyles(std::vector<StyledText> styles);
+  void SetParagraphStyle(SkParagraphStyle style);
+  void SetFontCollection(std::shared_ptr<SkFontCollection> fontCollection) {
+    _fontCollection = fontCollection;
+  }
 
  private:
+
+  void RecordPicture();
+
+  // Creates and draws the decorations onto the canvas.
+  void PaintDecorations(SkCanvas* canvas, StyledRun run, SkPoint offset);
+
+  // Draws the background onto the canvas.
+  void PaintBackground(SkCanvas* canvas, StyledRun run, SkPoint offset);
+
+  // Draws the shadows onto the canvas.
+  void PaintShadow(SkCanvas* canvas, StyledRun run, SkPoint offset);
+
   SkScalar _alphabeticBaseline;
   SkScalar _height;
   SkScalar _width;
@@ -73,17 +99,13 @@ class SkParagraph {
   SkScalar _minIntrinsicWidth;
   size_t   _linesNumber;
 
-  SkShaper _shaper;
-
-  uint16_t* _text16;
-  size_t _textLen;
-  TextDirection _dir;
-  size_t _maxLines;
-  SkColor _foreground;
-  SkColor _background;
-  std::string _fontFamily;
-  SkScalar _fontSize;
-  SkFontStyle::Weight _weight;
-
-  sk_sp<SkTextBlob> _blob;
+  // Input
+  std::vector<uint16_t> _text16;
+  std::shared_ptr<SkFontCollection> _fontCollection;
+  std::vector<StyledText> _styles;
+  // Shaping
+  SkParagraphStyle _style;
+  std::vector<StyledRun> _styledRuns;
+  // Painting
+  sk_sp<SkPicture> _picture;
 };

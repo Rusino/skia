@@ -71,8 +71,6 @@ protected:
         canvas->clipRect(SkRect::MakeWH(w, h));
         canvas->drawColor(bg);
 
-        SkShaper shaper(nullptr);
-
         SkScalar margin = 20;
 
         SkPaint paint;
@@ -85,7 +83,7 @@ protected:
             SkTextBlobBuilder builder;
             paint.setTextSize(SkIntToScalar(i));
             SkFont font = SkFont::LEGACY_ExtractFromPaint(paint);
-            SkPoint end = shaper.shape(&builder, font, gText, strlen(gText), true,
+            SkPoint end = SkShaper::shape(&builder, gText, strlen(gText), font, true,
                                        { margin, margin }, w - margin);
             canvas->drawTextBlob(builder.make(), 0, 0, paint);
 

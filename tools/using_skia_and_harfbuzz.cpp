@@ -138,9 +138,9 @@ public:
         font.setSize(SkDoubleToScalar(config->font_size.value));
     }
 
-    void WriteLine(SkShaper& shaper, const char *text, size_t textBytes) {
+    void WriteLine(const char *text, size_t textBytes) {
         SkTextBlobBuilder textBlobBuilder;
-        SkPoint endPoint = shaper.shape(&textBlobBuilder, font, text, textBytes, true,
+        SkPoint endPoint = SkShaper::shape(&textBlobBuilder, text, textBytes, font, true,
                                         SkPoint{0, 0},
                                         config->page_width.value - 2*config->left_margin.value);
         sk_sp<const SkTextBlob> blob = textBlobBuilder.make();
@@ -208,12 +208,11 @@ int main(int argc, char **argv) {
     if (font_file.size() > 0) {
         typeface = SkTypeface::MakeFromFile(font_file.c_str(), 0 /* index */);
     }
-    SkShaper shaper(typeface);
-    assert(shaper.good());
+
     //SkString line("This is هذا هو الخط a line.");
     //SkString line("⁧This is a line هذا هو الخط.⁩");
     for (std::string line; std::getline(std::cin, line);) {
-        placement.WriteLine(shaper, line.c_str(), line.size());
+        placement.WriteLine(line.c_str(), line.size());
     }
 
     doc->close();

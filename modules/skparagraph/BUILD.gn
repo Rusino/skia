@@ -19,13 +19,25 @@ source_set("skparagraph") {
   if (skia_enable_skparagraph) {
     public_configs = [ ":public_config" ]
     public = [
+                "include/SkFontCollection.h",
                 "include/SkParagraph.h",
+                "include/SkParagraphBuilder.h",
+                "include/SkParagraphStyle.h",
+                "include/SkTextShadow.h",
+                "include/SkTextStyle.h",
                 "include/SkDartTypes.h",
              ]
     deps = [
       "../..:skia",
     ]
-    sources = [ "src/SkParagraph.cpp" ]
+    sources = [
+                "src/SkFontCollection.cpp",
+                "src/SkParagraph.cpp",
+                "src/SkParagraphBuilder.cpp",
+                "src/SkParagraphStyle.cpp",
+                "src/SkTextShadow.cpp",
+                "src/SkTextStyle.cpp",
+              ]
     deps += [
       "//third_party/harfbuzz",
       "//third_party/icu",

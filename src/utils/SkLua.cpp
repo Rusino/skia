@@ -1920,11 +1920,9 @@ static int lsk_newTextBlob(lua_State* L) {
     lua2rect(L, 2, &bounds);
     const SkPaint& paint = *get_obj<SkPaint>(L, 3);
 
-    SkShaper shaper(nullptr);
-
     SkFont font = SkFont::LEGACY_ExtractFromPaint(paint);
     SkTextBlobBuilder builder;
-    SkPoint end = shaper.shape(&builder, font, text, strlen(text), true,
+    SkPoint end = SkShaper::shape(&builder, text, strlen(text), font, true,
                                { bounds.left(), bounds.top() }, bounds.width());
 
     push_ref<SkTextBlob>(L, builder.make());

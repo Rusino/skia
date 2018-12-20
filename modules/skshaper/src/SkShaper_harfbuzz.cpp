@@ -6,7 +6,6 @@
  */
 
 #include "SkFontArguments.h"
-#include "SkFontMgr.h"
 #include "SkLoadICU.h"
 #include "SkMalloc.h"
 #include "SkOnce.h"
@@ -15,26 +14,18 @@
 #include "SkRefCnt.h"
 #include "SkScalar.h"
 #include "SkShaper.h"
-#include "SkStream.h"
 #include "SkString.h"
 #include "SkTArray.h"
 #include "SkTDPQueue.h"
-#include "SkTFitsIn.h"
-#include "SkTLazy.h"
 #include "SkTemplates.h"
 #include "SkTextBlobPriv.h"
 #include "SkTo.h"
-#include "SkTypeface.h"
-#include "SkTypes.h"
-#include "SkUTF.h"
+#include "SkIterators.h"
+#include "SkFontPriv.h"
 
-#include <hb.h>
-#include <hb-ot.h>
 #include <unicode/brkiter.h>
 #include <unicode/locid.h>
 #include <unicode/stringpiece.h>
-#include <unicode/ubidi.h>
-#include <unicode/unistr.h>
 #include <unicode/urename.h>
 #include <unicode/utext.h>
 #include <unicode/utypes.h>
@@ -44,347 +35,6 @@
 #include <cstring>
 
 namespace {
-template <class T, void(*P)(T*)> using resource = std::unique_ptr<T, SkFunctionWrapper<void, T, P>>;
-using HBBlob   = resource<hb_blob_t  , hb_blob_destroy  >;
-using HBFace   = resource<hb_face_t  , hb_face_destroy  >;
-using HBFont   = resource<hb_font_t  , hb_font_destroy  >;
-using HBBuffer = resource<hb_buffer_t, hb_buffer_destroy>;
-using ICUBiDi  = resource<UBiDi      , ubidi_close      >;
-
-HBBlob stream_to_blob(std::unique_ptr<SkStreamAsset> asset) {
-  size_t size = asset->getLength();
-  HBBlob blob;
-  if (const void* base = asset->getMemoryBase()) {
-    blob.reset(hb_blob_create((char*)base, SkToUInt(size),
-                              HB_MEMORY_MODE_READONLY, asset.release(),
-                              [](void* p) { delete (SkStreamAsset*)p; }));
-  } else {
-    // SkDebugf("Extra SkStreamAsset copy\n");
-    void* ptr = size ? sk_malloc_throw(size) : nullptr;
-    asset->read(ptr, size);
-    blob.reset(hb_blob_create((char*)ptr, SkToUInt(size),
-                              HB_MEMORY_MODE_READONLY, ptr, sk_free));
-  }
-  SkASSERT(blob);
-  hb_blob_make_immutable(blob.get());
-  return blob;
-}
-
-HBFont create_hb_font(SkTypeface* tf) {
-  if (!tf) {
-    return nullptr;
-  }
-  int index;
-  std::unique_ptr<SkStreamAsset> typefaceAsset(tf->openStream(&index));
-  if (!typefaceAsset) {
-    SkString name;
-    tf->getFamilyName(&name);
-    SkDebugf("Typeface '%s' has no data :(\n", name.c_str());
-    return nullptr;
-  }
-  HBBlob blob(stream_to_blob(std::move(typefaceAsset)));
-  HBFace face(hb_face_create(blob.get(), (unsigned)index));
-  SkASSERT(face);
-  if (!face) {
-    return nullptr;
-  }
-  hb_face_set_index(face.get(), (unsigned)index);
-  hb_face_set_upem(face.get(), tf->getUnitsPerEm());
-
-  HBFont font(hb_font_create(face.get()));
-  SkASSERT(font);
-  if (!font) {
-    return nullptr;
-  }
-  hb_ot_font_set_funcs(font.get());
-  int axis_count = tf->getVariationDesignPosition(nullptr, 0);
-  if (axis_count > 0) {
-    SkAutoSTMalloc<4, SkFontArguments::VariationPosition::Coordinate> axis_values(axis_count);
-    if (tf->getVariationDesignPosition(axis_values, axis_count) == axis_count) {
-      hb_font_set_variations(font.get(),
-                             reinterpret_cast<hb_variation_t*>(axis_values.get()),
-                             axis_count);
-    }
-  }
-  return font;
-}
-
-/** this version replaces invalid utf-8 sequences with code point U+FFFD. */
-static inline SkUnichar utf16_next(const UChar** ptr, const UChar* end) {
-  SkUnichar val = SkUTF::NextUTF16(ptr, end);
-  if (val < 0) {
-    return 0xFFFD;  // REPLACEMENT CHARACTER
-  }
-  return val;
-}
-
-class RunIterator {
- public:
-  virtual ~RunIterator() {}
-  virtual void consume() = 0;
-  // Pointer one past the last (utf16) element in the current run.
-  virtual const UChar* endOfCurrentRun() const = 0;
-  virtual bool atEnd() const = 0;
-  bool operator<(const RunIterator& that) const {
-    return this->endOfCurrentRun() < that.endOfCurrentRun();
-  }
-};
-
-class BiDiRunIterator : public RunIterator {
- public:
-  static SkTLazy<BiDiRunIterator> Make(const UChar* utf16, size_t utf16Bytes, UBiDiLevel level) {
-    SkTLazy<BiDiRunIterator> ret;
-
-    // ubidi only accepts utf16 (though internally it basically works on utf32 chars).
-    // We want an ubidi_setPara(UBiDi*, UText*, UBiDiLevel, UBiDiLevel*, UErrorCode*);
-    if (!SkTFitsIn<int32_t>(utf16Bytes)) {
-      SkDebugf("Bidi error: text too long");
-      return ret;
-    }
-
-    UErrorCode status = U_ZERO_ERROR;
-    ICUBiDi bidi(ubidi_openSized(utf16Bytes, 0, &status));
-    if (U_FAILURE(status)) {
-      SkDebugf("Bidi error: %s", u_errorName(status));
-      return ret;
-    }
-    SkASSERT(bidi);
-
-    // The required lifetime of utf16 isn't well documented.
-    // It appears it isn't used after ubidi_setPara except through ubidi_getText.
-    ubidi_setPara(bidi.get(), utf16, utf16Bytes, level, nullptr, &status);
-    if (U_FAILURE(status)) {
-      SkDebugf("Bidi error: %s", u_errorName(status));
-      return ret;
-    }
-
-    ret.init(utf16, utf16 + utf16Bytes, std::move(bidi));
-    return ret;
-  }
-  BiDiRunIterator(const UChar* utf16, const UChar* end, ICUBiDi bidi)
-      : fBidi(std::move(bidi))
-      , fEndOfCurrentRun(utf16)
-      , fEndOfAllRuns(end)
-      , fUTF16LogicalPosition(0)
-      , fLevel(UBIDI_DEFAULT_LTR)
-  {}
-  void consume() override {
-    SkASSERT(fUTF16LogicalPosition < ubidi_getLength(fBidi.get()));
-    int32_t endPosition = ubidi_getLength(fBidi.get());
-    fLevel = ubidi_getLevelAt(fBidi.get(), fUTF16LogicalPosition);
-    SkUnichar u = utf16_next(&fEndOfCurrentRun, fEndOfAllRuns);
-    fUTF16LogicalPosition += SkUTF::ToUTF16(u);
-    UBiDiLevel level;
-    while (fUTF16LogicalPosition < endPosition) {
-      level = ubidi_getLevelAt(fBidi.get(), fUTF16LogicalPosition);
-      if (level != fLevel) {
-        break;
-      }
-      u = utf16_next(&fEndOfCurrentRun, fEndOfAllRuns);
-      fUTF16LogicalPosition += SkUTF::ToUTF16(u);
-    }
-  }
-  const UChar* endOfCurrentRun() const override {
-    return fEndOfCurrentRun;
-  }
-  bool atEnd() const override {
-    return fUTF16LogicalPosition == ubidi_getLength(fBidi.get());
-  }
-
-  UBiDiLevel currentLevel() const {
-    return fLevel;
-  }
- private:
-  ICUBiDi fBidi;
-  const UChar* fEndOfCurrentRun;
-  const UChar* fEndOfAllRuns;
-  int32_t fUTF16LogicalPosition;
-  UBiDiLevel fLevel;
-};
-
-class ScriptRunIterator : public RunIterator {
- public:
-  static SkTLazy<ScriptRunIterator> Make(const UChar* utf16, size_t utf16Bytes,
-                                         hb_unicode_funcs_t* hbUnicode)
-  {
-    SkTLazy<ScriptRunIterator> ret;
-    ret.init(utf16, utf16Bytes, hbUnicode);
-    return ret;
-  }
-  ScriptRunIterator(const UChar* utf16, size_t utf16Bytes, hb_unicode_funcs_t* hbUnicode)
-      : fCurrent(utf16), fEnd(fCurrent + utf16Bytes)
-      , fHBUnicode(hbUnicode)
-      , fCurrentScript(HB_SCRIPT_UNKNOWN)
-  {}
-  void consume() override {
-    SkASSERT(fCurrent < fEnd);
-    SkUnichar u = utf16_next(&fCurrent, fEnd);
-    fCurrentScript = hb_unicode_script(fHBUnicode, u);
-    while (fCurrent < fEnd) {
-      const UChar* prev = fCurrent;
-      u = utf16_next(&fCurrent, fEnd);
-      const hb_script_t script = hb_unicode_script(fHBUnicode, u);
-      if (script != fCurrentScript) {
-        if (fCurrentScript == HB_SCRIPT_INHERITED || fCurrentScript == HB_SCRIPT_COMMON) {
-          fCurrentScript = script;
-        } else if (script == HB_SCRIPT_INHERITED || script == HB_SCRIPT_COMMON) {
-          continue;
-        } else {
-          fCurrent = prev;
-          break;
-        }
-      }
-    }
-    if (fCurrentScript == HB_SCRIPT_INHERITED) {
-      fCurrentScript = HB_SCRIPT_COMMON;
-    }
-  }
-  const UChar* endOfCurrentRun() const override {
-    return fCurrent;
-  }
-  bool atEnd() const override {
-    return fCurrent == fEnd;
-  }
-
-  hb_script_t currentScript() const {
-    return fCurrentScript;
-  }
- private:
-  const UChar* fCurrent;
-  const UChar* fEnd;
-  hb_unicode_funcs_t* fHBUnicode;
-  hb_script_t fCurrentScript;
-};
-
-class FontRunIterator : public RunIterator {
- public:
-  static SkTLazy<FontRunIterator> Make(const UChar* utf16, size_t utf16Bytes,
-                                       sk_sp<SkTypeface> typeface,
-                                       hb_font_t* hbFace,
-                                       sk_sp<SkFontMgr> fallbackMgr)
-  {
-    SkTLazy<FontRunIterator> ret;
-    ret.init(utf16, utf16Bytes, std::move(typeface), hbFace, std::move(fallbackMgr));
-    return ret;
-  }
-  FontRunIterator(const UChar* utf16, size_t utf16Bytes, sk_sp<SkTypeface> typeface,
-                  hb_font_t* hbFace, sk_sp<SkFontMgr> fallbackMgr)
-      : fCurrent(utf16), fEnd(fCurrent + utf16Bytes)
-      , fFallbackMgr(std::move(fallbackMgr))
-      , fHBFont(hbFace), fTypeface(std::move(typeface))
-      , fFallbackHBFont(nullptr), fFallbackTypeface(nullptr)
-      , fCurrentHBFont(fHBFont), fCurrentTypeface(fTypeface.get())
-  {}
-  void consume() override {
-    SkASSERT(fCurrent < fEnd);
-    SkUnichar u = utf16_next(&fCurrent, fEnd);
-    // If the starting typeface can handle this character, use it.
-    if (fTypeface->charsToGlyphs(&u, SkTypeface::kUTF32_Encoding, nullptr, 1)) {
-      fCurrentTypeface = fTypeface.get();
-      fCurrentHBFont = fHBFont;
-      // If the current fallback can handle this character, use it.
-    } else if (fFallbackTypeface &&
-        fFallbackTypeface->charsToGlyphs(&u, SkTypeface::kUTF32_Encoding, nullptr, 1))
-    {
-      fCurrentTypeface = fFallbackTypeface.get();
-      fCurrentHBFont = fFallbackHBFont.get();
-      // If not, try to find a fallback typeface
-    } else {
-      fFallbackTypeface.reset(fFallbackMgr->matchFamilyStyleCharacter(
-          nullptr, fTypeface->fontStyle(), nullptr, 0, u));
-      fFallbackHBFont = create_hb_font(fFallbackTypeface.get());
-      fCurrentTypeface = fFallbackTypeface.get();
-      fCurrentHBFont = fFallbackHBFont.get();
-    }
-
-    while (fCurrent < fEnd) {
-      const UChar* prev = fCurrent;
-      u = utf16_next(&fCurrent, fEnd);
-
-      // If not using initial typeface and initial typeface has this character, stop fallback.
-      if (fCurrentTypeface != fTypeface.get() &&
-          fTypeface->charsToGlyphs(&u, SkTypeface::kUTF32_Encoding, nullptr, 1))
-      {
-        fCurrent = prev;
-        return;
-      }
-      // If the current typeface cannot handle this character, stop using it.
-      if (!fCurrentTypeface->charsToGlyphs(&u, SkTypeface::kUTF32_Encoding, nullptr, 1)) {
-        fCurrent = prev;
-        return;
-      }
-    }
-  }
-  const UChar* endOfCurrentRun() const override {
-    return fCurrent;
-  }
-  bool atEnd() const override {
-    return fCurrent == fEnd;
-  }
-
-  SkTypeface* currentTypeface() const {
-    return fCurrentTypeface;
-  }
-  hb_font_t* currentHBFont() const {
-    return fCurrentHBFont;
-  }
- private:
-  const UChar* fCurrent;
-  const UChar* fEnd;
-  sk_sp<SkFontMgr> fFallbackMgr;
-  hb_font_t* fHBFont;
-  sk_sp<SkTypeface> fTypeface;
-  HBFont fFallbackHBFont;
-  sk_sp<SkTypeface> fFallbackTypeface;
-  hb_font_t* fCurrentHBFont;
-  SkTypeface* fCurrentTypeface;
-};
-
-class RunIteratorQueue {
- public:
-  void insert(RunIterator* runIterator) {
-    fRunIterators.insert(runIterator);
-  }
-
-  bool advanceRuns() {
-    const RunIterator* leastRun = fRunIterators.peek();
-
-    if (leastRun->atEnd()) {
-      SkASSERT(this->allRunsAreAtEnd());
-      return false;
-    }
-    const UChar* leastEnd = leastRun->endOfCurrentRun();
-    RunIterator* currentRun = nullptr;
-    SkDEBUGCODE(const UChar* previousEndOfCurrentRun);
-    while ((currentRun = fRunIterators.peek())->endOfCurrentRun() <= leastEnd) {
-      fRunIterators.pop();
-      SkDEBUGCODE(previousEndOfCurrentRun = currentRun->endOfCurrentRun());
-      currentRun->consume();
-      SkASSERT(previousEndOfCurrentRun < currentRun->endOfCurrentRun());
-      fRunIterators.insert(currentRun);
-    }
-    return true;
-  }
-
-  const UChar* endOfCurrentRun() const {
-    return fRunIterators.peek()->endOfCurrentRun();
-  }
-
- private:
-  bool allRunsAreAtEnd() const {
-    for (int i = 0; i < fRunIterators.count(); ++i) {
-      if (!fRunIterators.at(i)->atEnd()) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  static bool CompareRunIterator(RunIterator* const& a, RunIterator* const& b) {
-    return *a < *b;
-  }
-  SkTDPQueue<RunIterator*, CompareRunIterator> fRunIterators;
-};
 
 static constexpr bool is_LTR(UBiDiLevel level) {
   return (level & 1) == 0;
@@ -421,6 +71,7 @@ struct ShapedRunGlyphIterator {
         return nullptr;
       }
     }
+
     return &runs[fRunIndex].fGlyphs[fGlyphIndex];
   }
 
@@ -439,143 +90,142 @@ struct ShapedRunGlyphIterator {
 
 }  // namespace
 
-struct SkShaper::Impl {
-  HBFont fHarfBuzzFont;
-  HBBuffer fBuffer;
-  sk_sp<SkTypeface> fTypeface;
-  std::unique_ptr<icu::BreakIterator> fBreakIterator;
-};
+/*
+SkShaper::SkShaper(const char* utf8, size_t utf8Bytes, SkParagraphStyle defaultStyle) :
+    fDefaultStyle(defaultStyle) {
 
-SkShaper::SkShaper(sk_sp<SkTypeface> tf) : fImpl(new Impl) {
-  SkOnce once;
-  once([] { SkLoadICU(); });
+  icu::UnicodeString utf16 = icu::UnicodeString::fromUTF8(icu::StringPiece(utf8, utf8Bytes));
+  fUtf16 = (UChar*) utf16.getBuffer();
+  fUtf16Bytes = utf16.length();
 
-  fImpl->fTypeface = tf ? std::move(tf) : SkTypeface::MakeDefault();
-  fImpl->fHarfBuzzFont = create_hb_font(fImpl->fTypeface.get());
-  SkASSERT(fImpl->fHarfBuzzFont);
-  fImpl->fBuffer.reset(hb_buffer_create());
-  SkASSERT(fImpl->fBuffer);
+  initialize();
+}
+*/
+SkShaper::SkShaper(const UChar* utf16, size_t utf16Bytes,
+                   std::vector<StyledText>::iterator begin,
+                   std::vector<StyledText>::iterator end,
+                   SkTextStyle defaultStyle)
+    : fUtf16(utf16)
+    , fUtf16Bytes(utf16Bytes) {
 
-  icu::Locale thai("th");
-  UErrorCode status = U_ZERO_ERROR;
-  fImpl->fBreakIterator.reset(icu::BreakIterator::createLineInstance(thai, status));
-  if (U_FAILURE(status)) {
-    SkDebugf("Could not create break iterator: %s", u_errorName(status));
-    SK_ABORT("");
+  initialize();
+
+  sk_sp<SkFontMgr> fontMgr = SkFontMgr::RefDefault();
+
+  fFontIterator = FontRunIterator::Make(utf16, utf16Bytes, begin, end, defaultStyle);
+  FontRunIterator* font = fFontIterator.getMaybeNull();
+  if (!font) {
+    return;
   }
+
+  fIteratorQueue.insert(font);
+
 }
 
 SkShaper::~SkShaper() {}
 
-bool SkShaper::good() const {
-  return fImpl->fHarfBuzzFont &&
-      fImpl->fBuffer &&
-      fImpl->fTypeface &&
-      fImpl->fBreakIterator;
+bool SkShaper::initialize() {
+  SkOnce once;
+  once([] { SkLoadICU(); });
+
+  UBiDiLevel defaultLevel = fDefaultStyle.getTextDirection() == SkTextDirection::ltr ? UBIDI_DEFAULT_LTR : UBIDI_DEFAULT_RTL;
+  fBidiIterator = BiDiRunIterator::Make(fUtf16, fUtf16Bytes, defaultLevel);
+  BiDiRunIterator* bidi = fBidiIterator.getMaybeNull();
+  if (!bidi) {
+    return false;
+  }
+
+  fIteratorQueue.insert(bidi);
+
+  fScriptIterator = ScriptRunIterator::Make(fUtf16, fUtf16Bytes);
+  ScriptRunIterator* script = fScriptIterator.getMaybeNull();
+  if (!script) {
+    return false;
+  }
+  fIteratorQueue.insert(script);
+
+  icu::Locale thai("th");
+  UErrorCode status = U_ZERO_ERROR;
+  fBreakIterator.reset(icu::BreakIterator::createLineInstance(thai, status));
+  if (U_FAILURE(status)) {
+    SkDebugf("Could not create break iterator: %s", u_errorName(status));
+    SK_ABORT("");
+  }
+
+  return true;
 }
 
+bool SkShaper::good() const {
+  return fFontIterator.get()->getfHarfBuzzFont() &&
+      fScriptIterator.get()->getBuffer() &&
+      fFontIterator.get()->getTypeface() &&
+      fBreakIterator;
+}
+
+// Simple static method that shapes 8-bytes text
 SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
-                        const SkFont& srcPaint,
                         const char* utf8,
                         size_t utf8Bytes,
+                        const SkFont& font,
                         bool leftToRight,
                         SkPoint point,
                         SkScalar width) {
+
   icu::UnicodeString utf16 = icu::UnicodeString::fromUTF8(icu::StringPiece(utf8, utf8Bytes));
-  return shape(builder, srcPaint, (UChar*) utf16.getBuffer(), utf16.length(), leftToRight, point, width);
-}
 
-SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
-                        const SkFont& srcPaint,
-                        const UChar* utf16,
-                        size_t utf16Bytes,
-                        bool leftToRight,
-                        SkPoint point,
-                        SkScalar width) {
-  resetLayout();
-  resetLinebreaks();
-
-  if (!generateGlyphs(srcPaint, utf16, utf16Bytes, leftToRight)) {
+  std::vector<StyledText> dummy;
+  SkShaper shaper((UChar*) utf16.getBuffer(),  utf16.length(), dummy.begin(), dummy.end(), SkTextStyle());
+  if (!shaper.generateGlyphs()) {
     return point;
   }
 
   // Iterate over the glyphs in logical order to mark line endings.
-  generateLineBreaks(width);
+  shaper.generateLineBreaks(width);
 
   // Reorder the runs and glyphs per line and write them out.
-  return  generateTextBlob(builder, point,[](size_t line_number,
-                                             SkSize size,
-                                             int previousRunIndex,
-                                             int runIndex) {});
+  return shaper.refineLineBreaks(builder,
+                  point,
+                  [](const ShapedRun& run, int s, int e, SkPoint point, SkRect background) {},
+                  [](size_t line_number, SkSize size, int p, int c) {});
 }
 
-bool SkShaper::generateGlyphs(const SkFont& srcPaint,
-                              const UChar* utf16,
-                              size_t utf16Bytes,
-                              bool leftToRight) {
+bool SkShaper::generateGlyphs() {
 
-  sk_sp<SkFontMgr> fontMgr = SkFontMgr::RefDefault();
-  UBiDiLevel defaultLevel = leftToRight ? UBIDI_DEFAULT_LTR : UBIDI_DEFAULT_RTL;
-  //hb_script_t script = ...
-
-  RunIteratorQueue runSegmenter;
-
-  SkTLazy<BiDiRunIterator> maybeBidi(BiDiRunIterator::Make(utf16, utf16Bytes, defaultLevel));
-  BiDiRunIterator* bidi = maybeBidi.getMaybeNull();
-  if (!bidi) {
-    return false;
-  }
-  runSegmenter.insert(bidi);
-
-  hb_unicode_funcs_t* hbUnicode = hb_buffer_get_unicode_funcs(fImpl->fBuffer.get());
-  SkTLazy<ScriptRunIterator> maybeScript(ScriptRunIterator::Make(utf16, utf16Bytes, hbUnicode));
-  ScriptRunIterator* script = maybeScript.getMaybeNull();
-  if (!script) {
-    return false;
-  }
-  runSegmenter.insert(script);
-
-  SkTLazy<FontRunIterator> maybeFont(FontRunIterator::Make(utf16, utf16Bytes,
-                                                           fImpl->fTypeface,
-                                                           fImpl->fHarfBuzzFont.get(),
-                                                           std::move(fontMgr)));
-  FontRunIterator* font = maybeFont.getMaybeNull();
-  if (!font) {
-    return false;
-  }
-  runSegmenter.insert(font);
-
-  icu::BreakIterator& breakIterator = *fImpl->fBreakIterator;
+  // Find all possible breaks
+  icu::BreakIterator& breakIterator = *fBreakIterator;
   {
     UErrorCode status = U_ZERO_ERROR;
     UText utf16UText = UTEXT_INITIALIZER;
-    utext_openUChars(&utf16UText, utf16, utf16Bytes, &status);
+    utext_openUChars(&utf16UText, fUtf16, fUtf16Bytes, &status);
     std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> autoClose(&utf16UText);
     if (U_FAILURE(status)) {
       SkDebugf("Could not create utf16UText: %s", u_errorName(status));
       return false;
     }
     breakIterator.setText(&utf16UText, status);
-    //utext_close(&utf8UText);
     if (U_FAILURE(status)) {
       SkDebugf("Could not setText on break iterator: %s", u_errorName(status));
       return false;
     }
   }
 
-  const UChar* utf16Start = nullptr;
-  const UChar* utf16End = utf16;
-  while (runSegmenter.advanceRuns()) {
-    utf16Start = utf16End;
-    utf16End = runSegmenter.endOfCurrentRun();
+  ScriptRunIterator* script = fScriptIterator.getMaybeNull();
+  BiDiRunIterator* bidi = fBidiIterator.getMaybeNull();
+  FontRunIterator* font = fFontIterator.getMaybeNull();
 
-    hb_buffer_t* buffer = fImpl->fBuffer.get();
+  const UChar* utf16Start = nullptr;
+  const UChar* utf16End = fUtf16;
+  while (fIteratorQueue.advanceRuns()) {
+    utf16Start = utf16End;
+    utf16End = fIteratorQueue.endOfCurrentRun();
+
+    hb_buffer_t* buffer = script->getBuffer().get();
     SkAutoTCallVProc<hb_buffer_t, hb_buffer_clear_contents> autoClearBuffer(buffer);
     hb_buffer_set_content_type(buffer, HB_BUFFER_CONTENT_TYPE_UNICODE);
     hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_CHARACTERS);
 
     // Add precontext.
-    hb_buffer_add_utf16(buffer, utf16, utf16Start - utf16, utf16Start - utf16, 0);
+    hb_buffer_add_utf16(buffer, fUtf16, utf16Start - fUtf16, utf16Start - fUtf16, 0);
 
     // Populate the hb_buffer directly with utf8 cluster indexes.
     const UChar* utf16Current = utf16Start;
@@ -586,7 +236,7 @@ bool SkShaper::generateGlyphs(const SkFont& srcPaint,
     }
 
     // Add postcontext.
-    hb_buffer_add_utf16(buffer, utf16Current, utf16 + utf16Bytes - utf16Current, 0, 0);
+    hb_buffer_add_utf16(buffer, utf16Current, fUtf16 + fUtf16Bytes - utf16Current, 0, 0);
 
     size_t utf8runLength = utf16End - utf16Start;
     if (!SkTFitsIn<int>(utf8runLength)) {
@@ -621,15 +271,16 @@ bool SkShaper::generateGlyphs(const SkFont& srcPaint,
       return false;
     }
 
-    SkFont paint(srcPaint);
-    paint.setTypeface(sk_ref_sp(font->currentTypeface()));
-    ShapedRun& run = _runs.emplace_back(utf16Start, utf16End, len, paint, bidi->currentLevel(),
+    // TODO: Create the font properly
+    SkFont srcFont = font->getCurrentFont();
+    ShapedRun& run = _runs.emplace_back(utf16Start, utf16End, len, srcFont, bidi->currentLevel(),
                                         std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]));
+
     int scaleX, scaleY;
     scaleX = scaleY = 1;
     hb_font_get_scale(font->currentHBFont(), &scaleX, &scaleY);
-    double textSizeY = run.fPaint.getSize() / scaleY;
-    double textSizeX = run.fPaint.getSize() / scaleX * run.fPaint.getScaleX();
+    double textSizeY = run.fFont.getSize() / scaleY;
+    double textSizeX = run.fFont.getSize() / scaleX * run.fFont.getScaleX();
     for (unsigned i = 0; i < len; i++) {
       ShapedGlyph& glyph = run.fGlyphs[i];
       glyph.fID = info[i].codepoint;
@@ -643,7 +294,7 @@ bool SkShaper::generateGlyphs(const SkFont& srcPaint,
       glyph.fMustLineBreakBefore = false;
     }
 
-    int32_t clusterOffset = utf16Start - utf16;
+    int32_t clusterOffset = utf16Start - fUtf16;
     uint32_t previousCluster = 0xFFFFFFFF;
     for (unsigned i = 0; i < len; ++i) {
       ShapedGlyph& glyph = run.fGlyphs[i];
@@ -661,7 +312,6 @@ bool SkShaper::generateGlyphs(const SkFont& srcPaint,
   }
 
   return true;
-
 }
 
 bool SkShaper::generateLineBreaks(SkScalar width) {
@@ -703,6 +353,9 @@ bool SkShaper::generateLineBreaks(SkScalar width) {
     glyph = glyphIterator.current();
     if (glyph) {
       glyph->fMustLineBreakBefore = true;
+      //auto& run = this->_runs[glyphIterator.fRunIndex];
+      //SkDebugf("Break at %d\n", run.fUtf16End - fUtf16);
+
     }
     widthSoFar = 0;
     previousBreakValid = false;
@@ -712,10 +365,11 @@ bool SkShaper::generateLineBreaks(SkScalar width) {
   return breakable;
 }
 
-void SkShaper::append(SkTextBlobBuilder* builder, const ShapedRun& run, int start, int end, SkPoint* p) const {
+void SkShaper::append(SkTextBlobBuilder* builder, const ShapedRun& run, size_t start, size_t end, SkPoint* p) const {
+
   unsigned len = end - start;
   SkPaint tmpPaint;
-  run.fPaint.LEGACY_applyToPaint(&tmpPaint);
+  run.fFont.LEGACY_applyToPaint(&tmpPaint);
   tmpPaint.setTextEncoding(kGlyphID_SkTextEncoding);
 
   auto runBuffer = SkTextBlobBuilderPriv::AllocRunTextPos(builder, tmpPaint, len,
@@ -734,9 +388,7 @@ void SkShaper::append(SkTextBlobBuilder* builder, const ShapedRun& run, int star
   }
 }
 
-SkPoint SkShaper::generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& point, LineBreaker lineBreaker) const {
-
-  SkASSERT(builder);
+SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& point, RunBreaker runBreaker, LineBreaker lineBreaker) const {
 
   SkPoint currentPoint = point;
 
@@ -754,7 +406,7 @@ SkPoint SkShaper::generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& po
 
     if (previousRunIndex != runIndex) {
       SkFontMetrics metrics;
-      this->_runs[runIndex].fPaint.getMetrics(&metrics);
+      this->_runs[runIndex].fFont.getMetrics(&metrics);
       maxAscent = SkTMin(maxAscent, metrics.fAscent);
       maxDescent = SkTMax(maxDescent, metrics.fDescent);
       maxLeading = SkTMax(maxLeading, metrics.fLeading);
@@ -777,6 +429,7 @@ SkPoint SkShaper::generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& po
     ubidi_reorderVisual(runLevels, numRuns, logicalFromVisual);
 
     for (int i = 0; i < numRuns; ++i) {
+
       int logicalIndex = previousBreak.fRunIndex + logicalFromVisual[i];
 
       int startGlyphIndex = (logicalIndex == previousBreak.fRunIndex)
@@ -785,7 +438,18 @@ SkPoint SkShaper::generateTextBlob(SkTextBlobBuilder* builder, const SkPoint& po
       int endGlyphIndex = (logicalIndex == runIndex)
                           ? glyphIndex + 1
                           : this->_runs[logicalIndex].fNumGlyphs;
+
+      SkFontMetrics metrics;
+      this->_runs[logicalIndex].fFont.getMetrics(&metrics);
+      SkScalar runHeight = metrics.fDescent + metrics.fLeading - metrics.fAscent;
+
+      SkPoint backgroundPoint = SkPoint::Make(currentPoint.fX, currentPoint.fY + metrics.fAscent);
+      auto startPoint = currentPoint;
       append(builder, this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, &currentPoint);
+      SkScalar runWidth = currentPoint.fX - backgroundPoint.fX;
+
+      SkRect rect = SkRect::MakeXYWH(backgroundPoint.fX, backgroundPoint.fY, runWidth, runHeight);
+      runBreaker(this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, startPoint, rect);
     }
 
     // Callback to notify about one more line
@@ -826,7 +490,7 @@ SkSize SkShaper::breakIntoWords(WordBreaker wordBreaker) const {
 
     if (previousRunIndex != runIndex) {
       SkFontMetrics metrics;
-      this->_runs[runIndex].fPaint.getMetrics(&metrics);
+      this->_runs[runIndex].fFont.getMetrics(&metrics);
       maxAscent = SkTMin(maxAscent, metrics.fAscent);
       maxDescent = SkTMax(maxDescent, metrics.fDescent);
       maxLeading = SkTMax(maxLeading, metrics.fLeading);
