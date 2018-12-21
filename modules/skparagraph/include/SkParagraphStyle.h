@@ -42,6 +42,7 @@ class SkParagraphStyle {
   void setTextDirection(SkTextDirection direction) { _textDirection = direction; }
   void setMaxLines(size_t maxLines) { _maxLines = maxLines; }
   void setEllipsis(const std::u16string& ellipsis) { _ellipsis = ellipsis; }
+  void setLineHeight(SkScalar line_height) { _line_height = line_height; }
 
   bool unlimited_lines() const;
   bool ellipsized() const;
@@ -54,4 +55,5 @@ class SkParagraphStyle {
   SkTextDirection _textDirection;
   size_t _maxLines;
   std::u16string _ellipsis;
+  SkScalar _line_height;
 };

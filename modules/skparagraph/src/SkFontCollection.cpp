@@ -37,7 +37,10 @@ size_t SkFontCollection::FamilyKey::Hasher::operator()(
          std::hash<std::string>()(key.locale);
 }
 
-SkFontCollection::SkFontCollection() {}
+SkFontCollection::SkFontCollection()
+  : _enableCallback(true) {
+  _defaultFontManager = SkFontMgr::RefDefault();
+}
 
 SkFontCollection::~SkFontCollection() = default;
 
@@ -45,49 +48,42 @@ size_t SkFontCollection::GetFontManagersCount() const {
   return GetFontManagerOrder().size();
 }
 
-void SkFontCollection::SetDefaultFontManager(sk_sp<SkFontMgr> font_manager) {
-  _defaultFontManager = font_manager;
-}
-
-void SkFontCollection::SetAssetFontManager(sk_sp<SkFontMgr> font_manager) {
+void SkFontCollection::SetAssetFontManager(std::shared_ptr<SkFontManager> font_manager) {
   _assetFontManager = font_manager;
 }
 
-void SkFontCollection::SetDynamicFontManager(sk_sp<SkFontMgr> font_manager) {
+void SkFontCollection::SetDynamicFontManager(std::shared_ptr<SkFontManager> font_manager) {
   _dynamicFontManager = font_manager;
 }
 
-void SkFontCollection::SetTestFontManager(sk_sp<SkFontMgr> font_manager) {
+void SkFontCollection::SetTestFontManager(std::shared_ptr<SkFontManager> font_manager) {
   _testFontManager = font_manager;
 }
 
 // Return the available font managers in the order they should be queried.
-std::vector<sk_sp<SkFontMgr>> SkFontCollection::GetFontManagerOrder() const {
-  std::vector<sk_sp<SkFontMgr>> order;
+std::vector<std::shared_ptr<SkFontManager>> SkFontCollection::GetFontManagerOrder() const {
+  std::vector<std::shared_ptr<SkFontManager>> order;
   if (_testFontManager)
     order.push_back(_testFontManager);
   if (_dynamicFontManager)
     order.push_back(_dynamicFontManager);
   if (_assetFontManager)
     order.push_back(_assetFontManager);
-  if (_defaultFontManager)
-    order.push_back(_defaultFontManager);
+  //if (_defaultFontManager)
+  //  order.push_back(_defaultFontManager);
   return order;
 }
 
-sk_sp<SkTypeface> SkFontCollection::findTypeface(
-    const std::string& fontFamily,
-    const std::string& locale,
-    const SkTextStyle& textStyle) {
+sk_sp<SkTypeface> SkFontCollection::findTypeface(SkTextStyle& textStyle) {
 
   // Look inside the font collections cache first.
   sk_sp<SkTypeface> typeface = nullptr;
-  FamilyKey familyKey(fontFamily, locale);
+  FamilyKey familyKey(textStyle.getFontFamily(), "en");
   auto cached = _typefaces.find(familyKey);
   if (cached == _typefaces.end()) {
-    for (sk_sp<SkFontMgr>& manager : GetFontManagerOrder()) {
+    for (auto manager : GetFontManagerOrder()) {
       // Cache the font collection for future queries
-      SkFontStyleSet* set = manager->matchFamily(fontFamily.c_str());
+      SkFontStyleSet* set = manager->matchFamily(textStyle.getFontFamily().c_str());
       if (set == nullptr || set->count() == 0) {
         continue;
       }
@@ -109,6 +105,12 @@ sk_sp<SkTypeface> SkFontCollection::findTypeface(
     typeface = cached->second;
   }
 
+  textStyle.setTypeface(typeface);
+
   return typeface;
+}
+
+void SkFontCollection::DisableFontFallback() {
+  _enableCallback = false;
 }
 

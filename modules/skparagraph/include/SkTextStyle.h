@@ -85,6 +85,7 @@ class SkTextStyle {
   void setWordSpacing(SkScalar wordSpacing) { _wordSpacing = wordSpacing; }
 
   sk_sp<SkTypeface> getTypeface();
+  void setTypeface(sk_sp<SkTypeface> typeface) { _typeface = typeface; }
 
 
  private:

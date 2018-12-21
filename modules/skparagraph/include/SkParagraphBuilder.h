@@ -74,6 +74,4 @@ class SkParagraphBuilder {
   std::vector<StyledText> _runs;
   std::shared_ptr<SkFontCollection> _fontCollection;
   SkParagraphStyle _style;
-
-  // TODO: FML_DISALLOW_COPY_AND_ASSIGN(ParagraphBuilder);
 };

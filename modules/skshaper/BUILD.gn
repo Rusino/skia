@@ -11,6 +11,7 @@ config("public_config") {
   if (skia_enable_skshaper) {
     include_dirs = [ "include",
        "../../third_party/icu",
+       "../../third_party/externals/harfbuzz/src",
        "../../src/utils",
        "../../src/core",
        "../../include/private",

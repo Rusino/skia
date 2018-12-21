@@ -26,6 +26,8 @@ source_set("skparagraph") {
                 "include/SkTextShadow.h",
                 "include/SkTextStyle.h",
                 "include/SkDartTypes.h",
+                "include/SkFontManager.h",
+                "include/SkFontProvider.h",
              ]
     deps = [
       "../..:skia",
@@ -37,6 +39,8 @@ source_set("skparagraph") {
                 "src/SkParagraphStyle.cpp",
                 "src/SkTextShadow.cpp",
                 "src/SkTextStyle.cpp",
+                "src/SkFontManager.cpp",
+                "src/SkFontProvider.cpp",
               ]
     deps += [
       "//third_party/harfbuzz",
