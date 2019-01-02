@@ -61,7 +61,8 @@ public:
   SkShaper(const UChar* utf16, size_t utf16Bytes,
             std::vector<StyledText>::iterator begin,
             std::vector<StyledText>::iterator end,
-            SkTextStyle defaultStyle);
+            SkTextStyle defaultStyle,
+            std::shared_ptr<SkFontCollection> font_collection);
   ~SkShaper();
 
   typedef std::function<void(size_t line_number, SkSize size, int startIndex, int nextStartIndex)> LineBreaker;
@@ -104,6 +105,7 @@ private:
 
   SkTArray<ShapedRun> _runs;
   SkParagraphStyle fDefaultStyle;
+  std::shared_ptr<SkFontCollection> fFontCollection;
 
   SkTLazy<BiDiRunIterator> fBidiIterator;
   SkTLazy<ScriptRunIterator> fScriptIterator;

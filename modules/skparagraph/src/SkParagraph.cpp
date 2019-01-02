@@ -97,7 +97,7 @@ bool SkParagraph::Layout(double width) {
   }
 
   // Shape the text
-  SkShaper shaper(&_text16[0], _text16.size(), _styles.begin(), _styles.end(), _style.getTextStyle());
+  SkShaper shaper(&_text16[0], _text16.size(), _styles.begin(), _styles.end(), _style.getTextStyle(), _fontCollection );
 
   if (!shaper.generateGlyphs()) {
     SkDebugf("Error shaping\n");
@@ -197,7 +197,13 @@ void SkParagraph::RecordPicture() {
     paint.setAntiAlias(true);
     paint.setLCDRenderText(true);
     paint.setTextSize(run.textStyle.getFontSize());
-    paint.setTypeface(SkTypeface::MakeFromName(run.textStyle.getFontFamily().data(),run.textStyle.getFontStyle()));
+    paint.setTypeface(run.textStyle.getTypeface());
+
+    auto typeface = run.textStyle.getTypeface();
+    SkString name;
+    typeface->getFamilyName(&name);
+    SkDebugf("Family name: %s\n", name.c_str());
+    SkDebugf("Font size: %d\n", run.textStyle.getFontSize());
 
     PaintBackground(textCanvas, run, point);
     PaintShadow(textCanvas, run, point);

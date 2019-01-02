@@ -32,11 +32,15 @@ SkParagraphBuilder::~SkParagraphBuilder() = default;
 
 void SkParagraphBuilder::SetParagraphStyle(const SkParagraphStyle& style) {
   _style = style;
+
+  resolveTypeface(_style.getTextStyle());
   _runs.emplace_back(_text.size(), _text.size(), _style.getTextStyle());
 }
 
 void SkParagraphBuilder::PushStyle(const SkTextStyle& style) {
   EndRunIfNeeded();
+
+  resolveTypeface(_style.getTextStyle());
   _styles.push(style);
   _runs.emplace_back(_text.size(),_text.size(), style);
 }
@@ -102,6 +106,19 @@ std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
   paragraph->SetFontCollection(_fontCollection);
 
   return paragraph;
+}
+
+sk_sp<SkTypeface> SkParagraphBuilder::resolveTypeface(SkTextStyle& style) {
+
+  sk_sp<SkTypeface> typeface = _fontCollection->findTypeface(style);
+  if (typeface != nullptr) {
+    style.setTypeface(_fontCollection->findTypeface(style));
+    SkDebugf("Assign %s\n", style.getFontFamily().c_str());
+  } else {
+    SkDebugf("Default %s\n", style.getFontFamily().c_str());
+  }
+
+  return typeface;
 }
 
 /*

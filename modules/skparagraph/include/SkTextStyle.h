@@ -87,7 +87,6 @@ class SkTextStyle {
   sk_sp<SkTypeface> getTypeface();
   void setTypeface(sk_sp<SkTypeface> typeface) { _typeface = typeface; }
 
-
  private:
   SkTextDecoration _decoration;
   SkColor _decorationColor;

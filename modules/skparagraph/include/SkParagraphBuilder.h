@@ -68,6 +68,7 @@ class SkParagraphBuilder {
  private:
 
   void EndRunIfNeeded();
+  sk_sp<SkTypeface> resolveTypeface(SkTextStyle& style);
 
   std::vector<uint16_t> _text;
   std::stack<SkTextStyle> _styles;

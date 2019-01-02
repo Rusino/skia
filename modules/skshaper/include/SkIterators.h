@@ -23,6 +23,7 @@
 #include "SkTDPQueue.h"
 #include "SkStream.h"
 #include "SkTextBlob.h"
+#include "SkFontCollection.h"
 
 template <class T, void(*P)(T*)> using resource = std::unique_ptr<T, SkFunctionWrapper<void, T, P>>;
 using HBBlob   = resource<hb_blob_t  , hb_blob_destroy  >;
@@ -342,7 +343,7 @@ class FontRunIterator : public RunIterator {
       fCurrentStyle = fIterator->textStyle;
     }
 
-    fCurrentTypeface = fCurrentStyle.getTypeface().get();
+    fCurrentTypeface = fCurrentStyle.getTypeface();
     fHarfBuzzFont = create_hb_font(fTypeface.get());
     SkASSERT(fHarfBuzzFont);
     fCurrentHBFont = fHarfBuzzFont.get();
@@ -371,18 +372,28 @@ class FontRunIterator : public RunIterator {
   HBFont& getfHarfBuzzFont() { return fHarfBuzzFont; }
   sk_sp<SkTypeface> getTypeface() { return fTypeface; }
 
-  SkTypeface* currentTypeface() const {
+  sk_sp<SkTypeface> currentTypeface() const {
     return fCurrentTypeface;
   }
 
   SkFont getCurrentFont() {
-
+/*
     SkFont font;
     font.setSize(fCurrentStyle.getFontSize());
     font.setEdging(SkFont::Edging::kAlias);
     font.setTypeface(SkTypeface::MakeFromName(fCurrentStyle.getFontFamily().data(), fCurrentStyle.getFontStyle()));
-
     return font;
+*/
+
+    SkDebugf("current font size %f:\n", fCurrentStyle.getFontSize());
+    if (fCurrentTypeface != nullptr) {
+      SkString name;
+      fCurrentTypeface->getFamilyName(&name);
+      SkDebugf("Found typeface %s for %s\n", fCurrentStyle.getFontFamily().c_str(), name.c_str());
+    } else {
+      SkDebugf("No typeface %s for %s\n", fCurrentStyle.getFontFamily().c_str());
+    }
+    return SkFont(fCurrentTypeface, fCurrentStyle.getFontSize());
   }
 
   hb_font_t* currentHBFont() const {
@@ -404,7 +415,7 @@ class FontRunIterator : public RunIterator {
   sk_sp<SkTypeface> fTypeface;
 
   hb_font_t* fCurrentHBFont;
-  SkTypeface* fCurrentTypeface;
+  sk_sp<SkTypeface> fCurrentTypeface;
 };
 
 class RunIteratorQueue {

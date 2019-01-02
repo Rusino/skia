@@ -43,9 +43,10 @@ SkTextStyle::SkTextStyle()
 
 // TODO: use font provider to resolve the font
 sk_sp<SkTypeface> SkTextStyle::getTypeface() {
-  if (_typeface == nullptr) {
-    return SkTypeface::MakeFromName(_fontFamily.data(), SkFontStyle());
+  if (_typeface != nullptr) {
+    return _typeface; // SkTypeface::MakeFromName(_fontFamily.data(), SkFontStyle());
   } else {
+    SkDebugf("MakeDefault\n");
     return SkTypeface::MakeDefault();
   }
 }

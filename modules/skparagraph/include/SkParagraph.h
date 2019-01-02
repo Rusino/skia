@@ -15,8 +15,6 @@
 #include "SkTLazy.h"
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
-#include "SkFontCollection.h"
-
 
 // Comes as a result of shaping (broken down by lines and styles)
 struct StyledRun {
@@ -74,6 +72,7 @@ class SkParagraph {
 
   void SetStyles(std::vector<StyledText> styles);
   void SetParagraphStyle(SkParagraphStyle style);
+
   void SetFontCollection(std::shared_ptr<SkFontCollection> fontCollection) {
     _fontCollection = fontCollection;
   }
@@ -101,8 +100,8 @@ class SkParagraph {
 
   // Input
   std::vector<uint16_t> _text16;
-  std::shared_ptr<SkFontCollection> _fontCollection;
   std::vector<StyledText> _styles;
+  std::shared_ptr<SkFontCollection> _fontCollection;
   // Shaping
   SkParagraphStyle _style;
   std::vector<StyledRun> _styledRuns;
