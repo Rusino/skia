@@ -199,12 +199,6 @@ void SkParagraph::RecordPicture() {
     paint.setTextSize(run.textStyle.getFontSize());
     paint.setTypeface(run.textStyle.getTypeface());
 
-    auto typeface = run.textStyle.getTypeface();
-    SkString name;
-    typeface->getFamilyName(&name);
-    SkDebugf("Family name: %s\n", name.c_str());
-    SkDebugf("Font size: %d\n", run.textStyle.getFontSize());
-
     PaintBackground(textCanvas, run, point);
     PaintShadow(textCanvas, run, point);
     textCanvas->drawTextBlob(run.blob, point.x(), point.y(), paint);
@@ -304,7 +298,7 @@ void SkParagraph::PaintDecorations(SkCanvas* canvas,
     case SkTextDecorationStyle::kWavy: {
       int wave_count = 0;
       double x_start = 0;
-      double wavelength = underline_thickness * run.textStyle.getDecorationThicknessMultiplier();
+      double wavelength = underline_thickness * run.textStyle.getDecorationThicknessMultiplier() * 2;
 
       path.moveTo(x, y);
       while (x_start + wavelength * 2 < width) {

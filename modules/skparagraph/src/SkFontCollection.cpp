@@ -26,19 +26,26 @@
 
 #include "SkTextStyle.h"
 
+// TODO: Extract the platform dependent part
+#define DEFAULT_FONT_FAMILY "sans-serif"
+
 bool SkFontCollection::FamilyKey::operator==(
     const SkFontCollection::FamilyKey& other) const {
-  return font_family == other.font_family && locale == other.locale;
+  return font_family == other.font_family &&
+         locale == other.locale &&
+         font_style == other.font_style;
 }
 
 size_t SkFontCollection::FamilyKey::Hasher::operator()(
     const SkFontCollection::FamilyKey& key) const {
   return std::hash<std::string>()(key.font_family) ^
-         std::hash<std::string>()(key.locale);
+         std::hash<std::string>()(key.locale) ^
+         std::hash<uint32_t>()(key.font_style.weight()) ^
+         std::hash<uint32_t>()(key.font_style.slant());
 }
 
 SkFontCollection::SkFontCollection()
-  : _enableCallback(true) {
+  : _enableFontFallback(true) {
   _defaultFontManager = SkFontMgr::RefDefault();
 }
 
@@ -49,14 +56,17 @@ size_t SkFontCollection::GetFontManagersCount() const {
 }
 
 void SkFontCollection::SetAssetFontManager(std::shared_ptr<SkFontManager> font_manager) {
+  SkDebugf("SetAssetFontManager\n");
   _assetFontManager = font_manager;
 }
 
 void SkFontCollection::SetDynamicFontManager(std::shared_ptr<SkFontManager> font_manager) {
+  SkDebugf("SetDynamicFontManager\n");
   _dynamicFontManager = font_manager;
 }
 
 void SkFontCollection::SetTestFontManager(std::shared_ptr<SkFontManager> font_manager) {
+  SkDebugf("SetTestFontManager\n");
   _testFontManager = font_manager;
 }
 
@@ -69,16 +79,18 @@ std::vector<std::shared_ptr<SkFontManager>> SkFontCollection::GetFontManagerOrde
     order.push_back(_dynamicFontManager);
   if (_assetFontManager)
     order.push_back(_assetFontManager);
-  //if (_defaultFontManager)
+  //if (_defaultFontManager && _enableCallback)
   //  order.push_back(_defaultFontManager);
   return order;
 }
 
+// TODO: default fallback
 sk_sp<SkTypeface> SkFontCollection::findTypeface(SkTextStyle& textStyle) {
 
-  // Look inside the font collections cache first.
   sk_sp<SkTypeface> typeface = nullptr;
-  FamilyKey familyKey(textStyle.getFontFamily(), "en");
+
+  // Look inside the font collections cache first
+  FamilyKey familyKey(textStyle.getFontFamily(), "en", textStyle.getFontStyle());
   auto cached = _typefaces.find(familyKey);
   if (cached == _typefaces.end()) {
     for (auto manager : GetFontManagerOrder()) {
@@ -88,16 +100,26 @@ sk_sp<SkTypeface> SkFontCollection::findTypeface(SkTextStyle& textStyle) {
         continue;
       }
 
-      for (auto i = 0; i < set->count(); ++i) {
+      for (int i = 0; i < set->count(); ++i) {
+        set->createTypeface(i);
+      }
 
-        typeface = sk_sp<SkTypeface>(set->createTypeface(i));
+      sk_sp<SkTypeface> match(set->matchStyle(textStyle.getFontStyle()));
+      if (match != nullptr) {
+        typeface = match;
+        break;
+      }
+    }
+
+    if (typeface == nullptr) {
+      // Try default
+      if (_enableFontFallback) {
+        typeface = _defaultFontManager->legacyMakeTypeface(DEFAULT_FONT_FAMILY, textStyle.getFontStyle());
         if (typeface == nullptr) {
-          continue;
+          typeface = SkTypeface::MakeDefault();
         }
       }
-      break;
-    }
-    if (typeface == nullptr) {
+      textStyle.setTypeface(typeface);
       return typeface;
     }
     _typefaces[familyKey] = typeface;
@@ -111,6 +133,6 @@ sk_sp<SkTypeface> SkFontCollection::findTypeface(SkTextStyle& textStyle) {
 }
 
 void SkFontCollection::DisableFontFallback() {
-  _enableCallback = false;
+  _enableFontFallback = false;
 }
 

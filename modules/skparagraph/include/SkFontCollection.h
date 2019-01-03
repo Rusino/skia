@@ -43,11 +43,12 @@ class SkFontCollection : public std::enable_shared_from_this<SkFontCollection> {
 
  private:
   struct FamilyKey {
-    FamilyKey(const std::string& family, const std::string& loc)
-        : font_family(family), locale(loc) {}
+    FamilyKey(const std::string& family, const std::string& loc, SkFontStyle style)
+        : font_family(family), locale(loc), font_style(style) {}
 
     std::string font_family;
     std::string locale;
+    SkFontStyle font_style;
 
     bool operator==(const FamilyKey& other) const;
 
@@ -56,7 +57,7 @@ class SkFontCollection : public std::enable_shared_from_this<SkFontCollection> {
     };
   };
 
-  bool _enableCallback;
+  bool _enableFontFallback;
   sk_sp<SkFontMgr> _defaultFontManager;
   std::shared_ptr<SkFontManager> _assetFontManager;
   std::shared_ptr<SkFontManager> _dynamicFontManager;

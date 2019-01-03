@@ -160,7 +160,7 @@ bool SkShaper::initialize() {
 bool SkShaper::good() const {
   return fFontIterator.get()->getfHarfBuzzFont() &&
       fScriptIterator.get()->getBuffer() &&
-      fFontIterator.get()->getTypeface() &&
+      fFontIterator.get()->currentTypeface() &&
       fBreakIterator;
 }
 

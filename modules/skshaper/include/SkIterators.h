@@ -326,14 +326,12 @@ class FontRunIterator : public RunIterator {
       , fIterator(begin)
       , fLast(end)
   {
-    fTypeface = defaultStyle.getTypeface();
-    fHarfBuzzFont = create_hb_font(fTypeface.get());
+    fCurrentTypeface = SkTypeface::MakeDefault();
+    fHarfBuzzFont = create_hb_font(fCurrentTypeface.get());
     fHBFont = fHarfBuzzFont.get();
   }
 
   void consume() override {
-
-    SkASSERT(fIterator != fLast);
 
     if (fIterator == fLast) {
       fCurrent = fEnd;
@@ -344,12 +342,13 @@ class FontRunIterator : public RunIterator {
     }
 
     fCurrentTypeface = fCurrentStyle.getTypeface();
-    fHarfBuzzFont = create_hb_font(fTypeface.get());
+    SkASSERT(fCurrentTypeface);
+    fHarfBuzzFont = create_hb_font(fCurrentTypeface.get());
     SkASSERT(fHarfBuzzFont);
     fCurrentHBFont = fHarfBuzzFont.get();
 
     while (fIterator != fLast &&
-        SkTypeface::Equal(fCurrentStyle.getTypeface().get(), fIterator->textStyle.getTypeface().get())) {
+        SkTypeface::Equal(fCurrentTypeface.get(), fIterator->textStyle.getTypeface().get())) {
       ++fIterator;
     }
   }
@@ -370,7 +369,6 @@ class FontRunIterator : public RunIterator {
   }
 
   HBFont& getfHarfBuzzFont() { return fHarfBuzzFont; }
-  sk_sp<SkTypeface> getTypeface() { return fTypeface; }
 
   sk_sp<SkTypeface> currentTypeface() const {
     return fCurrentTypeface;
@@ -384,15 +382,6 @@ class FontRunIterator : public RunIterator {
     font.setTypeface(SkTypeface::MakeFromName(fCurrentStyle.getFontFamily().data(), fCurrentStyle.getFontStyle()));
     return font;
 */
-
-    SkDebugf("current font size %f:\n", fCurrentStyle.getFontSize());
-    if (fCurrentTypeface != nullptr) {
-      SkString name;
-      fCurrentTypeface->getFamilyName(&name);
-      SkDebugf("Found typeface %s for %s\n", fCurrentStyle.getFontFamily().c_str(), name.c_str());
-    } else {
-      SkDebugf("No typeface %s for %s\n", fCurrentStyle.getFontFamily().c_str());
-    }
     return SkFont(fCurrentTypeface, fCurrentStyle.getFontSize());
   }
 
@@ -412,7 +401,6 @@ class FontRunIterator : public RunIterator {
 
   HBFont fHarfBuzzFont;
   hb_font_t* fHBFont;
-  sk_sp<SkTypeface> fTypeface;
 
   hb_font_t* fCurrentHBFont;
   sk_sp<SkTypeface> fCurrentTypeface;

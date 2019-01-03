@@ -43,12 +43,13 @@ SkTextStyle::SkTextStyle()
 
 // TODO: use font provider to resolve the font
 sk_sp<SkTypeface> SkTextStyle::getTypeface() {
-  if (_typeface != nullptr) {
-    return _typeface; // SkTypeface::MakeFromName(_fontFamily.data(), SkFontStyle());
-  } else {
-    SkDebugf("MakeDefault\n");
-    return SkTypeface::MakeDefault();
+  /*
+  if (_typeface == nullptr) {
+    SkDebugf("MakeDefault!!!!!\n");
+    _typeface = SkTypeface::MakeDefault();
   }
+   */
+  return _typeface; // SkTypeface::MakeFromName(_fontFamily.data(), SkFontStyle());
 }
 
 bool SkTextStyle::equals(const SkTextStyle& other) const {
