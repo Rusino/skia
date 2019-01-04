@@ -42,7 +42,7 @@ void SkParagraphBuilder::PushStyle(const SkTextStyle& style) {
   EndRunIfNeeded();
 
   auto textStyle = style;
-  _fontCollection->findTypeface(textStyle);;
+  _fontCollection->findTypeface(textStyle);
   _styles.push(textStyle);
   _runs.emplace_back(_text.size(),_text.size(), textStyle);
 }

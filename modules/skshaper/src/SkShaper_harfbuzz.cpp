@@ -91,17 +91,6 @@ struct ShapedRunGlyphIterator {
 
 }  // namespace
 
-/*
-SkShaper::SkShaper(const char* utf8, size_t utf8Bytes, SkParagraphStyle defaultStyle) :
-    fDefaultStyle(defaultStyle) {
-
-  icu::UnicodeString utf16 = icu::UnicodeString::fromUTF8(icu::StringPiece(utf8, utf8Bytes));
-  fUtf16 = (UChar*) utf16.getBuffer();
-  fUtf16Bytes = utf16.length();
-
-  initialize();
-}
-*/
 SkShaper::SkShaper(const UChar* utf16, size_t utf16Bytes,
                    std::vector<StyledText>::iterator begin,
                    std::vector<StyledText>::iterator end,
@@ -371,6 +360,10 @@ bool SkShaper::generateLineBreaks(SkScalar width) {
 
 void SkShaper::append(SkTextBlobBuilder* builder, const ShapedRun& run, size_t start, size_t end, SkPoint* p) const {
 
+  if (end == start) {
+    // TODO: I don't think it should happen, but it does
+    return;
+  }
   unsigned len = end - start;
   SkPaint tmpPaint;
   run.fFont.LEGACY_applyToPaint(&tmpPaint);
@@ -404,6 +397,7 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& po
   int previousRunIndex = -1;
   size_t line_number = 0;
   while (glyphIterator.current()) {
+
     int runIndex = glyphIterator.fRunIndex;
     int glyphIndex = glyphIterator.fGlyphIndex;
     ShapedGlyph* nextGlyph = glyphIterator.next();
@@ -448,10 +442,9 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& po
       SkScalar runHeight = metrics.fDescent + metrics.fLeading - metrics.fAscent;
 
       SkPoint backgroundPoint = SkPoint::Make(currentPoint.fX, currentPoint.fY + metrics.fAscent);
-      auto startPoint = currentPoint;
+      auto startPoint = currentPoint;;
       append(builder, this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, &currentPoint);
       SkScalar runWidth = currentPoint.fX - backgroundPoint.fX;
-
       SkRect rect = SkRect::MakeXYWH(backgroundPoint.fX, backgroundPoint.fY, runWidth, runHeight);
       runBreaker(this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, startPoint, rect);
     }
@@ -462,7 +455,6 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& po
                 SkSize::Make(currentPoint.fX - point.fX, currentPoint.fY + maxDescent + maxLeading - point.fY),
                 previousBreak.fRunIndex,
                 runIndex);
-
     currentPoint.fY += maxDescent + maxLeading;
     currentPoint.fX = point.fX;
     maxAscent = 0;

@@ -59,6 +59,12 @@ bool SkParagraph::DidExceedMaxLines() {
 void SkParagraph::SetText(std::vector<uint16_t> utf16text) {
 
   _text16 = std::move(utf16text);
+
+  icu::UnicodeString utf16 = icu::UnicodeString(&_text16[0], _text16.size());
+  std::string str;
+  utf16.toUTF8String(str);
+  SkDebugf("SetText '%s'\n", str.c_str());
+
 }
 
 void SkParagraph::SetText(const char* utf8text, size_t textBytes) {
@@ -80,6 +86,11 @@ void SkParagraph::SetParagraphStyle(SkParagraphStyle style) {
 }
 
 bool SkParagraph::Layout(double width) {
+
+  if (_text16.empty()) {
+    // TODO: ???
+    return true;
+  }
 
   // Collect Flutter values
   _alphabeticBaseline = 0;
@@ -127,7 +138,6 @@ bool SkParagraph::Layout(double width) {
 
           size_t startGlyphIndex = std::max<size_t>(style->start, lineStart) - zero;
           size_t endGlyphIndex = std::min<size_t>(style->end, lineEnd) - zero;
-
           /*
           icu::UnicodeString utf16 = icu::UnicodeString(run.fUtf16Start, run.fUtf16End - run.fUtf16Start);
           std::string str;
@@ -209,6 +219,11 @@ void SkParagraph::RecordPicture() {
 }
 
 void SkParagraph::Paint(SkCanvas* canvas, double x, double y) const {
+
+  if (_text16.empty()) {
+    // TODO: ???
+    return;
+  }
 
   SkMatrix matrix = SkMatrix::MakeTrans(SkDoubleToScalar(x), SkDoubleToScalar(y));
   canvas->drawPicture(_picture, &matrix, nullptr);
@@ -412,7 +427,7 @@ std::vector<SkTextBox> SkParagraph::GetRectsForRange(
     RectHeightStyle rect_height_style,
     RectWidthStyle rect_width_style) {
   // TODO: implement
-  SkASSERT(false);
+  //SkASSERT(false);
   std::vector<SkTextBox> result;
   return result;
 }
