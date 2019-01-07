@@ -286,6 +286,7 @@ bool SkShaper::generateGlyphs() {
       glyph.fOffset.fY = pos[i].y_offset * textSizeY;
       glyph.fAdvance.fX = pos[i].x_advance * textSizeX;
       glyph.fAdvance.fY = pos[i].y_advance * textSizeY;
+      glyph.fMustLineBreakBefore = false;
       glyph.fHasVisual = true; //!font->currentTypeface()->glyphBoundsAreZero(glyph.fID);
       if (glyph.fID == 0) {
         // TODO: how to substitute any control characters with space
@@ -312,13 +313,13 @@ bool SkShaper::generateGlyphs() {
       }
       glyph.fMayLineBreakBefore = glyph.fCluster != previousCluster && breakIteratorCurrent == glyphCluster;
       previousCluster = glyph.fCluster;
-      /*
+
       char glyphname[32];
       hb_font_get_glyph_name (font->currentHBFont(), glyph.fID, glyphname, sizeof(glyphname));
       SkDebugf ("glyph='%s' %d [%d] %d %s %s\n", glyphname, glyph.fID, i, u_charType(glyph.fID),
       glyph.fMayLineBreakBefore ? "word" : "",
           glyph.fMustLineBreakBefore ? "line" : "");
-      */
+
     }
   }
 

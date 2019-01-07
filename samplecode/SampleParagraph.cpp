@@ -276,12 +276,13 @@ protected:
         canvas->translate(0, this->height()/2);
         drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
       */
+      const std::string cupertino = "Cupertino";
       const std::string text = "My neighbor came over to say,\n"
                                "Although not in a neighborly way,\n\n"
                                "That he'd knock me around,\n\n\n"
                                "If I didn't stop the sound,\n\n\n\n"
                                "Of the classical music I play.";
-      drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE);
+      drawText(canvas, this->width(), this->height(), cupertino, SK_ColorBLACK, SK_ColorWHITE);
     }
 
 private:
