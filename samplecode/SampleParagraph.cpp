@@ -282,7 +282,22 @@ protected:
                                "That he'd knock me around,\n\n\n"
                                "If I didn't stop the sound,\n\n\n\n"
                                "Of the classical music I play.";
-      drawText(canvas, this->width(), this->height(), cupertino, SK_ColorBLACK, SK_ColorWHITE);
+      const std::string code = "// Create a flat button.\n"
+                               "FlatButton(\n"
+                               "  child: const Text('BUTTON TITLE'),\n"
+                               "  onPressed: () {\n"
+                               "    // Perform some action\n"
+                               "  }\n"
+                               ");\n"
+                               "\n"
+                               "// Create a disabled button.\n"
+                               "// Buttons are disabled when onPressed isn't\n"
+                               "// specified or is null.\n"
+                               "const FlatButton(\n"
+                               "  child: Text('BUTTON TITLE'),\n"
+                               "  onPressed: null\n"
+                               ");";
+      drawText(canvas, this->width(), this->height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 10);
     }
 
 private:

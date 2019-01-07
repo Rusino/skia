@@ -138,12 +138,10 @@ bool SkParagraph::Layout(double width) {
 
           size_t startGlyphIndex = std::max<size_t>(style->start, lineStart) - zero;
           size_t endGlyphIndex = std::min<size_t>(style->end, lineEnd) - zero;
-          /*
           icu::UnicodeString utf16 = icu::UnicodeString(run.fUtf16Start, run.fUtf16End - run.fUtf16Start);
           std::string str;
           utf16.toUTF8String(str);
           SkDebugf("Block  %d:%d '%s'\n", startGlyphIndex, endGlyphIndex, str.c_str());
-          */
           SkTextBlobBuilder builder;
           shaper.append(&builder, run, startGlyphIndex, endGlyphIndex, &currentPoint);
           style->blob = builder.make();

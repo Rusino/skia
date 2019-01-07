@@ -114,7 +114,7 @@ sk_sp<SkTypeface> SkFontCollection::findTypeface(SkTextStyle& textStyle) {
     if (typeface == nullptr) {
       // Try default
       if (_enableFontFallback) {
-        typeface = _defaultFontManager->legacyMakeTypeface(DEFAULT_FONT_FAMILY, textStyle.getFontStyle());
+        typeface = _defaultFontManager->legacyMakeTypeface(textStyle.getFontFamily().c_str()/*DEFAULT_FONT_FAMILY*/, textStyle.getFontStyle());
         if (typeface == nullptr) {
           typeface = SkTypeface::MakeDefault();
         }
