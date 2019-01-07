@@ -192,9 +192,9 @@ void SkParagraph::RecordPicture() {
   SkCanvas* textCanvas = recorder.beginRecording(_width, _height, nullptr, 0);
 
   SkPoint point = SkPoint::Make(0, 0);
-  SkPaint paint;
   for (auto& run : _styledRuns) {
 
+    SkPaint paint;
     if (run.textStyle.hasForeground()) {
       paint = run.textStyle.getForeground();
     } else {
