@@ -59,12 +59,12 @@ bool SkParagraph::DidExceedMaxLines() {
 void SkParagraph::SetText(std::vector<uint16_t> utf16text) {
 
   _text16 = std::move(utf16text);
-
+/*
   icu::UnicodeString utf16 = icu::UnicodeString(&_text16[0], _text16.size());
   std::string str;
   utf16.toUTF8String(str);
   SkDebugf("SetText '%s'\n", str.c_str());
-
+*/
 }
 
 void SkParagraph::SetText(const char* utf8text, size_t textBytes) {

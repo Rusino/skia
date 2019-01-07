@@ -91,7 +91,7 @@ protected:
         paint.setColor(fg);
 
         SkTextStyle style;
-        style.setbackgroundColor(SK_ColorBLUE);
+        style.setBackgroundColor(SK_ColorBLUE);
         style.setForegroundColor(paint);
         SkParagraphStyle paraStyle;
         paraStyle.setTextStyle(style);
@@ -102,7 +102,7 @@ protected:
           builder.AddText("Paragraph:");
           for (auto para : gParagraph) {
             SkTextStyle style;
-            style.setbackgroundColor(bg);
+            style.setBackgroundColor(bg);
             style.setForegroundColor(paint);
             style.setFontFamily(std::get<0>(para));
             SkFontStyle fontStyle(
@@ -111,7 +111,7 @@ protected:
                 std::get<2>(para) ? SkFontStyle::Slant::kItalic_Slant : SkFontStyle::Slant::kUpright_Slant);
             style.setFontStyle(fontStyle);
             style.setFontSize(std::get<3>(para) * i);
-            style.setbackgroundColor(std::get<4>(para));
+            style.setBackgroundColor(std::get<4>(para));
             SkPaint foreground;
             foreground.setColor(std::get<5>(para));
             style.setForegroundColor(foreground);
@@ -174,7 +174,7 @@ protected:
     paint.setColor(fg);
 
     SkTextStyle style;
-    style.setbackgroundColor(SK_ColorBLUE);
+    style.setBackgroundColor(SK_ColorBLUE);
     style.setForegroundColor(paint);
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
@@ -182,12 +182,12 @@ protected:
     paraStyle.getTextStyle().setFontSize(10);
     SkParagraphBuilder builder(paraStyle, nullptr);
 
-    style.setbackgroundColor(bg);
+    style.setBackgroundColor(bg);
     style.setForegroundColor(paint);
     style.setFontFamily(ff);
     style.setFontStyle(SkFontStyle());
     style.setFontSize(fs);
-    style.setbackgroundColor(bg);
+    style.setBackgroundColor(bg);
     SkPaint foreground;
     foreground.setColor(fg);
     style.setForegroundColor(foreground);
@@ -214,10 +214,59 @@ protected:
     canvas->translate(0, paragraph->GetHeight() + margin);
   }
 
+    void drawText(SkCanvas* canvas, SkScalar w, SkScalar h,
+                  const std::string& text,
+                  SkColor fg = SK_ColorDKGRAY,
+                  SkColor bg = SK_ColorWHITE,
+                  std::string ff = "sans-serif",
+                  SkScalar fs = 24) {
+    SkAutoCanvasRestore acr(canvas, true);
+
+    canvas->clipRect(SkRect::MakeWH(w, h));
+    canvas->drawColor(bg);
+
+    SkScalar margin = 20;
+
+    SkPaint paint;
+    paint.setAntiAlias(true);
+    paint.setLCDRenderText(true);
+    paint.setColor(fg);
+
+    SkTextStyle style;
+    style.setBackgroundColor(SK_ColorBLUE);
+    style.setForegroundColor(paint);
+    SkParagraphStyle paraStyle;
+    paraStyle.setTextStyle(style);
+
+    paraStyle.getTextStyle().setFontSize(10);
+    SkParagraphBuilder builder(paraStyle, std::make_shared<SkFontCollection>());
+
+    style.setBackgroundColor(bg);
+    style.setForegroundColor(paint);
+    style.setFontFamily(ff);
+    style.setFontStyle(SkFontStyle());
+    style.setFontSize(fs);
+    style.setBackgroundColor(bg);
+    SkPaint foreground;
+    foreground.setColor(fg);
+    style.setForegroundColor(foreground);
+
+    builder.PushStyle(style);
+    builder.AddText(text);
+    builder.Pop();
+
+    auto paragraph = builder.Build();
+    paragraph->Layout(w - margin);
+
+    paragraph->Paint(canvas, margin, margin);
+
+    canvas->translate(0, paragraph->GetHeight() + margin);
+  }
+
     void onDrawContent(SkCanvas* canvas) override {
       //drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
       //drawSimpleTest(canvas, this->width(), this->height());
-
+      /*
         SkScalar width = this->width() / 3;
         drawTest(canvas, width, this->height(), SK_ColorBLACK, SK_ColorWHITE);
         canvas->translate(width, 0);
@@ -226,7 +275,13 @@ protected:
         drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorWHITE);
         canvas->translate(0, this->height()/2);
         drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
-
+      */
+      const std::string text = "My neighbor came over to say,\n"
+                               "Although not in a neighborly way,\n\n"
+                               "That he'd knock me around,\n\n\n"
+                               "If I didn't stop the sound,\n\n\n\n"
+                               "Of the classical music I play.";
+      drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE);
     }
 
 private:

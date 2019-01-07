@@ -269,6 +269,10 @@ bool SkShaper::generateGlyphs() {
     ShapedRun& run = _runs.emplace_back(utf16Start, utf16End, len, srcFont, bidi->currentLevel(),
                                         std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]));
 
+
+    hb_codepoint_t space;
+    hb_font_get_glyph_from_name (font->currentHBFont(), "space", -1, &space);
+
     int scaleX, scaleY;
     scaleX = scaleY = 1;
     hb_font_get_scale(font->currentHBFont(), &scaleX, &scaleY);
@@ -283,8 +287,12 @@ bool SkShaper::generateGlyphs() {
       glyph.fAdvance.fX = pos[i].x_advance * textSizeX;
       glyph.fAdvance.fY = pos[i].y_advance * textSizeY;
       glyph.fHasVisual = true; //!font->currentTypeface()->glyphBoundsAreZero(glyph.fID);
+      if (glyph.fID == 0) {
+        // TODO: how to substitute any control characters with space
+        // TODO: better yet, only whitespaces
+        glyph.fID = space;
+      }
       //info->mask safe_to_break;
-      glyph.fMustLineBreakBefore = false;
     }
 
     int32_t clusterOffset = utf16Start - fUtf16;
@@ -297,10 +305,20 @@ bool SkShaper::generateGlyphs() {
           breakIteratorCurrent < glyphCluster)
       {
         breakIteratorCurrent = breakIterator.next();
+        if (breakIterator.getRuleStatus() == UBRK_LINE_HARD) {
+          ShapedGlyph& next = run.fGlyphs[breakIteratorCurrent - clusterOffset];
+          next.fMustLineBreakBefore = true;
+         }
       }
-      glyph.fMayLineBreakBefore = glyph.fCluster != previousCluster &&
-          breakIteratorCurrent == glyphCluster;
+      glyph.fMayLineBreakBefore = glyph.fCluster != previousCluster && breakIteratorCurrent == glyphCluster;
       previousCluster = glyph.fCluster;
+      /*
+      char glyphname[32];
+      hb_font_get_glyph_name (font->currentHBFont(), glyph.fID, glyphname, sizeof(glyphname));
+      SkDebugf ("glyph='%s' %d [%d] %d %s %s\n", glyphname, glyph.fID, i, u_charType(glyph.fID),
+      glyph.fMayLineBreakBefore ? "word" : "",
+          glyph.fMustLineBreakBefore ? "line" : "");
+      */
     }
   }
 
@@ -316,6 +334,14 @@ bool SkShaper::generateLineBreaks(SkScalar width) {
   ShapedRunGlyphIterator previousBreak(this->_runs);
   ShapedRunGlyphIterator glyphIterator(this->_runs);
   while (ShapedGlyph* glyph = glyphIterator.current()) {
+    if (glyph->fMustLineBreakBefore) {
+      breakable = false;
+      widthSoFar = 0;
+      previousBreakValid = false;
+      canAddBreakNow = false;
+      glyphIterator.next();
+      continue;
+    }
     if (glyph->fMayLineBreakBefore) {
       breakable = true;
     }
