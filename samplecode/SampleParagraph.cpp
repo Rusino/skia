@@ -98,7 +98,7 @@ protected:
 
         for (auto i = 1; i < 5; ++ i) {
           paraStyle.getTextStyle().setFontSize(24 * i);
-          SkParagraphBuilder builder(paraStyle, nullptr);
+          SkParagraphBuilder builder(paraStyle, std::make_shared<SkFontCollection>());
           builder.AddText("Paragraph:");
           for (auto para : gParagraph) {
             SkTextStyle style;
@@ -149,7 +149,7 @@ protected:
 
           paragraph->Paint(canvas, margin, margin);
 
-          canvas->translate(0, paragraph->GetHeight() + margin);
+          canvas->translate(0, paragraph->GetHeight());
         }
     }
 
@@ -180,7 +180,7 @@ protected:
     paraStyle.setTextStyle(style);
 
     paraStyle.getTextStyle().setFontSize(10);
-    SkParagraphBuilder builder(paraStyle, nullptr);
+    SkParagraphBuilder builder(paraStyle, std::make_shared<SkFontCollection>());
 
     style.setBackgroundColor(bg);
     style.setForegroundColor(paint);
@@ -266,7 +266,7 @@ protected:
   }
 
     void onDrawContent(SkCanvas* canvas) override {
-      //drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
+      drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
       //drawSimpleTest(canvas, this->width(), this->height());
       /*
         SkScalar width = this->width() / 3;
@@ -278,32 +278,33 @@ protected:
         canvas->translate(0, this->height()/2);
         drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
       */
-      const std::string cupertino = "Cupertino";
-      const std::string text = "My neighbor came over to say,\n"
-                               "Although not in a neighborly way,\n\n"
-                               "That he'd knock me around,\n\n\n"
-                               "If I didn't stop the sound,\n\n\n\n"
-                               "Of the classical music I play.";
-      std::vector<std::string> code = {"// Create a flat button.\n",
-                               "FlatButton(\n",
-                               /*
-                               "  child: const Text('BUTTON TITLE'),\n",
-                               "  onPressed: () {\n",
-                               "    // Perform some action\n",
-                               "  }\n",
-                               ");"
-                               "\n\n",
-                               "// Create a disabled button.\n",
-                               "// Buttons are disabled when onPressed isn't\n",
-                               "// specified or is null.\n",
-                               "const FlatButton(\n  child: ",
-                               "Text('BUTTON TITLE'),\n",
-                               "  ",
-                               "onPressed: null\n",
-                               ");"
-                                */
-                                };
-      drawText(canvas, this->width(), this->height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 10);
+      std::vector<std::string> cupertino = { "Cupertino" };
+      std::vector<std::string>  text = {
+          "My neighbor came over to say,\n"
+          "Although not in a neighborly way,\n\n"
+          "That he'd knock me around,\n\n\n"
+          "If I didn't stop the sound,\n\n\n\n"
+          "Of the classical music I play."
+      };
+      std::vector<std::string> code = {
+          "// Create a flat button.\n",
+           "FlatButton(\n",
+           "  child: const Text('BUTTON TITLE'),\n",
+           "  onPressed: () {\n",
+           "    // Perform some action\n",
+           "  }\n",
+           ");"
+           "\n\n",
+           "// Create a disabled button.\n",
+           "// Buttons are disabled when onPressed isn't\n",
+           "// specified or is null.\n",
+           "const FlatButton(\n  child: ",
+           "Text('BUTTON TITLE'),\n",
+           "  ",
+           "onPressed: null\n",
+           ");"
+        };
+      //drawText(canvas, this->width(), this->height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
     }
 
 private:

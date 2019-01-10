@@ -59,13 +59,13 @@ struct ShapedRun {
 class SkShaper {
 public:
   SkShaper(const UChar* utf16, size_t utf16Bytes,
-            std::vector<StyledText>::iterator begin,
-            std::vector<StyledText>::iterator end,
-            SkTextStyle defaultStyle,
-            std::shared_ptr<SkFontCollection> font_collection);
+           std::vector<Block>::iterator begin,
+           std::vector<Block>::iterator end,
+           SkTextStyle defaultStyle,
+           std::shared_ptr<SkFontCollection> font_collection);
   ~SkShaper();
 
-  typedef std::function<void(size_t line_number, SkSize size, int startIndex, int nextStartIndex)> LineBreaker;
+  typedef std::function<void(bool lineBreak, size_t line_number, SkSize size, SkScalar spacer, int startIndex, int nextStartIndex)> LineBreaker;
   typedef std::function<void(SkSize size, int startIndex, int nextStartIndex)> WordBreaker;
   typedef std::function<void(const ShapedRun& run, int start, int end, SkPoint point, SkRect background)> RunBreaker;
 

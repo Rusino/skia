@@ -16,19 +16,20 @@
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
 
-// Comes as a result of shaping (broken down by lines and styles)
-struct StyledRun {
-  StyledRun(size_t start, size_t end, sk_sp<SkTextBlob> blob, SkRect rect, SkTextStyle style)
-      : start(start)
-      , end(end)
-      , blob(blob)
-      , rect(rect)
-      , textStyle(style) {}
-  size_t start;
-  size_t end;
-  sk_sp<SkTextBlob> blob;
-  SkRect rect;
-  SkTextStyle textStyle;
+struct Line {
+  Line(std::vector<Block> blocks)
+      : blocks(std::move(blocks)) {
+    size.fHeight = 0;
+    size.fWidth = 0;
+    spacer = 0;
+  }
+  std::vector<Block> blocks;
+  SkSize size;
+  SkScalar spacer;
+  size_t Start() const { return blocks.empty() ? 0 : blocks.front().start; };
+  size_t End() const { return blocks.empty() ? 0 : blocks.back().end; };
+  size_t Length() const { return blocks.empty() ? 0 :  blocks.back().end - blocks.front().start; }
+  bool IsEmpty() const { return blocks.empty(); }
 };
 
 class SkCanvas;
@@ -82,13 +83,22 @@ class SkParagraph {
   void RecordPicture();
 
   // Creates and draws the decorations onto the canvas.
-  void PaintDecorations(SkCanvas* canvas, StyledRun run, SkPoint offset);
+  void PaintDecorations(SkCanvas* canvas, Block block, SkPoint offset) const;
 
   // Draws the background onto the canvas.
-  void PaintBackground(SkCanvas* canvas, StyledRun run, SkPoint offset);
+  void PaintBackground(SkCanvas* canvas, Block block, SkPoint offset) const;
 
   // Draws the shadows onto the canvas.
-  void PaintShadow(SkCanvas* canvas, StyledRun run, SkPoint offset);
+  void PaintShadow(SkCanvas* canvas, Block block, SkPoint offset) const;
+
+  // Break the text by explicit line breaks
+  void BreakLines();
+
+  // Layout one line without explicit line breaks
+  bool LayoutLine(std::vector<Line>::iterator& iter, SkScalar width);
+
+  // Paint one line (produced with explicit line break or shaper)
+  void PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& line) const;
 
   SkScalar _alphabeticBaseline;
   SkScalar _height;
@@ -104,7 +114,7 @@ class SkParagraph {
   std::shared_ptr<SkFontCollection> _fontCollection;
   // Shaping
   SkParagraphStyle _style;
-  std::vector<StyledRun> _styledRuns;
+  std::vector<Line> _lines;
   // Painting
   sk_sp<SkPicture> _picture;
 };

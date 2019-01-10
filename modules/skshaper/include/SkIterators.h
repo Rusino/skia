@@ -53,6 +53,27 @@ struct StyledText {
   SkTextStyle textStyle;
 };
 
+// The smallest part of the text that is painted separately
+struct Block {
+  Block(size_t start, size_t end, sk_sp<SkTextBlob> blob, SkRect rect, SkTextStyle style)
+      : start(start)
+      , end(end)
+      , textStyle(style)
+      , blob(blob)
+      , rect(rect)
+  {}
+  Block(size_t start, size_t end, SkTextStyle style)
+      : start(start)
+      , end(end)
+      , textStyle(style)
+  {}
+  size_t start;
+  size_t end;
+  SkTextStyle textStyle;
+  sk_sp<SkTextBlob> blob;
+  SkRect rect;
+};
+
 class RunIterator {
  public:
   virtual ~RunIterator() {}
@@ -199,113 +220,14 @@ class ScriptRunIterator : public RunIterator {
   hb_script_t fCurrentScript;
   HBBuffer fBuffer;
 };
-/*
-class FontRunIterator1 : public RunIterator {
- public:
-  static SkTLazy<FontRunIterator1> Make(const UChar* utf16,
-                                       size_t utf16Bytes,
-                                       sk_sp<SkTypeface> typeface,
-                                       sk_sp<SkFontMgr> fallbackMgr)
-  {
-    SkTLazy<FontRunIterator1> ret;
-    ret.init(utf16, utf16Bytes, std::move(typeface), std::move(fallbackMgr));
-    return ret;
-  }
 
-  FontRunIterator1(const UChar* utf16,
-                  size_t utf16Bytes,
-                  sk_sp<SkTypeface> typeface,
-                  sk_sp<SkFontMgr> fallbackMgr)
-      : fCurrent(utf16)
-      , fEnd(fCurrent + utf16Bytes)
-      , fFallbackMgr(std::move(fallbackMgr))
-      , fTypeface(std::move(typeface))
-      , fFallbackHBFont(nullptr)
-      , fFallbackTypeface(nullptr)
-      , fCurrentTypeface(fTypeface.get())
-  {
-    fHarfBuzzFont = create_hb_font(fTypeface.get());
-    SkASSERT(fHarfBuzzFont);
-    fHBFont = fHarfBuzzFont.get();
-  }
-
-  void consume() override {
-    SkASSERT(fCurrent < fEnd);
-    SkUnichar u = utf16_next(&fCurrent, fEnd);
-    // If the starting typeface can handle this character, use it.
-    if (fTypeface->charsToGlyphs(&u, SkTypeface::kUTF32_Encoding, nullptr, 1)) {
-      fCurrentTypeface = fTypeface.get();
-      fCurrentHBFont = fHBFont;
-      // If the current fallback can handle this character, use it.
-    } else if (fFallbackTypeface &&
-        fFallbackTypeface->charsToGlyphs(&u, SkTypeface::kUTF32_Encoding, nullptr, 1))
-    {
-      fCurrentTypeface = fFallbackTypeface.get();
-      fCurrentHBFont = fFallbackHBFont.get();
-      // If not, try to find a fallback typeface
-    } else {
-      fFallbackTypeface.reset(fFallbackMgr->matchFamilyStyleCharacter(
-          nullptr, fTypeface->fontStyle(), nullptr, 0, u));
-      fFallbackHBFont = create_hb_font(fFallbackTypeface.get());
-      fCurrentTypeface = fFallbackTypeface.get();
-      fCurrentHBFont = fFallbackHBFont.get();
-    }
-
-    while (fCurrent < fEnd) {
-      const UChar* prev = fCurrent;
-      u = utf16_next(&fCurrent, fEnd);
-
-      // If not using initial typeface and initial typeface has this character, stop fallback.
-      if (fCurrentTypeface != fTypeface.get() &&
-          fTypeface->charsToGlyphs(&u, SkTypeface::kUTF32_Encoding, nullptr, 1))
-      {
-        fCurrent = prev;
-        return;
-      }
-      // If the current typeface cannot handle this character, stop using it.
-      if (!fCurrentTypeface->charsToGlyphs(&u, SkTypeface::kUTF32_Encoding, nullptr, 1)) {
-        fCurrent = prev;
-        return;
-      }
-    }
-  }
-  const UChar* endOfCurrentRun() const override {
-    return fCurrent;
-  }
-  bool atEnd() const override {
-    return fCurrent == fEnd;
-  }
-
-  HBFont& getfHarfBuzzFont() { return fHarfBuzzFont; }
-  sk_sp<SkTypeface> getTypeface() { return fTypeface; }
-
-  SkTypeface* currentTypeface() const {
-    return fCurrentTypeface;
-  }
-  hb_font_t* currentHBFont() const {
-    return fCurrentHBFont;
-  }
-
- private:
-  const UChar* fCurrent;
-  const UChar* fEnd;
-  sk_sp<SkFontMgr> fFallbackMgr;
-  hb_font_t* fHBFont;
-  sk_sp<SkTypeface> fTypeface;
-  HBFont fFallbackHBFont;
-  sk_sp<SkTypeface> fFallbackTypeface;
-  hb_font_t* fCurrentHBFont;
-  SkTypeface* fCurrentTypeface;
-  HBFont fHarfBuzzFont;
-};
-*/
 class FontRunIterator : public RunIterator {
  public:
 
   static SkTLazy<FontRunIterator> Make(const UChar* utf16,
                                         size_t utf16Bytes,
-                                        std::vector<StyledText>::iterator begin,
-                                        std::vector<StyledText>::iterator end,
+                                        std::vector<Block>::iterator begin,
+                                        std::vector<Block>::iterator end,
                                         SkTextStyle defaultStyle)
   {
     SkTLazy<FontRunIterator> ret;
@@ -315,8 +237,8 @@ class FontRunIterator : public RunIterator {
 
   FontRunIterator(const UChar* utf16,
                   size_t utf16Bytes,
-                  std::vector<StyledText>::iterator begin,
-                  std::vector<StyledText>::iterator end,
+                  std::vector<Block>::iterator begin,
+                  std::vector<Block>::iterator end,
                   SkTextStyle defaultStyle)
       : fCurrent(utf16)
       , fStart(utf16)
@@ -324,11 +246,13 @@ class FontRunIterator : public RunIterator {
       , fCurrentStyle(SkTextStyle())
       , fDefaultStyle(defaultStyle)
       , fIterator(begin)
+      , fNext(begin)
       , fLast(end)
   {
     fCurrentTypeface = SkTypeface::MakeDefault();
     fHarfBuzzFont = create_hb_font(fCurrentTypeface.get());
     fHBFont = fHarfBuzzFont.get();
+    MoveToNext();
   }
 
   void consume() override {
@@ -337,7 +261,7 @@ class FontRunIterator : public RunIterator {
       fCurrent = fEnd;
       fCurrentStyle = fDefaultStyle;
     } else {
-      fCurrent = fStart + fIterator->end;
+      fCurrent = fNext == fLast ? fEnd : std::next(fCurrent, fNext->start - fIterator->start);
       fCurrentStyle = fIterator->textStyle;
     }
 
@@ -347,9 +271,20 @@ class FontRunIterator : public RunIterator {
     SkASSERT(fHarfBuzzFont);
     fCurrentHBFont = fHarfBuzzFont.get();
 
-    while (fIterator != fLast &&
-        SkTypeface::Equal(fCurrentTypeface.get(), fIterator->textStyle.getTypeface().get())) {
-      ++fIterator;
+    MoveToNext();
+  }
+
+  void MoveToNext() {
+
+    fIterator = fNext;
+    if (fIterator == fLast) {
+      return;
+    }
+
+    auto typeface = fIterator->textStyle.getTypeface();
+    while (fNext != fLast &&
+        SkTypeface::Equal(typeface.get(), fNext->textStyle.getTypeface().get())) {
+      ++fNext;
     }
   }
 
@@ -395,9 +330,9 @@ class FontRunIterator : public RunIterator {
   const UChar* fEnd;
   SkTextStyle fCurrentStyle;
   SkTextStyle fDefaultStyle;
-  std::vector<StyledText>::iterator fIterator;
-  std::vector<StyledText>::iterator fFirst;
-  std::vector<StyledText>::iterator fLast;
+  std::vector<Block>::iterator fIterator;
+  std::vector<Block>::iterator fNext;
+  std::vector<Block>::iterator fLast;
 
   HBFont fHarfBuzzFont;
   hb_font_t* fHBFont;

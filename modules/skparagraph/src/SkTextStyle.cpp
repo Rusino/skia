@@ -42,7 +42,7 @@ SkTextStyle::SkTextStyle()
 }
 
 // TODO: use font provider to resolve the font
-sk_sp<SkTypeface> SkTextStyle::getTypeface() {
+sk_sp<SkTypeface> SkTextStyle::getTypeface() const {
   /*
   if (_typeface == nullptr) {
     SkDebugf("MakeDefault!!!!!\n");

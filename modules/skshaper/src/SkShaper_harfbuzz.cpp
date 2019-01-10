@@ -92,8 +92,8 @@ struct ShapedRunGlyphIterator {
 }  // namespace
 
 SkShaper::SkShaper(const UChar* utf16, size_t utf16Bytes,
-                   std::vector<StyledText>::iterator begin,
-                   std::vector<StyledText>::iterator end,
+                   std::vector<Block>::iterator begin,
+                   std::vector<Block>::iterator end,
                    SkTextStyle defaultStyle,
                    std::shared_ptr<SkFontCollection> font_collection)
     : fUtf16(utf16)
@@ -164,7 +164,7 @@ SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
 
   icu::UnicodeString utf16 = icu::UnicodeString::fromUTF8(icu::StringPiece(utf8, utf8Bytes));
 
-  std::vector<StyledText> dummy;
+  std::vector<Block> dummy;
   SkShaper shaper((UChar*) utf16.getBuffer(),  utf16.length(),
                   dummy.begin(), dummy.end(), SkTextStyle(),
                   nullptr);
@@ -179,7 +179,7 @@ SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
   return shaper.refineLineBreaks(builder,
                   point,
                   [](const ShapedRun& run, int s, int e, SkPoint point, SkRect background) {},
-                  [](size_t line_number, SkSize size, int p, int c) {});
+                  [](bool line_break, size_t line_number, SkSize size, SkScalar spacer, int p, int c) {});
 }
 
 bool SkShaper::generateGlyphs() {
@@ -316,9 +316,9 @@ bool SkShaper::generateGlyphs() {
 
       char glyphname[32];
       hb_font_get_glyph_name (font->currentHBFont(), glyph.fID, glyphname, sizeof(glyphname));
-      SkDebugf ("glyph='%s' %d [%d] %d %s %s\n", glyphname, glyph.fID, i, u_charType(glyph.fID),
-      glyph.fMayLineBreakBefore ? "word" : "",
-          glyph.fMustLineBreakBefore ? "line" : "");
+      //SkDebugf ("glyph='%s' %d [%d] %d %s %s\n", glyphname, glyph.fID, i, u_charType(glyph.fID),
+      //glyph.fMayLineBreakBefore ? "word" : "",
+      //    glyph.fMustLineBreakBefore ? "line" : "");
 
     }
   }
@@ -415,6 +415,7 @@ void SkShaper::append(SkTextBlobBuilder* builder, const ShapedRun& run, size_t s
 SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& point, RunBreaker runBreaker, LineBreaker lineBreaker) const {
 
   SkPoint currentPoint = point;
+  SkPoint previousPoint = point;
 
   ShapedRunGlyphIterator previousBreak(this->_runs);
   ShapedRunGlyphIterator glyphIterator(this->_runs);
@@ -469,7 +470,7 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& po
       SkScalar runHeight = metrics.fDescent + metrics.fLeading - metrics.fAscent;
 
       SkPoint backgroundPoint = SkPoint::Make(currentPoint.fX, currentPoint.fY + metrics.fAscent);
-      auto startPoint = currentPoint;;
+      auto startPoint = currentPoint;
       append(builder, this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, &currentPoint);
       SkScalar runWidth = currentPoint.fX - backgroundPoint.fX;
       SkRect rect = SkRect::MakeXYWH(backgroundPoint.fX, backgroundPoint.fY, runWidth, runHeight);
@@ -478,10 +479,14 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& po
 
     // Callback to notify about one more line
     ++line_number;
-    lineBreaker(line_number,
-                SkSize::Make(currentPoint.fX - point.fX, currentPoint.fY + maxDescent + maxLeading - point.fY),
-                previousBreak.fRunIndex,
-                runIndex);
+    lineBreaker(
+        nextGlyph != nullptr,
+        line_number,
+        SkSize::Make(currentPoint.fX - point.fX, currentPoint.fY + maxDescent + maxLeading - previousPoint.fY),
+        maxDescent + maxLeading,
+        previousBreak.fRunIndex,
+        runIndex);
+    previousPoint = currentPoint;
     currentPoint.fY += maxDescent + maxLeading;
     currentPoint.fX = point.fX;
     maxAscent = 0;
