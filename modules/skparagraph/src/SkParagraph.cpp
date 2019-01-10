@@ -209,7 +209,7 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
                                           std::back_inserter(tail));
                                 line->blocks.erase(block, line->blocks.end());
                               }
-                              line = _lines.emplace(std::next(line), tail);
+                              line = _lines.emplace(std::next(line), tail, false);
                               block = line->blocks.begin();
                             }
                           });
@@ -229,11 +229,15 @@ void SkParagraph::RecordPicture() {
   SkCanvas* textCanvas = recorder.beginRecording(_width, _height, nullptr, 0);
 
   SkPoint point = SkPoint::Make(0, 0);
+  SkScalar shift = 0;
   for (auto& line : _lines) {
 
+    if (line.hardBreak) {
+      textCanvas->translate(0, shift);
+    }
     PaintLine(textCanvas, point, line);
+    shift = line.size.height();
     //point.fY += line.spacer;
-    //textCanvas->translate(0, line.spacer);
   }
 
   _picture = recorder.finishRecordingAsPicture();
@@ -507,17 +511,19 @@ void SkParagraph::BreakLines() {
 
     // Generate blocks for future use
     std::vector<Block> blocks;
-    blocks.reserve(lastStyle - firstStyle);
-    for (auto s = firstStyle; s < lastStyle; ++s) {
-      auto& style = _styles[s];
-      blocks.emplace_back(
-          SkTMax(style.start, firstChar),
-          SkTMin(style.end, lastChar),
-          style.textStyle);
+    if (firstChar != lastChar) {
+      blocks.reserve(lastStyle - firstStyle);
+      for (auto s = firstStyle; s < lastStyle; ++s) {
+        auto& style = _styles[s];
+        blocks.emplace_back(
+            SkTMax(style.start, firstChar),
+            SkTMin(style.end, lastChar),
+            style.textStyle);
+      }
     }
 
     // Add one more string to the list
-    _lines.emplace(_lines.begin(), blocks);
+    _lines.emplace(_lines.begin(), blocks, true);
 
     if (blocks.empty()) {
       // For empty lines we will lose all the styles info after this point, so let's do it here

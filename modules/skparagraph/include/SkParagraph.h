@@ -17,19 +17,22 @@
 #include "SkParagraphStyle.h"
 
 struct Line {
-  Line(std::vector<Block> blocks)
-      : blocks(std::move(blocks)) {
+  Line(std::vector<Block> blocks, bool hardBreak)
+      : blocks(std::move(blocks))
+      , hardBreak(hardBreak){
     size.fHeight = 0;
     size.fWidth = 0;
     spacer = 0;
+    hardBreak = false;
   }
   std::vector<Block> blocks;
   SkSize size;
   SkScalar spacer;
+  bool hardBreak;
   size_t Start() const { return blocks.empty() ? 0 : blocks.front().start; };
   size_t End() const { return blocks.empty() ? 0 : blocks.back().end; };
   size_t Length() const { return blocks.empty() ? 0 :  blocks.back().end - blocks.front().start; }
-  bool IsEmpty() const { return blocks.empty(); }
+  bool IsEmpty() const { return blocks.empty() || Length() == 0; }
 };
 
 class SkCanvas;

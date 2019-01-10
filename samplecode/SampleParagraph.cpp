@@ -304,7 +304,7 @@ protected:
            "onPressed: null\n",
            ");"
         };
-      //drawText(canvas, this->width(), this->height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
+      //drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
     }
 
 private:
