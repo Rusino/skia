@@ -32,6 +32,18 @@ class SkTextStyle {
 
   SkTextStyle();
 
+  bool operator==(const SkTextStyle& rhs) const {
+    return this->_height == rhs._height &&
+           this->_letterSpacing == rhs._letterSpacing &&
+           this->_fontStyle == rhs._fontStyle &&
+           this->_fontFamily == rhs._fontFamily &&
+           this->_background == rhs._background &&
+           this->_foreground == rhs._foreground &&
+           this->_color == rhs._color &&
+           this->_textShadows == rhs._textShadows &&
+           this->_decoration == rhs._decoration;
+  }
+
   bool equals(const SkTextStyle& other) const;
 
   // Colors

@@ -48,6 +48,12 @@ struct StyledText {
 
   StyledText(size_t start, size_t end, SkTextStyle textStyle)
       : start(start), end(end), textStyle(textStyle) { };
+
+  bool operator==(const StyledText& rhs) const {
+    return start == rhs.start &&
+           end == rhs.end &&
+           textStyle == rhs.textStyle;
+  }
   size_t start;
   size_t end;
   SkTextStyle textStyle;

@@ -29,6 +29,14 @@ class SkParagraphStyle {
 
   SkParagraphStyle();
 
+  bool operator==(const SkParagraphStyle& rhs) const {
+    return this->_line_height == rhs._line_height &&
+           this->_ellipsis == rhs._ellipsis &&
+           this->_textDirection == rhs._textDirection &&
+           this->_textAlign == rhs._textAlign &&
+           this->_textStyle == rhs._textStyle;
+  }
+
   SkTextStyle& getTextStyle() {
     return _textStyle;
   }

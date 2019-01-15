@@ -1545,6 +1545,9 @@ if (skia_enable_tools) {
       ":tool_utils",
       "modules/skottie:tests",
       "modules/sksg:tests",
+      "modules/skparagraph",
+      "modules/skshaper",
+      "//third_party/icu",
       "//third_party/libpng",
       "//third_party/zlib",
     ]

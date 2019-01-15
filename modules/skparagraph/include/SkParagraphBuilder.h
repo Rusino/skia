@@ -67,6 +67,8 @@ class SkParagraphBuilder {
 
  private:
 
+  friend class ParagraphBuilderTester;
+
   void EndRunIfNeeded();
 
   std::vector<uint16_t> _text;

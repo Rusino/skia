@@ -83,6 +83,8 @@ class SkParagraph {
 
  private:
 
+  friend class ParagraphBuilderTester;
+
   void RecordPicture();
 
   // Creates and draws the decorations onto the canvas.
