@@ -45,7 +45,8 @@ size_t SkFontCollection::FamilyKey::Hasher::operator()(
 }
 
 SkFontCollection::SkFontCollection()
-  : _enableFontFallback(true) {
+  : _enableFontFallback(true)
+  ,  _defaultFontManager(SkFontMgr::RefDefault()) {
 }
 
 SkFontCollection::~SkFontCollection() {
@@ -56,17 +57,14 @@ size_t SkFontCollection::GetFontManagersCount() const {
 }
 
 void SkFontCollection::SetAssetFontManager(sk_sp<SkFontMgr> font_manager) {
-  SkDebugf("SetAssetFontManager\n");
   _assetFontManager = font_manager;
 }
 
 void SkFontCollection::SetDynamicFontManager(sk_sp<SkFontMgr> font_manager) {
-  SkDebugf("SetDynamicFontManager\n");
   _dynamicFontManager = font_manager;
 }
 
 void SkFontCollection::SetTestFontManager(sk_sp<SkFontMgr> font_manager) {
-  SkDebugf("SetTestFontManager\n");
   _testFontManager = font_manager;
 }
 
@@ -79,8 +77,8 @@ std::vector<sk_sp<SkFontMgr>> SkFontCollection::GetFontManagerOrder() const {
     order.push_back(_dynamicFontManager);
   if (_assetFontManager)
     order.push_back(_assetFontManager);
-  //if (_defaultFontManager && _enableCallback)
-  //  order.push_back(_defaultFontManager);
+  if (_defaultFontManager && _enableFontFallback)
+    order.push_back(_defaultFontManager);
   return order;
 }
 
@@ -112,18 +110,11 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
     }
 
     if (typeface == nullptr) {
-      // Try default;
-      if (_enableFontFallback) {
-        sk_sp<SkFontMgr> defaultFontManager(SkFontMgr::RefDefault());
-        typeface = defaultFontManager->legacyMakeTypeface(textStyle.getFontFamily().c_str()/*DEFAULT_FONT_FAMILY*/, textStyle.getFontStyle());
-        if (typeface == nullptr) {
-          typeface = SkTypeface::MakeDefault();
-        }
-      }
-      textStyle.setTypeface(typeface);
-      return typeface.get();
+      // Do something?
+      return nullptr;
+    } else {
+      _typefaces.set(familyKey, typeface);
     }
-    _typefaces.set(familyKey, typeface);
   } else {
     typeface = *found;
   }

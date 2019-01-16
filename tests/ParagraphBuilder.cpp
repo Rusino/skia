@@ -168,6 +168,18 @@ class ParagraphBuilderTester {
     };
     RunBuilderTest(reporter, input0, "", {});
 
+    // Empty text with one style
+    input0.push_back(RunDef(ts1));
+    input0.push_back(RunDef());
+    RunBuilderTest(reporter, input0, "", {});
+
+    // Non-empty text with one style that is not applied to anything
+    input0.push_back(RunDef("not empty"));
+    std::vector<StyledText> output0 = {
+        {00, 9, ts},
+    };
+    RunBuilderTest(reporter, input0, "not empty", output0);
+
     // Simple paragraph
     std::vector<RunDef> input1 = {
         RunDef(ps),
@@ -283,7 +295,7 @@ class ParagraphBuilderTester {
     std::vector<StyledText> output6 = {
         {0, 17, ts},
     };
-    RunBuilderTest(reporter, input6, "Simple paragraph.", output6);
+    RunBuilderTest(reporter, input6, "Simple paragraph.", output6, true);
   }
 
   // This unit test loads and uses different fonts to check if they are available
@@ -295,7 +307,14 @@ class ParagraphBuilderTester {
     const SkFontStyle italic_bold(SkFontStyle::kBold_Weight, SkFontStyle::kNormal_Width, SkFontStyle::Slant::kItalic_Slant);
 
     SkFontCollection fontCollection;
+
+    RunFontTest(reporter, fontCollection, "Utopia", normal, true);
+    REPORTER_ASSERT(reporter, fontCollection.GetFontManagersCount() == 1);
     fontCollection.DisableFontFallback();
+    REPORTER_ASSERT(reporter, fontCollection.GetFontManagersCount() == 0);
+    // Still found in cache
+    RunFontTest(reporter, fontCollection, "Utopia", normal, true);
+    RunFontTest(reporter, fontCollection, "Alexander", normal, false);
 
     sk_sp<TestFontManager> assetFontManager = sk_make_sp<TestFontManager>("monospace");
     sk_sp<TestFontManager> dynamicFontManager = sk_make_sp<TestFontManager>("sans-serif");
@@ -315,10 +334,26 @@ class ParagraphBuilderTester {
     // No fonts from test font provider
     RunFontTest(reporter, fontCollection, "serif", normal, false);
     fontCollection.SetTestFontManager(testFontManager);
+    REPORTER_ASSERT(reporter, fontCollection.GetFontManagersCount() == 3);
     RunFontTest(reporter, fontCollection, "serif", normal, true);
-
-    // This font is not anywhere
-    RunFontTest(reporter, fontCollection, "Something else", normal, false);
+/*
+    sk_sp<SkFontMgr> mgr(SkFontMgr::RefDefault());
+    for (int i = 0; i < mgr->countFamilies(); ++i) {
+      SkString familyName;
+      mgr->getFamilyName(i, &familyName);
+      sk_sp<SkFontStyleSet> styleSet(mgr->createStyleSet(i));
+      int N = styleSet->count();
+      for (int j = 0; j < N; ++j) {
+        SkFontStyle fontStyle;
+        SkString style;
+        styleSet->getStyle(j, &fontStyle, &style);
+        SkDebugf(
+            "'%s': \t %3d\t %1d\t %1d\n",
+            familyName.c_str(), fontStyle.weight(), fontStyle.width(), (int)fontStyle.slant());
+      }
+      SkDebugf("\n");
+    }
+*/
   }
 
  private:
@@ -340,7 +375,8 @@ class ParagraphBuilderTester {
   static void RunBuilderTest(skiatest::Reporter* reporter,
                              const std::vector<RunDef>& commands,
                              const std::string& text,
-                             std::vector<StyledText> runs) {
+                             std::vector<StyledText> runs,
+                             bool checkBuild = false) {
     if (!commands.empty()) {
       REPORTER_ASSERT(reporter,
                       commands.size() > 0 && commands[0].command == paragraph);
@@ -391,6 +427,12 @@ class ParagraphBuilderTester {
       SkDebugf("runs: %d != %d\n", builder._runs.size(), runs.size());
     }
     REPORTER_ASSERT(reporter, builder._runs == runs);
+
+    if (checkBuild) {
+      std::unique_ptr<SkParagraph> paragraph = builder.Build();
+      REPORTER_ASSERT(reporter, builder._runs.empty());
+      REPORTER_ASSERT(reporter, builder._text.empty());
+    }
   }
 
   static void RunFontTest(skiatest::Reporter* reporter,
@@ -409,7 +451,9 @@ class ParagraphBuilderTester {
 
       SkString foundName;
       found->getFamilyName(&foundName);
-      REPORTER_ASSERT(reporter, strcmp(foundName.c_str(), familyName));
+      if (strcmp(foundName.c_str(), familyName) != 0) {
+        SkDebugf("Found family name does not match the parameter: %s != %s\n", foundName.c_str(), familyName);
+      }
       REPORTER_ASSERT(reporter, found->fontStyle() == fontStyle);
     } else {
       REPORTER_ASSERT(reporter, found == nullptr);

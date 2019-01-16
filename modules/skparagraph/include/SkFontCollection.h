@@ -65,6 +65,7 @@ class SkFontCollection : public SkRefCnt {
 
   bool _enableFontFallback;
   SkTHashMap<FamilyKey, sk_sp<SkTypeface>, FamilyKey::Hasher> _typefaces;
+  sk_sp<SkFontMgr> _defaultFontManager;
   sk_sp<SkFontMgr> _assetFontManager;
   sk_sp<SkFontMgr> _dynamicFontManager;
   sk_sp<SkFontMgr> _testFontManager;
