@@ -35,8 +35,6 @@ class SkParagraphBuilder {
   // use the top-most style.
   void PushStyle(const SkTextStyle& style);
 
-  SkTextStyle PeekStyle();
-
   // Remove a style from the stack. Useful to apply different styles to chunks
   // of text such as bolding.
   // Example:

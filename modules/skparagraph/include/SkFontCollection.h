@@ -18,14 +18,15 @@
 #include <memory>
 #include <set>
 #include <string>
-#include <unordered_map>
+
+#include "SkTHash.h"
 
 #include "SkFontMgr.h"
 #include "SkRefCnt.h"
 #include "SkTextStyle.h"
-#include "SkFontManager.h"
+#include "SkFontMgr.h"
 
-class SkFontCollection : public std::enable_shared_from_this<SkFontCollection> {
+class SkFontCollection : public SkRefCnt {
  public:
   SkFontCollection();
 
@@ -33,18 +34,23 @@ class SkFontCollection : public std::enable_shared_from_this<SkFontCollection> {
 
   size_t GetFontManagersCount() const;
 
-  void SetAssetFontManager(std::shared_ptr<SkFontManager> fontManager);
-  void SetDynamicFontManager(std::shared_ptr<SkFontManager> fontManager);
-  void SetTestFontManager(std::shared_ptr<SkFontManager> fontManager);
+  void SetAssetFontManager(sk_sp<SkFontMgr> fontManager);
+  void SetDynamicFontManager(sk_sp<SkFontMgr> fontManager);
+  void SetTestFontManager(sk_sp<SkFontMgr> fontManager);
 
-  sk_sp<SkTypeface> findTypeface(SkTextStyle& textStyle);
+  SkTypeface* findTypeface(SkTextStyle& textStyle);
 
   void DisableFontFallback();
 
  private:
+
+  friend class ParagraphBuilderTester;
+
   struct FamilyKey {
     FamilyKey(const std::string& family, const std::string& loc, SkFontStyle style)
         : font_family(family), locale(loc), font_style(style) {}
+
+    FamilyKey() {}
 
     std::string font_family;
     std::string locale;
@@ -58,13 +64,9 @@ class SkFontCollection : public std::enable_shared_from_this<SkFontCollection> {
   };
 
   bool _enableFontFallback;
-  sk_sp<SkFontMgr> _defaultFontManager;
-  std::shared_ptr<SkFontManager> _assetFontManager;
-  std::shared_ptr<SkFontManager> _dynamicFontManager;
-  std::shared_ptr<SkFontManager> _testFontManager;
-  std::unordered_map<FamilyKey,
-                     sk_sp<SkTypeface>,
-                     FamilyKey::Hasher>
-                    _typefaces;
-  std::vector<std::shared_ptr<SkFontManager>> GetFontManagerOrder() const;
+  SkTHashMap<FamilyKey, sk_sp<SkTypeface>, FamilyKey::Hasher> _typefaces;
+  sk_sp<SkFontMgr> _assetFontManager;
+  sk_sp<SkFontMgr> _dynamicFontManager;
+  sk_sp<SkFontMgr> _testFontManager;
+  std::vector<sk_sp<SkFontMgr>> GetFontManagerOrder() const;
 };

@@ -37,9 +37,7 @@ class SkParagraphStyle {
            this->_textStyle == rhs._textStyle;
   }
 
-  SkTextStyle& getTextStyle() {
-    return _textStyle;
-  }
+  SkTextStyle& getTextStyle() { return _textStyle; }
   size_t getMaxLines() { return _maxLines; }
   SkTextDirection getTextDirection() { return _textDirection; }
 

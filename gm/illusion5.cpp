@@ -21,7 +21,7 @@
 #define START 100
 #define RADIUS 5.0
 
-const int NUMBER = (H - START) / SIZE;
+//const int NUMBER = (H - START) / SIZE;
 const float WIDTH = RADIUS * 2;
 
 // Scintillating Grid

@@ -74,7 +74,7 @@ class SkParagraph {
   void SetText(std::vector<uint16_t> utf16text);
   void SetText(const char* utf8text, size_t textBytes);
 
-  void SetStyles(std::vector<StyledText> styles);
+  void Runs(std::vector<StyledText> styles);
   void SetParagraphStyle(SkParagraphStyle style);
 
   void SetFontCollection(std::shared_ptr<SkFontCollection> fontCollection) {

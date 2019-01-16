@@ -84,7 +84,10 @@ class SkTextStyle {
   void addShadow(SkTextShadow shadow) { _textShadows.emplace_back(shadow); }
   void resetShadows() { _textShadows.clear(); }
 
-  void getFontMetrics(SkFontMetrics& metrics) const { _font.getMetrics(&metrics); }
+  void getFontMetrics(SkFontMetrics& metrics) const {
+    SkFont font(_typeface, -_fontSize);
+    font.getMetrics(&metrics);
+  }
 
   SkScalar getFontSize() const { return _fontSize; }
   void setFontSize(SkScalar size) { _fontSize = size; }
@@ -104,8 +107,6 @@ class SkTextStyle {
   SkColor _decorationColor;
   SkTextDecorationStyle _decorationStyle;
   SkScalar _decorationThicknessMultiplier;
-
-  SkFont _font;
 
   SkFontStyle _fontStyle;
 

@@ -78,7 +78,7 @@ void SkParagraph::SetText(const char* utf8text, size_t textBytes) {
   memcpy(&_text16[0], utf16.getBuffer(), textBytes * sizeof(uint16_t));
 }
 
-void SkParagraph::SetStyles(std::vector<StyledText> styles) {
+void SkParagraph::Runs(std::vector<StyledText> styles) {
   _styles = std::move(styles);
 }
 

@@ -32,6 +32,7 @@ SkParagraphBuilder::~SkParagraphBuilder() = default;
 
 void SkParagraphBuilder::SetParagraphStyle(const SkParagraphStyle& style) {
   _style = style;
+  _styles.push(_style.getTextStyle());
 
   auto& textStyle = _style.getTextStyle();
   _fontCollection->findTypeface(textStyle);
@@ -41,29 +42,28 @@ void SkParagraphBuilder::SetParagraphStyle(const SkParagraphStyle& style) {
 void SkParagraphBuilder::PushStyle(const SkTextStyle& style) {
   EndRunIfNeeded();
 
-  auto textStyle = style;
-  _fontCollection->findTypeface(textStyle);
-  _styles.push(textStyle);
-  _runs.emplace_back(_text.size(),_text.size(), textStyle);
-}
-
-SkTextStyle SkParagraphBuilder::PeekStyle() {
-  EndRunIfNeeded();
-  if (_styles.empty()) {
-    return _style.getTextStyle();
+  _styles.push(style);
+  if (!_runs.empty() && _runs.back().end == _text.size() && _runs.back().textStyle == style) {
+    // Just continue with the same style
+  } else {
+    // Resolve the new style and go with it
+    auto textStyle = style;
+    _fontCollection->findTypeface(textStyle);
+    _runs.emplace_back(_text.size(), _text.size(), textStyle);
   }
-  return _styles.top();
 }
 
 void SkParagraphBuilder::Pop() {
 
   EndRunIfNeeded();
-  if (_styles.empty()) {
-    return;
+  if (_styles.size() > 1) {
+    _styles.pop();
+  } else {
+    // In this case we use paragraph style and skip Pop operation
+    SkDebugf("SkParagraphBuilder.Pop() called too many times.\n");
   }
 
-  _styles.pop();
-  auto top = _styles.empty() ? _style.getTextStyle() : _styles.top();
+  auto top = _styles.top();
   _runs.emplace_back(_text.size(), _text.size(), top);
 }
 
@@ -90,6 +90,7 @@ void SkParagraphBuilder::EndRunIfNeeded() {
   if (_runs.empty()) {
     return;
   }
+
   auto& last = _runs.back();
   if (last.start == _text.size()) {
     _runs.pop_back();
@@ -103,7 +104,7 @@ std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
 
   std::unique_ptr<SkParagraph> paragraph = std::make_unique<SkParagraph>();
   paragraph->SetText(std::move(_text));
-  paragraph->SetStyles(std::move(_runs));
+  paragraph->Runs(std::move(_runs));
   paragraph->SetParagraphStyle(_style);
   paragraph->SetFontCollection(_fontCollection);
 
