@@ -106,7 +106,6 @@ std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
   paragraph->SetText(std::move(_text));
   paragraph->Runs(std::move(_runs));
   paragraph->SetParagraphStyle(_style);
-  paragraph->SetFontCollection(_fontCollection);
 
   return paragraph;
 }

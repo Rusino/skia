@@ -74,7 +74,7 @@ void SkParagraph::SetText(const char* utf8text, size_t textBytes) {
   std::string str;
   utf16.toUTF8String(str);
 
-  _text16.resize(textBytes + 1);
+  _text16.resize(textBytes);
   memcpy(&_text16[0], utf16.getBuffer(), textBytes * sizeof(uint16_t));
 }
 
@@ -127,7 +127,7 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
 
   SkShaper shaper(&_text16[line->Start()], line->Length(),
                   line->blocks.begin(), line->blocks.end(),
-                  _style.getTextStyle(), _fontCollection);
+                  _style.getTextStyle());
 
   if (!shaper.generateGlyphs()) {
     SkDebugf("Error shaping\n");
@@ -484,19 +484,24 @@ void SkParagraph::BreakLines() {
   size_t firstStyle = _styles.size() - 1;
   while (lastChar > 0) {
 
-    firstChar = breaker->preceding(firstChar);
-    if ((int32_t)firstChar == icu::BreakIterator::DONE) {
+    int32_t status = breaker->preceding(firstChar);
+    if (status == icu::BreakIterator::DONE) {
       // Take care of the first line
       firstChar = 0;
-    } else if (breaker->getRuleStatus() != UBRK_LINE_HARD) {
-      continue;
+    } else {
+      firstChar = status;
+      if (breaker->getRuleStatus() != UBRK_LINE_HARD) {
+        continue;
+      }
     }
 
-    int32_t character = *(_text16.begin() + lastChar - 1);
     // Remove all insignificant characters at the end of the line (whitespaces)
-    while (lastChar > firstChar && u_isWhitespace(character)) {
+    while (lastChar > firstChar) {
+      int32_t character = *(_text16.begin() + lastChar - 1);
+      if (!u_isWhitespace(character)) {
+        break;
+      }
       lastChar -= 1;
-      character = *(_text16.begin() + lastChar - 1);
     }
 
     // Find the first style that is related to the line
@@ -523,7 +528,7 @@ void SkParagraph::BreakLines() {
     }
 
     // Add one more string to the list
-    _lines.emplace(_lines.begin(), blocks, true);
+    _lines.emplace(_lines.begin(), blocks, breaker->getRuleStatus() == UBRK_LINE_HARD);
 
     if (blocks.empty()) {
       // For empty lines we will lose all the styles info after this point, so let's do it here
@@ -537,7 +542,7 @@ void SkParagraph::BreakLines() {
     // Move on
     lastChar = firstChar;
   }
-
+/*
   // Print all lines
   size_t linenum = 0;
   for (auto& line : _lines) {
@@ -562,6 +567,7 @@ void SkParagraph::BreakLines() {
       }
     }
   }
+  */
 }
 
 std::vector<SkTextBox> SkParagraph::GetRectsForRange(

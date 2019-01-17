@@ -23,7 +23,6 @@ struct Line {
     size.fHeight = 0;
     size.fWidth = 0;
     spacer = 0;
-    hardBreak = false;
   }
   std::vector<Block> blocks;
   SkSize size;
@@ -77,13 +76,9 @@ class SkParagraph {
   void Runs(std::vector<StyledText> styles);
   void SetParagraphStyle(SkParagraphStyle style);
 
-  void SetFontCollection(std::shared_ptr<SkFontCollection> fontCollection) {
-    _fontCollection = fontCollection;
-  }
-
  private:
 
-  friend class ParagraphBuilderTester;
+  friend class ParagraphTester;
 
   void RecordPicture();
 
@@ -116,7 +111,6 @@ class SkParagraph {
   // Input
   std::vector<uint16_t> _text16;
   std::vector<StyledText> _styles;
-  std::shared_ptr<SkFontCollection> _fontCollection;
   // Shaping
   SkParagraphStyle _style;
   std::vector<Line> _lines;

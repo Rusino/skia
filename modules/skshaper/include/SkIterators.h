@@ -23,7 +23,6 @@
 #include "SkTDPQueue.h"
 #include "SkStream.h"
 #include "SkTextBlob.h"
-#include "SkFontCollection.h"
 
 template <class T, void(*P)(T*)> using resource = std::unique_ptr<T, SkFunctionWrapper<void, T, P>>;
 using HBBlob   = resource<hb_blob_t  , hb_blob_destroy  >;
@@ -247,7 +246,6 @@ class FontRunIterator : public RunIterator {
                   std::vector<Block>::iterator end,
                   SkTextStyle defaultStyle)
       : fCurrent(utf16)
-      , fStart(utf16)
       , fEnd(fCurrent + utf16Bytes)
       , fCurrentStyle(SkTextStyle())
       , fDefaultStyle(defaultStyle)
@@ -332,7 +330,6 @@ class FontRunIterator : public RunIterator {
 
  private:
   const UChar* fCurrent;
-  const UChar* fStart;
   const UChar* fEnd;
   SkTextStyle fCurrentStyle;
   SkTextStyle fDefaultStyle;

@@ -14,6 +14,8 @@
 
 #include "SkTestTypeface.h"
 
+#include <unordered_map>
+
 #include "unicode/utypes.h"
 #include "unicode/unistr.h"
 #include "SkParagraphBuilder.h"
@@ -133,7 +135,7 @@ class TestFontManager : public SkFontMgr {
   sk_sp<TestFontStyleSet> _set;
 };
 
-class ParagraphBuilderTester {
+class ParagraphTester {
  public:
   // This unit test feeds an ParagraphBuilderTester various commands then checks to see if
   // the result contains the provided data.
@@ -356,6 +358,189 @@ class ParagraphBuilderTester {
 */
   }
 
+  // Make sure all the explict like breaks work correctly
+  static void TestParagraphExplicitLF(skiatest::Reporter* reporter) {
+
+    SkParagraphStyle ps;
+    SkTextStyle& ts = ps.getTextStyle();
+
+    SkTextStyle ts1;
+    ts1.setFontSize(10);
+    ts1.setFontFamily("Arial");
+    ts1.setBackgroundColor(SK_ColorYELLOW);
+
+    SkTextStyle ts2;
+    ts2.setFontSize(20);
+    ts2.setFontFamily("Arial");
+    ts2.setBackgroundColor(SK_ColorBLUE);
+
+    SkTextStyle ts3;
+    ts3.setFontSize(30);
+    ts3.setFontFamily("Arial");
+    ts3.setBackgroundColor(SK_ColorLTGRAY);
+
+    SkTextStyle ts4;
+    ts3.setFontSize(40);
+    ts3.setFontFamily("Arial");
+    ts3.setBackgroundColor(SK_ColorLTGRAY);
+
+    // Many newlines and nothing else
+    std::vector<StyledText> runs1 = { { 00, 06, ts } };
+    std::string line1 = "\n\n\n\n\n\n";
+    std::vector<std::string> lines1 = {
+        "", "", "", "", "", "",
+    };
+    RunLineBreakingTest(reporter, line1, runs1, lines1, {});
+
+    // Newlines at the end of each run
+    std::vector<StyledText> runs2 = {
+        { 00, 17, ts },
+        { 17, 34, ts },
+        { 34, 53, ts },
+    };
+    std::string line2 = "this is line one\nthis is line two\nthis is line three\n";
+    std::vector<std::string> lines2 = {
+        "this is line one", "this is line two", "this is line three"
+    };
+    RunLineBreakingTest(reporter, line2, runs2, lines2, {});
+
+    // Newlines in the middle of the run
+    std::vector<StyledText> runs3 = {
+        { 00, 35, ts },
+    };
+    std::string line3 = "Newlines\n in the middle\n of the run";
+    std::vector<std::string> lines3 = {
+        "Newlines", " in the middle", " of the run"
+    };
+    RunLineBreakingTest(reporter, line3, runs3, lines3, {});
+
+    // 2 runs cross 2 lines if you understand what I mean
+    std::vector<StyledText> runs4 = {
+        { 00, 03, ts1 },
+        { 03, 17, ts2 },
+        { 17, 28, ts3 },
+        { 28, 36, ts4 },
+    };
+    std::string line4 = "New|lines\n in the|middle\n of|the run";
+    std::vector<std::string> lines4 = {
+        "New|lines", " in the|middle", " of|the run"
+    };
+    std::vector<std::vector<StyledText>> blocks = {
+        {
+            { 00, 03, ts1 },
+            { 03,  9, ts2 },
+        },
+        {
+            { 10, 17, ts2 },
+            { 17, 24, ts3 },
+        },
+        {
+            { 25, 28, ts3 },
+            { 28, 36, ts4 }
+        },
+    };
+    RunLineBreakingTest(reporter, line4, runs4, lines4, blocks);
+  }
+
+  // Inspect one line layout
+  static void TestParagraphLayout(skiatest::Reporter* reporter) {
+
+    SkParagraphStyle ps;
+    SkTextStyle& ts = ps.getTextStyle();
+
+    SkTextStyle ts1;
+    ts1.setFontSize(10);
+    ts1.setFontFamily("Arial");
+    ts1.setBackgroundColor(SK_ColorYELLOW);
+
+    SkTextStyle ts2;
+    ts2.setFontSize(10);
+    ts2.setFontFamily("Arial");
+    ts2.setBackgroundColor(SK_ColorBLUE);
+
+    SkTextStyle ts3;
+    ts3.setFontSize(30);
+    ts3.setFontFamily("Arial");
+    ts3.setBackgroundColor(SK_ColorLTGRAY);
+
+    SkTextStyle ts4;
+    ts3.setFontSize(40);
+    ts3.setFontFamily("Arial");
+    ts3.setBackgroundColor(SK_ColorLTGRAY);
+
+    std::shared_ptr<SkFontCollection> fontCollection(std::make_shared<SkFontCollection>());
+    fontCollection->findTypeface(ts);
+    fontCollection->findTypeface(ts1);
+    fontCollection->findTypeface(ts2);
+    fontCollection->findTypeface(ts3);
+    fontCollection->findTypeface(ts4);
+
+    // One short line
+    std::vector<StyledText> runs1 = { { 00, 14, ts } };
+    std::string line1 = "One short line";
+    RunLayoutTest(reporter, line1, runs1, 500, { line1 }, { runs1 });
+
+    // Expect two lines
+    std::vector<StyledText> runs2 = { { 00, 44, ts } };
+    std::vector<std::vector<StyledText>> blocks2 = {
+        { { 00, 17, ts } },
+        { { 17, 33, ts } },
+        { { 33, 44, ts } },
+    };
+    std::string line2 = "This is the line that will break into three.";
+    std::vector<std::string> lines2 = {
+        "This is the line ", "that will break ", "into three."
+    };
+    RunLayoutTest(reporter, line2, runs2, 100, lines2, blocks2);
+
+    // One short line with two blocks
+    std::vector<StyledText> runs3 = { { 00, 07, ts1 }, { 07, 14, ts2 } };
+    std::vector<std::vector<StyledText>> blocks3 = {
+        { { 00, 07, ts1 }, { 07, 14, ts2 } }
+    };
+    std::string line3 = "One short line";
+    RunLayoutTest(reporter, line3, runs3, 500, { line3 }, { runs3 });
+
+/*
+    // Newlines in the middle of the run
+    std::vector<StyledText> runs3 = {
+        { 00, 35, ts },
+    };
+    std::string line3 = "Newlines\n in the middle\n of the run";
+    std::vector<std::string> lines3 = {
+        "Newlines", " in the middle", " of the run"
+    };
+    RunLineBreakingTest(reporter, line3, runs3, lines3, {});
+
+    // 2 runs cross 2 lines if you understand what I mean
+    std::vector<StyledText> runs4 = {
+        { 00, 03, ts1 },
+        { 03, 17, ts2 },
+        { 17, 28, ts3 },
+        { 28, 36, ts4 },
+    };
+    std::string line4 = "New|lines\n in the|middle\n of|the run";
+    std::vector<std::string> lines4 = {
+        "New|lines", " in the|middle", " of|the run"
+    };
+    std::vector<std::vector<StyledText>> blocks = {
+        {
+            { 00, 03, ts1 },
+            { 03,  9, ts2 },
+        },
+        {
+            { 10, 17, ts2 },
+            { 17, 24, ts3 },
+        },
+        {
+            { 25, 28, ts3 },
+            { 28, 36, ts4 }
+        },
+    };
+    RunLineBreakingTest(reporter, line4, runs4, lines4, blocks);
+    */
+  }
+
  private:
 
   enum Command { add, add1, push, pop, paragraph };
@@ -459,12 +644,100 @@ class ParagraphBuilderTester {
       REPORTER_ASSERT(reporter, found == nullptr);
     }
   };
+
+  static void RunLineBreakingTest(skiatest::Reporter* reporter,
+                                  const std::string& line,
+                                  std::vector<StyledText> runs,
+                                  std::vector<std::string> lines,
+                                  std::vector<std::vector<StyledText>> styles) {
+
+    SkParagraph paragraph;
+    paragraph.SetText(line.c_str(), line.size());
+    paragraph.Runs(std::move(runs));
+    paragraph.SetParagraphStyle(SkParagraphStyle());
+
+    paragraph.BreakLines();
+
+    if (lines.size() == paragraph._lines.size()) {
+      for (size_t i = 0; i != lines.size(); ++i) {
+        auto& line1 = lines[i];
+        auto& line2 = paragraph._lines[i];
+        REPORTER_ASSERT(reporter, line1.size() == line2.Length());
+        REPORTER_ASSERT(reporter, line2.hardBreak == (i != 0));
+        if (!styles.empty()) {
+          auto& blocks = styles[i];
+          if (blocks.size() == line2.blocks.size()) {
+            for (size_t j = 0; j < blocks.size(); ++j) {
+              auto& block = blocks[j];
+              auto& styled = line2.blocks[j];
+              REPORTER_ASSERT(reporter, block.start == styled.start);
+              REPORTER_ASSERT(reporter, block.end == styled.end);
+              REPORTER_ASSERT(reporter, block.textStyle == styled.textStyle);
+            }
+          }
+        }
+      }
+    } else {
+      REPORT_FAILURE(reporter, "Wrong number of broken lines.", SkString());
+    }
+  }
+
+  static void RunLayoutTest(skiatest::Reporter* reporter,
+                            const std::string& line,
+                            std::vector<StyledText> runs,
+                            SkScalar width,
+                            std::vector<std::string> lines,
+                            std::vector<std::vector<StyledText>> styles) {
+
+    SkParagraph paragraph;
+    paragraph.SetText(line.c_str(), line.size());
+    paragraph.Runs(runs);
+    paragraph.SetParagraphStyle(SkParagraphStyle());
+    paragraph.BreakLines();
+    REPORTER_ASSERT(reporter, paragraph._lines.size() == 1);
+
+    auto iter = paragraph._lines.begin();
+    paragraph.LayoutLine(iter, width);
+
+    REPORTER_ASSERT(reporter, paragraph._width <= width);
+
+    if (lines.size() == paragraph._lines.size()) {
+      for (size_t i = 0; i != lines.size(); ++i) {
+        auto& line1 = lines[i];
+        auto& line2 = paragraph._lines[i];
+        REPORTER_ASSERT(reporter, line1.size() == line2.Length());
+        REPORTER_ASSERT(reporter, line2.size.width() <= width);
+        REPORTER_ASSERT(reporter, !line2.hardBreak);
+
+        auto& blocks = styles[i];
+        if (blocks.size() == line2.blocks.size()) {
+          for (size_t j = 0; j < blocks.size(); ++j) {
+            auto& block = blocks[j];
+            auto& styled = line2.blocks[j];
+            REPORTER_ASSERT(reporter, block.start == styled.start);
+            REPORTER_ASSERT(reporter, block.end == styled.end);
+            REPORTER_ASSERT(reporter, block.textStyle == styled.textStyle);
+          }
+        }
+      }
+    } else {
+      REPORT_FAILURE(reporter, "Wrong number of shaped lines.", SkString());
+    }
+  }
 };
 
 DEF_TEST(ParagraphBuilder, reporter) {
-  ParagraphBuilderTester::TestParagraphBuilder(reporter);
+  ParagraphTester::TestParagraphBuilder(reporter);
 }
 
 DEF_TEST(ParagraphFontCollection, reporter) {
-  ParagraphBuilderTester::TestFontCollection(reporter);
+  ParagraphTester::TestFontCollection(reporter);
+}
+
+DEF_TEST(ParagraphExplicitLF, reporter) {
+  ParagraphTester::TestParagraphExplicitLF(reporter);
+}
+
+DEF_TEST(ParagraphLayout, reporter) {
+  ParagraphTester::TestParagraphLayout(reporter);
 }

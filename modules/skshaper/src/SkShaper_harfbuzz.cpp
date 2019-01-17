@@ -22,7 +22,6 @@
 #include "SkTo.h"
 #include "SkIterators.h"
 #include "SkFontPriv.h"
-#include "SkFontCollection.h"
 
 #include <unicode/brkiter.h>
 #include <unicode/locid.h>
@@ -94,8 +93,7 @@ struct ShapedRunGlyphIterator {
 SkShaper::SkShaper(const UChar* utf16, size_t utf16Bytes,
                    std::vector<Block>::iterator begin,
                    std::vector<Block>::iterator end,
-                   SkTextStyle defaultStyle,
-                   std::shared_ptr<SkFontCollection> font_collection)
+                   SkTextStyle defaultStyle)
     : fUtf16(utf16)
     , fUtf16Bytes(utf16Bytes) {
 
@@ -166,8 +164,7 @@ SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
 
   std::vector<Block> dummy;
   SkShaper shaper((UChar*) utf16.getBuffer(),  utf16.length(),
-                  dummy.begin(), dummy.end(), SkTextStyle(),
-                  nullptr);
+                  dummy.begin(), dummy.end(), SkTextStyle());
   if (!shaper.generateGlyphs()) {
     return point;
   }

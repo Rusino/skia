@@ -44,7 +44,7 @@ class SkFontCollection : public SkRefCnt {
 
  private:
 
-  friend class ParagraphBuilderTester;
+  friend class ParagraphTester;
 
   struct FamilyKey {
     FamilyKey(const std::string& family, const std::string& loc, SkFontStyle style)

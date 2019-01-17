@@ -65,7 +65,7 @@ class SkParagraphBuilder {
 
  private:
 
-  friend class ParagraphBuilderTester;
+  friend class ParagraphTester;
 
   void EndRunIfNeeded();
 
