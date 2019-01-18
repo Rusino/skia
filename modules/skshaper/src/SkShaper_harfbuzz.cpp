@@ -175,8 +175,8 @@ SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
   // Reorder the runs and glyphs per line and write them out.
   return shaper.refineLineBreaks(builder,
                   point,
-                  [](const ShapedRun& run, int s, int e, SkPoint point, SkRect background) {},
-                  [](bool line_break, size_t line_number, SkSize size, SkScalar spacer, int p, int c) {});
+                  [](sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect) {},
+                  [](bool endOfText, SkScalar width, SkScalar height) {});
 }
 
 bool SkShaper::generateGlyphs() {
@@ -212,7 +212,7 @@ bool SkShaper::generateGlyphs() {
     hb_buffer_t* buffer = script->getBuffer().get();
     SkAutoTCallVProc<hb_buffer_t, hb_buffer_clear_contents> autoClearBuffer(buffer);
     hb_buffer_set_content_type(buffer, HB_BUFFER_CONTENT_TYPE_UNICODE);
-    hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_CHARACTERS);
+    hb_buffer_set_cluster_level(buffer, HB_BUFFER_CLUSTER_LEVEL_MONOTONE_CHARACTERS); // ...LEVEL_CHARACTERS?
 
     // Add precontext.
     hb_buffer_add_utf16(buffer, fUtf16, utf16Start - fUtf16, utf16Start - fUtf16, 0);
@@ -261,11 +261,9 @@ bool SkShaper::generateGlyphs() {
       return false;
     }
 
-    // TODO: Create the font properly
     SkFont srcFont = font->getCurrentFont();
     ShapedRun& run = _runs.emplace_back(utf16Start, utf16End, len, srcFont, bidi->currentLevel(),
                                         std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]));
-
 
     hb_codepoint_t space;
     hb_font_get_glyph_from_name (font->currentHBFont(), "space", -1, &space);
@@ -323,9 +321,8 @@ bool SkShaper::generateGlyphs() {
   return true;
 }
 
-bool SkShaper::generateLineBreaks(SkScalar width) {
+void SkShaper::generateLineBreaks(SkScalar width) {
 
-  bool breakable = false;
   SkScalar widthSoFar = 0;
   bool previousBreakValid = false; // Set when previousBreak is set to a valid candidate break.
   bool canAddBreakNow = false; // Disallow line breaks before the first glyph of a run.
@@ -333,15 +330,11 @@ bool SkShaper::generateLineBreaks(SkScalar width) {
   ShapedRunGlyphIterator glyphIterator(this->_runs);
   while (ShapedGlyph* glyph = glyphIterator.current()) {
     if (glyph->fMustLineBreakBefore) {
-      breakable = false;
-      widthSoFar = 0;
+      widthSoFar = glyph->fAdvance.fX;
       previousBreakValid = false;
       canAddBreakNow = false;
       glyphIterator.next();
       continue;
-    }
-    if (glyph->fMayLineBreakBefore) {
-      breakable = true;
     }
     if (canAddBreakNow && glyph->fMayLineBreakBefore) {
       previousBreakValid = true;
@@ -370,24 +363,17 @@ bool SkShaper::generateLineBreaks(SkScalar width) {
     glyph = glyphIterator.current();
     if (glyph) {
       glyph->fMustLineBreakBefore = true;
-      //auto& run = this->_runs[glyphIterator.fRunIndex];
-      //SkDebugf("Break at %d\n", run.fUtf16End - fUtf16);
-
     }
     widthSoFar = 0;
     previousBreakValid = false;
     canAddBreakNow = false;
   }
-
-  return breakable;
 }
 
 void SkShaper::append(SkTextBlobBuilder* builder, const ShapedRun& run, size_t start, size_t end, SkPoint* p) const {
 
-  if (end == start) {
-    // TODO: I don't think it should happen, but it does
-    return;
-  }
+  SkASSERT(end > start);
+
   unsigned len = end - start;
   SkPaint tmpPaint;
   run.fFont.LEGACY_applyToPaint(&tmpPaint);
@@ -409,44 +395,46 @@ void SkShaper::append(SkTextBlobBuilder* builder, const ShapedRun& run, size_t s
   }
 }
 
-SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& point, RunBreaker runBreaker, LineBreaker lineBreaker) const {
+SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint& point, OnWordBreak onWordBreak, OnLineBreak onLineBreak) const {
 
-  SkPoint currentPoint = point;
-  SkPoint previousPoint = point;
+  SkPoint lineEnd = point;
+  SkPoint lineStart = point;
 
   ShapedRunGlyphIterator previousBreak(this->_runs);
   ShapedRunGlyphIterator glyphIterator(this->_runs);
-  SkScalar maxAscent = 0;
-  SkScalar maxDescent = 0;
-  SkScalar maxLeading = 0;
+
+  SkScalar maxLineAscent = 0;
+  SkScalar maxLineDescent = 0;
+  SkScalar maxLineLeading = 0;
+
   int previousRunIndex = -1;
   size_t line_number = 0;
   while (glyphIterator.current()) {
 
     int runIndex = glyphIterator.fRunIndex;
     int glyphIndex = glyphIterator.fGlyphIndex;
-    ShapedGlyph* nextGlyph = glyphIterator.next();
 
     if (previousRunIndex != runIndex) {
       SkFontMetrics metrics;
       this->_runs[runIndex].fFont.getMetrics(&metrics);
-      maxAscent = SkTMin(maxAscent, metrics.fAscent);
-      maxDescent = SkTMax(maxDescent, metrics.fDescent);
-      maxLeading = SkTMax(maxLeading, metrics.fLeading);
+      maxLineAscent = SkTMin(maxLineAscent, metrics.fAscent);
+      maxLineDescent = SkTMax(maxLineDescent, metrics.fDescent);
+      maxLineLeading = SkTMax(maxLineLeading, metrics.fLeading);
       previousRunIndex = runIndex;
     }
 
-    // Nothing can be written until the baseline is known.
-    if (!(nextGlyph == nullptr || nextGlyph->fMustLineBreakBefore)) {
+    // Nothing can be written until the baseline is known
+    ShapedGlyph* nextGlyph = glyphIterator.next();
+    if (nextGlyph != nullptr && !nextGlyph->fMustLineBreakBefore) {
       continue;
     }
 
-    currentPoint.fY -= maxAscent;
+    lineEnd.fY -= maxLineAscent;
 
     int numRuns = runIndex - previousBreak.fRunIndex + 1;
     SkAutoSTMalloc<4, UBiDiLevel> runLevels(numRuns);
     for (int i = 0; i < numRuns; ++i) {
-      runLevels[i] = this->_runs[previousBreak.fRunIndex + i].fLevel;
+      runLevels[i] = _runs[previousBreak.fRunIndex + i].fLevel;
     }
     SkAutoSTMalloc<4, int32_t> logicalFromVisual(numRuns);
     ubidi_reorderVisual(runLevels, numRuns, logicalFromVisual);
@@ -455,130 +443,53 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& po
 
       int logicalIndex = previousBreak.fRunIndex + logicalFromVisual[i];
 
-      int startGlyphIndex = (logicalIndex == previousBreak.fRunIndex)
-                            ? previousBreak.fGlyphIndex
-                            : 0;
-      int endGlyphIndex = (logicalIndex == runIndex)
-                          ? glyphIndex + 1
-                          : this->_runs[logicalIndex].fNumGlyphs;
+      auto& thisRun = _runs[logicalIndex];
 
-      SkFontMetrics metrics;
-      this->_runs[logicalIndex].fFont.getMetrics(&metrics);
-      SkScalar runHeight = metrics.fDescent + metrics.fLeading - metrics.fAscent;
+      int startGlyphIndex = logicalIndex == previousBreak.fRunIndex ? previousBreak.fGlyphIndex : 0;
+      int endGlyphIndex = logicalIndex == runIndex ? glyphIndex + 1 : thisRun.fNumGlyphs;
 
-      SkPoint backgroundPoint = SkPoint::Make(currentPoint.fX, currentPoint.fY + metrics.fAscent);
-      auto startPoint = currentPoint;
-      append(builder, this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, &currentPoint);
-      SkScalar runWidth = currentPoint.fX - backgroundPoint.fX;
-      SkRect rect = SkRect::MakeXYWH(backgroundPoint.fX, backgroundPoint.fY, runWidth, runHeight);
-      runBreaker(this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, startPoint, rect);
+      // Break the run into words
+      int startWord = startGlyphIndex;
+      for (int glyph = startGlyphIndex; glyph < endGlyphIndex; ++glyph) {
+        if (thisRun.fGlyphs[glyph].fMayLineBreakBefore && glyph != startGlyphIndex) {
+          // Found a word
+          SkRect backgroundRect = SkRect::MakeXYWH(lineEnd.fX, lineStart.fY, 0, 0);
+          SkTextBlobBuilder builder;
+          append(&builder, thisRun, startWord, glyph, &lineEnd);
+
+          SkFontMetrics metrics;
+          backgroundRect.fRight = lineEnd.fX;
+          backgroundRect.fBottom += thisRun.fFont.getMetrics(&metrics);
+          onWordBreak(builder.make(), thisRun, startWord, glyph, backgroundRect);
+          // Continue
+          startWord = glyph;
+        }
+      }
+      if (startWord != endGlyphIndex - 1) {
+        SkRect
+            backgroundRect = SkRect::MakeXYWH(lineEnd.fX, lineStart.fY, 0, 0);
+        SkTextBlobBuilder builder;
+        append(&builder, thisRun, startWord, endGlyphIndex, &lineEnd);
+
+        SkFontMetrics metrics;
+        backgroundRect.fRight = lineEnd.fX;
+        backgroundRect.fBottom += thisRun.fFont.getMetrics(&metrics);
+        onWordBreak(builder.make(), thisRun, startWord, endGlyphIndex, backgroundRect);
+      }
     }
 
     // Callback to notify about one more line
     ++line_number;
-    lineBreaker(
-        nextGlyph != nullptr,
-        line_number,
-        SkSize::Make(currentPoint.fX - point.fX, currentPoint.fY + maxDescent + maxLeading - previousPoint.fY),
-        maxDescent + maxLeading,
-        previousBreak.fRunIndex,
-        runIndex);
-    previousPoint = currentPoint;
-    currentPoint.fY += maxDescent + maxLeading;
-    currentPoint.fX = point.fX;
-    maxAscent = 0;
-    maxDescent = 0;
-    maxLeading = 0;
+    onLineBreak(nextGlyph == nullptr, lineEnd.fX - lineStart.fX, lineEnd.fY + maxLineDescent + maxLineLeading - lineStart.fY);
+    lineEnd.fY += maxLineDescent + maxLineLeading;
+    lineEnd.fX = point.fX;
+    lineStart = lineEnd;
+    maxLineAscent = 0;
+    maxLineDescent = 0;
+    maxLineLeading = 0;
     previousRunIndex = -1;
     previousBreak = glyphIterator;
   }
 
-  return currentPoint;
-}
-
-SkSize SkShaper::breakIntoWords(WordBreaker wordBreaker) const {
-
-  SkTextBlobBuilder builder;
-  SkPoint currentPoint = SkPoint::Make(0, 0);
-  SkSize size = SkSize::Make(0, 0);
-
-  ShapedRunGlyphIterator previousBreak(this->_runs);
-  ShapedRunGlyphIterator glyphIterator(this->_runs);
-  SkScalar maxAscent = 0;
-  SkScalar maxDescent = 0;
-  SkScalar maxLeading = 0;
-  int previousRunIndex = -1;
-  while (glyphIterator.current()) {
-    int runIndex = glyphIterator.fRunIndex;
-    int glyphIndex = glyphIterator.fGlyphIndex;
-    ShapedGlyph* nextGlyph = glyphIterator.next();
-
-    if (previousRunIndex != runIndex) {
-      SkFontMetrics metrics;
-      this->_runs[runIndex].fFont.getMetrics(&metrics);
-      maxAscent = SkTMin(maxAscent, metrics.fAscent);
-      maxDescent = SkTMax(maxDescent, metrics.fDescent);
-      maxLeading = SkTMax(maxLeading, metrics.fLeading);
-      previousRunIndex = runIndex;
-    }
-
-    // Nothing can be written until the baseline is known.
-    if (!(nextGlyph == nullptr || nextGlyph->fMayLineBreakBefore)) {
-      continue;
-    }
-
-    currentPoint.fY -= maxAscent;
-
-    int numRuns = runIndex - previousBreak.fRunIndex + 1;
-    SkAutoSTMalloc<4, UBiDiLevel> runLevels(numRuns);
-    for (int i = 0; i < numRuns; ++i) {
-      runLevels[i] = this->_runs[previousBreak.fRunIndex + i].fLevel;
-    }
-    SkAutoSTMalloc<4, int32_t> logicalFromVisual(numRuns);
-    ubidi_reorderVisual(runLevels, numRuns, logicalFromVisual);
-
-    for (int i = 0; i < numRuns; ++i) {
-      int logicalIndex = previousBreak.fRunIndex + logicalFromVisual[i];
-
-      int startGlyphIndex = (logicalIndex == previousBreak.fRunIndex)
-                            ? previousBreak.fGlyphIndex
-                            : 0;
-      int endGlyphIndex = (logicalIndex == runIndex)
-                          ? glyphIndex + 1
-                          : this->_runs[logicalIndex].fNumGlyphs;
-      append(&builder, this->_runs[logicalIndex], startGlyphIndex, endGlyphIndex, &currentPoint);
-    }
-
-    // Callback to notify about one more line
-    currentPoint.fY += maxDescent + maxLeading;
-
-    wordBreaker(SkSize::Make(currentPoint.fX, currentPoint.fY - size.fHeight),
-                previousBreak.fRunIndex,
-                runIndex);
-
-    size.fWidth = SkMaxScalar(size.fWidth, currentPoint.fX);
-    size.fHeight = currentPoint.fY;
-
-    currentPoint.fX = 0;
-    maxAscent = 0;
-    maxDescent = 0;
-    maxLeading = 0;
-    previousRunIndex = -1;
-    previousBreak = glyphIterator;
-  }
-
-  return size;
-}
-
-void SkShaper::resetLayout() {
-  _runs.reset();
-}
-
-void SkShaper::resetLinebreaks() {
-
-  ShapedRunGlyphIterator glyphIterator(this->_runs);
-  while (ShapedGlyph* glyph = glyphIterator.current()) {
-    glyph->fMustLineBreakBefore = false;
-    glyphIterator.next();
-  }
+  return lineEnd;
 }

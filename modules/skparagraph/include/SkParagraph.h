@@ -22,11 +22,9 @@ struct Line {
       , hardBreak(hardBreak){
     size.fHeight = 0;
     size.fWidth = 0;
-    spacer = 0;
   }
   std::vector<Block> blocks;
   SkSize size;
-  SkScalar spacer;
   bool hardBreak;
   size_t Start() const { return blocks.empty() ? 0 : blocks.front().start; };
   size_t End() const { return blocks.empty() ? 0 : blocks.back().end; };
@@ -96,6 +94,9 @@ class SkParagraph {
 
   // Layout one line without explicit line breaks
   bool LayoutLine(std::vector<Line>::iterator& iter, SkScalar width);
+
+  // Format one line by paragraph style
+  void FormatLine(Line& line, bool lastLine, SkScalar width);
 
   // Paint one line (produced with explicit line break or shaper)
   void PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& line) const;

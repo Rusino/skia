@@ -22,6 +22,13 @@
 
 static const float kDoubleDecorationSpacing = 3.0f;
 
+void printText(const std::string& label, const UChar* text, size_t start, size_t end) {
+  icu::UnicodeString utf16 = icu::UnicodeString(text + start, end - start);
+  std::string str;
+  utf16.toUTF8String(str);
+  SkDebugf("%s: %d:%d'%s'\n", label.c_str(), start, end, str.c_str());
+}
+
 SkParagraph::SkParagraph()
     : _picture(nullptr) {}
 
@@ -60,12 +67,6 @@ bool SkParagraph::DidExceedMaxLines() {
 void SkParagraph::SetText(std::vector<uint16_t> utf16text) {
 
   _text16 = std::move(utf16text);
-/*
-  icu::UnicodeString utf16 = icu::UnicodeString(&_text16[0], _text16.size());
-  std::string str;
-  utf16.toUTF8String(str);
-  SkDebugf("SetText '%s'\n", str.c_str());
-*/
 }
 
 void SkParagraph::SetText(const char* utf8text, size_t textBytes) {
@@ -108,6 +109,10 @@ bool SkParagraph::Layout(double width) {
     ++iter;
   }
 
+  for (size_t i = 0; i < _lines.size(); ++i) {
+    FormatLine(_lines[i], i == _lines.size() - 1, width);
+  }
+
   RecordPicture();
 
   return true;
@@ -135,92 +140,100 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
   }
 
   // Iterate over the glyphs in logical order to mark line endings.
-  bool breakable = shaper.generateLineBreaks(SkDoubleToScalar(width));
+  shaper.generateLineBreaks(SkDoubleToScalar(width));
 
-  // Reorder the runs and glyphs per line and write them out.
+  // Start iterating from the first block in the line
   auto block = line->blocks.begin();
 
-  // TODO: simplify the logic
   SkTextBlobBuilder bigBuilder;
   shaper.refineLineBreaks(&bigBuilder, {0, 0},
-                          [this, &block, &shaper, &line]
-                              (const ShapedRun& run, size_t s, size_t e, SkPoint point, SkRect background) {
-                            size_t zero = run.fUtf16Start - &_text16[0]; // Number of characters before this shaped run
-                            size_t lineStart =  zero + s;
-                            size_t lineEnd = zero + e;
-                            //if (block->end < lineStart || block->start > lineEnd) {
-                            //  return;
-                            //}
+      // Match blocks (styles) and runs (words)
+      [this, &block, &line]
+      (sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect) {
+        size_t endWord = run.fUtf16Start - &_text16[0] + e;
+        //printText("Word", run.fUtf16Start, s, e);
 
-                            icu::UnicodeString utf16 = icu::UnicodeString(run.fUtf16Start + s, e - s);
-                            std::string str;
-                            utf16.toUTF8String(str);
-                            SkDebugf("Shaped run: %d:%d'%s'\n", s, e, str.c_str());
+        SkASSERT(block != line->blocks.end());
+        block->blob = blob;
+        block->rect = rect;
+        if (block->end > endWord) {
+          // One block (style) can have few runs (words); let's break them here
+          auto oldEnd = block->end;
+          block->end = endWord;
+          block = line->blocks.emplace(std::next(block), endWord, oldEnd, block->blob, block->rect, block->textStyle);
+        } else {
+          // One word is covered by many styles
+          // We have 3 solutions here:
+          // 1. Stop it by separating runs by any style, not only font-related
+          // 2. Take the first style for the entire word (implemented)
+          // 3. TODO: Make each run a glyph, not a "word" and deal with it appropriately
+          block->blob = blob;
+          ++block;
+          // Remove all the other styles that cover only this word
+          while (block != line->blocks.end() && block->end < endWord) {
+            block = line->blocks.erase(block);
+          }
+        }
+      },
+      // Create extra lines if required by Shaper
+      [&line, &block, this](bool endOfText, SkScalar width, SkScalar height) {
+        line->size = SkSize::Make(width, height);
+        _height += height;
+        _width = SkMaxScalar(_width, width);
+        if (!endOfText) {
+          // Break blocks between two lines
+          std::vector<Block> tail;
+          if (block != line->blocks.end()) {
+            std::move(block, line->blocks.end(), std::back_inserter(tail));
+            line->blocks.erase(block, line->blocks.end());
+          }
+          // Add one more line and start from the it's first block again
+          line = _lines.emplace(std::next(line), tail, false);
+          block = line->blocks.begin();
+        }
+      });
+  return true;
+}
 
-                            SkPoint currentPoint = point;
-                            // Only the first block has the background
-                            bool firstBlockInTheRun = true;
-                            while (true) {
+void SkParagraph::FormatLine(Line& line, bool lastLine, SkScalar width) {
 
-                              size_t startGlyphIndex = std::max<size_t>(block->start, lineStart) - zero;
-                              size_t endGlyphIndex = std::min<size_t>(block->end, lineEnd) - zero;
-                              icu::UnicodeString utf16 = icu::UnicodeString(run.fUtf16Start + startGlyphIndex, endGlyphIndex - startGlyphIndex);
-                              std::string str;
-                              utf16.toUTF8String(str);
-                              SkDebugf("Block  %d:%d '%s'\n", startGlyphIndex, endGlyphIndex, str.c_str());
-                              SkTextBlobBuilder builder;
-                              shaper.append(&builder, run, startGlyphIndex, endGlyphIndex, &currentPoint);
-                              block->blob = builder.make();
-                              block->rect = firstBlockInTheRun ? background : SkRect::MakeXYWH(0,0,0,0);
-                              firstBlockInTheRun = false;
-
-                              if (block->end < lineEnd) {
-                                // Style ended but the line didn't; continue
-                                ++block;
-                              } else if (block->end == lineEnd) {
-                                // End of line is the end of style; move on
-                                ++block;
-                                break;
-                              } else {
-                                // Style is bigger than the line; we need to break it
-                                auto oldEnd = block->end;
-                                block->end = lineEnd;
-                                block = line->blocks.emplace(std::next(block), lineEnd, oldEnd, block->blob, block->rect, block->textStyle);
-                                break;
-                              }
-                            }
-                          },
-                          [&line, &block, this](
-                              bool lineBreak,
-                              size_t line_number,
-                              SkSize size,
-                              SkScalar spacer,
-                              int previousRunIndex,
-                              int runIndex) {
-                            line->size = size;
-                            line->spacer = spacer;
-                            _height += line->size.height();
-                            _width = SkMaxScalar(_width, line->size.width());
-                            if (lineBreak) {
-                              std::vector<Block> tail;
-                              if (block != line->blocks.end()) {
-                                std::move(block,
-                                          line->blocks.end(),
-                                          std::back_inserter(tail));
-                                line->blocks.erase(block, line->blocks.end());
-                              }
-                              line = _lines.emplace(std::next(line), tail, false);
-                              block = line->blocks.begin();
-                            }
-                          });
-
-  if (breakable || false) {
-    shaper.breakIntoWords([this](SkSize size, int startIndex, int nextStartIndex) {
-      _minIntrinsicWidth = SkMaxScalar(_minIntrinsicWidth, size.fWidth);
-    });
+  SkScalar delta = width - line.size.width();
+  SkAssertResult(delta >= 0);
+  if (delta == 0) {
+    // Nothing to do
+    return;
   }
 
-  return true;
+  switch (_style.effective_align()) {
+    case SkTextAlign::left:
+      break;
+    case SkTextAlign::right:
+      for (auto& block : line.blocks) {
+        block.shift += delta;
+      }
+      break;
+    case SkTextAlign::center: {
+      auto half = delta / 2;
+      for (auto& block : line.blocks) {
+        block.shift += half;
+      }
+      break;
+    }
+    case SkTextAlign::justify: {
+      if (lastLine) {
+        break;
+      }
+      SkScalar step = delta / (line.blocks.size() - 1);
+      SkScalar shift = 0;
+      for (auto& block : line.blocks) {
+        block.shift += shift;
+        shift += step;
+      }
+      break;
+    }
+    default:
+      break;
+  }
 }
 
 void SkParagraph::RecordPicture() {
@@ -229,15 +242,9 @@ void SkParagraph::RecordPicture() {
   SkCanvas* textCanvas = recorder.beginRecording(_width, _height, nullptr, 0);
 
   SkPoint point = SkPoint::Make(0, 0);
-  SkScalar shift = 0;
   for (auto& line : _lines) {
 
-    if (line.hardBreak) {
-      textCanvas->translate(0, shift);
-    }
     PaintLine(textCanvas, point, line);
-    shift = line.size.height();
-    //point.fY += line.spacer;
   }
 
   _picture = recorder.finishRecordingAsPicture();
@@ -259,10 +266,10 @@ void SkParagraph::PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& lin
     paint.setTextSize(block.textStyle.getFontSize());
     paint.setTypeface(block.textStyle.getTypeface());
 
-    PaintBackground(textCanvas, block, point);
-    PaintShadow(textCanvas, block, point);
-    textCanvas->drawTextBlob(block.blob, point.x(), point.y(), paint);
-    PaintDecorations(textCanvas, block, point);
+    //PaintBackground(textCanvas, block, point);
+    //PaintShadow(textCanvas, block, point);
+    textCanvas->drawTextBlob(block.blob, point.x() + block.shift, point.y(), paint);
+    //PaintDecorations(textCanvas, block, point);
   }
 }
 
@@ -296,20 +303,19 @@ void SkParagraph::PaintDecorations(SkCanvas* canvas,
   SkFontMetrics metrics;
   block.textStyle.getFontMetrics(metrics);
   SkScalar underline_thickness;
-  if ((metrics.fFlags &
-      SkFontMetrics::FontMetricsFlags::kUnderlineThicknessIsValid_Flag) &&
-      metrics.fUnderlineThickness > 0) {
-    underline_thickness = metrics.fUnderlineThickness;
-  } else {
-    // Backup value if the fUnderlineThickness metric is not available:
-    // Divide by 14pt as it is the default size.
-    underline_thickness = block.textStyle.getFontSize() / 14.0f;
+  if (!metrics.hasUnderlineThickness(&underline_thickness)) {
+    underline_thickness = 1;
   }
+  underline_thickness *= block.textStyle.getFontSize() / 14.0f;
   paint.setStrokeWidth(underline_thickness * block.textStyle.getDecorationThicknessMultiplier());
 
   auto bounds = block.rect;
+  SkScalar underlined;
+  if (!metrics.hasUnderlinePosition(&underlined)) {
+    underlined = metrics.fDescent / 2;
+  }
   SkScalar x = offset.x() + bounds.x();
-  SkScalar y = offset.y() + bounds.y();
+  SkScalar y = offset.y() + bounds.y() - metrics.fAscent;
 
   // Setup the decorations
   switch (block.textStyle.getDecorationStyle()) {
@@ -389,7 +395,7 @@ void SkParagraph::PaintDecorations(SkCanvas* canvas,
     if (block.textStyle.getDecoration() & SkTextDecoration::kOverline) {
       // We subtract fAscent here because for double overlines, we want the
       // second line to be above, not below the first.
-      //y_offset -= metrics.fAscent;
+      y_offset += metrics.fAscent;
       if (block.textStyle.getDecorationStyle() != SkTextDecorationStyle::kWavy) {
         canvas->drawLine(x, y - y_offset, x + width, y - y_offset, paint);
       } else {
@@ -401,20 +407,21 @@ void SkParagraph::PaintDecorations(SkCanvas* canvas,
     }
     // Strikethrough
     if (block.textStyle.getDecoration() & SkTextDecoration::kLineThrough) {
-      if (metrics.fFlags &
-          SkFontMetrics::FontMetricsFlags::kStrikeoutThicknessIsValid_Flag) {
-        paint.setStrokeWidth(metrics.fStrikeoutThickness * block.textStyle.getDecorationThicknessMultiplier());
-        y_offset = i * metrics.fStrikeoutThickness * kDoubleDecorationSpacing * 5;
+      SkScalar thickness;
+      if (!metrics.hasStrikeoutThickness(&thickness)) {
+        thickness = 1;
       }
+      thickness *= block.textStyle.getDecorationThicknessMultiplier();
+      y_offset = i * thickness;
+
       // Make sure the double line is "centered" vertically.
       //y_offset += (decoration_count - 1.0) * underline_thickness *
       //    kDoubleDecorationSpacing / -2.0;
-
-      y_offset += block.rect.height()/2;
-      y_offset -=
-          (metrics.fFlags & SkFontMetrics::FontMetricsFlags::kStrikeoutThicknessIsValid_Flag)
-          ? metrics.fStrikeoutPosition
-          : metrics.fXHeight / -2.0;
+     SkScalar offs;
+     if (!metrics.hasStrikeoutPosition(&offs)) {
+       offs = (metrics.fDescent - metrics.fAscent) / -2.0;
+     }
+      y_offset += offs;
       if (block.textStyle.getDecorationStyle() != SkTextDecorationStyle::kWavy) {
         canvas->drawLine(x, y + y_offset, x + width, y + y_offset, paint);
       } else {

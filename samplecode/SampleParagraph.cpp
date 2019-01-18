@@ -45,7 +45,7 @@ static const char gText[] =
 
 static const std::vector<std::tuple<std::string, bool, bool, int, SkColor, SkColor, bool, SkTextDecorationStyle>> gParagraph = {
     { "monospace", true, false, 14, SK_ColorWHITE, SK_ColorRED, true, SkTextDecorationStyle::kDashed},
-    { "Helvetica Neue", false, false, 20, SK_ColorWHITE, SK_ColorBLUE, false, SkTextDecorationStyle::kDotted},
+    { "Assyrian", false, false, 20, SK_ColorWHITE, SK_ColorBLUE, false, SkTextDecorationStyle::kDotted},
     { "serif", true, true, 10, SK_ColorWHITE, SK_ColorRED, true, SkTextDecorationStyle::kDouble},
     { "Arial", false, true, 16, SK_ColorGRAY, SK_ColorWHITE, true, SkTextDecorationStyle::kSolid},
     { "sans-serif", false,  false, 8, SK_ColorWHITE, SK_ColorRED, false, SkTextDecorationStyle::kWavy}
@@ -96,7 +96,7 @@ protected:
         SkParagraphStyle paraStyle;
         paraStyle.setTextStyle(style);
 
-        for (auto i = 1; i < 5; ++ i) {
+        for (auto i = 5; i < 6; ++i) {
           paraStyle.getTextStyle().setFontSize(24 * i);
           SkParagraphBuilder builder(paraStyle, std::make_shared<SkFontCollection>());
           builder.AddText("Paragraph:");
@@ -157,9 +157,9 @@ protected:
                         SkColor fg = SK_ColorDKGRAY,
                         SkColor bg = SK_ColorWHITE,
                         std::string ff = "sans-serif",
-                        SkScalar fs = 100,
+                        SkScalar fs = 40,
                         bool shadow = false,
-                        bool decoration = true
+                        bool decoration = false
                         ) {
     SkAutoCanvasRestore acr(canvas, true);
 
@@ -265,8 +265,44 @@ protected:
     canvas->translate(0, paragraph->GetHeight() + margin);
   }
 
+  void drawLine(SkCanvas* canvas, SkScalar w, SkScalar h,
+                const std::string& text,
+                SkTextAlign align) {
+    SkAutoCanvasRestore acr(canvas, true);
+
+    canvas->clipRect(SkRect::MakeWH(w, h));
+    canvas->drawColor(SK_ColorWHITE);
+
+    SkScalar margin = 20;
+
+    SkPaint paint;
+    paint.setAntiAlias(true);
+    paint.setLCDRenderText(true);
+    paint.setColor(SK_ColorBLUE);
+
+    SkTextStyle style;
+    style.setBackgroundColor(SK_ColorLTGRAY);
+    style.setForegroundColor(paint);
+    style.setFontFamily("Arial");
+    style.setFontSize(30);
+    SkParagraphStyle paraStyle;
+    paraStyle.setTextStyle(style);
+    paraStyle.setTextAlign(align);
+
+    SkParagraphBuilder builder(paraStyle, std::make_shared<SkFontCollection>());
+    builder.AddText(text);
+
+    auto paragraph = builder.Build();
+    paragraph->Layout(w - margin * 2);
+
+    paragraph->Paint(canvas, margin, margin);
+
+    canvas->translate(0, paragraph->GetHeight() + margin);
+
+  }
+
     void onDrawContent(SkCanvas* canvas) override {
-      drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
+      //drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
       //drawSimpleTest(canvas, this->width(), this->height());
       /*
         SkScalar width = this->width() / 3;
@@ -305,6 +341,17 @@ protected:
            ");"
         };
       //drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
+      SkScalar height = this->height() / 4;
+      std::string line = "Hesitation is always easy rarely useful.";
+      std::string str(gText);
+      drawLine(canvas, this->width(), height, str, SkTextAlign::left);
+      canvas->translate(0, height);
+      drawLine(canvas, this->width(), height, str, SkTextAlign::right);
+      canvas->translate(0, height);
+      drawLine(canvas, this->width(), height, str, SkTextAlign::center);
+      canvas->translate(0, height);
+      drawLine(canvas, this->width(), height, str, SkTextAlign::justify);
+
     }
 
 private:

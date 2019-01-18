@@ -66,17 +66,20 @@ struct Block {
       , textStyle(style)
       , blob(blob)
       , rect(rect)
+      , shift(0)
   {}
   Block(size_t start, size_t end, SkTextStyle style)
       : start(start)
       , end(end)
       , textStyle(style)
+      , shift(0)
   {}
   size_t start;
   size_t end;
   SkTextStyle textStyle;
   sk_sp<SkTextBlob> blob;
   SkRect rect;
+  SkScalar shift;
 };
 
 class RunIterator {

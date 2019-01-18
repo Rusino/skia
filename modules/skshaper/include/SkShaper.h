@@ -64,9 +64,8 @@ public:
            SkTextStyle defaultStyle);
   ~SkShaper();
 
-  typedef std::function<void(bool lineBreak, size_t line_number, SkSize size, SkScalar spacer, int startIndex, int nextStartIndex)> LineBreaker;
-  typedef std::function<void(SkSize size, int startIndex, int nextStartIndex)> WordBreaker;
-  typedef std::function<void(const ShapedRun& run, int start, int end, SkPoint point, SkRect background)> RunBreaker;
+  typedef std::function<void(bool endOfText, SkScalar width, SkScalar height)> OnLineBreak;
+  typedef std::function<void(sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect)> OnWordBreak;
 
   bool good() const;
   static SkPoint shape(SkTextBlobBuilder* builder,
@@ -79,21 +78,15 @@ public:
 
   bool generateGlyphs();
 
-  bool generateLineBreaks(SkScalar width);
+  void generateLineBreaks(SkScalar width);
 
-  SkPoint refineLineBreaks(SkTextBlobBuilder* builder, const SkPoint& point, RunBreaker runBreaker = {}, LineBreaker lineBreaker = {}) const;
-
-  SkSize breakIntoWords(WordBreaker wordBreaker = {}) const;
+  SkPoint refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint& point, OnWordBreak onWordBreak = {}, OnLineBreak onLineBreak = {}) const;
 
   void append(SkTextBlobBuilder* builder, const ShapedRun& run, size_t start, size_t end, SkPoint* p) const;
 
  protected:
 
   bool initialize();
-
-  void resetLayout();
-
-  void resetLinebreaks();
 
 private:
   SkShaper(const SkShaper&) = delete;
