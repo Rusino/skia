@@ -253,7 +253,7 @@ void SkParagraph::RecordPicture() {
   _picture = recorder.finishRecordingAsPicture();
 }
 
-void SkParagraph::PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& line) const {
+void SkParagraph::PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& line) {
 
   for (auto& block : line.blocks) {
     SkPaint paint;
@@ -272,21 +272,83 @@ void SkParagraph::PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& lin
     PaintBackground(textCanvas, block, point);
     PaintShadow(textCanvas, block, point);
     textCanvas->drawTextBlob(block.blob, point.x() + block.shift, point.y(), paint);
-    PaintDecorations(textCanvas, block, point);
   }
+
+  PaintDecorations(textCanvas, line, point);
 }
 
-void SkParagraph::PaintDecorations(SkCanvas* canvas,
-                                   Block block,
-                                   SkPoint offset) const {
-  if (block.textStyle.getDecoration() == SkTextDecoration::kNone) {
-    return;
+SkScalar SkParagraph::ComputeDecorationThickness(SkTextStyle textStyle) {
+
+  SkScalar thickness = 1.0f;
+
+  SkFontMetrics metrics;
+  textStyle.getFontMetrics(metrics);
+
+  switch (textStyle.getDecoration()) {
+    case SkTextDecoration::kUnderline:
+      if (!metrics.hasUnderlineThickness(&thickness)) {
+        thickness = 1.f;
+      }
+      break;
+    case SkTextDecoration::kOverline:
+      break;
+    case SkTextDecoration::kLineThrough:
+        if (!metrics.hasStrikeoutThickness(&thickness)) {
+          thickness = 1.f;
+        }
+      break;
+    default:
+      SkASSERT(false);
   }
 
-  SkPaint paint;
-  // Set stroke
+  thickness = SkMaxScalar(thickness, textStyle.getFontSize() / 14.f);
+
+  return thickness * textStyle.getDecorationThicknessMultiplier();
+}
+
+SkScalar SkParagraph::ComputeDecorationPosition(Block block, SkScalar thickness) {
+
+  SkFontMetrics metrics;
+  block.textStyle.getFontMetrics(metrics);
+
+  SkScalar position;
+
+  switch (block.textStyle.getDecoration()) {
+    case SkTextDecoration::kUnderline:
+      if (metrics.hasUnderlinePosition(&position)) {
+        return position - metrics.fAscent;
+      } else {
+        position = metrics.fDescent - metrics.fAscent;
+        if (block.textStyle.getDecorationStyle() == SkTextDecorationStyle::kWavy ||
+            block.textStyle.getDecorationStyle() == SkTextDecorationStyle::kDouble
+            ) {
+          return position - thickness * 3;
+        } else {
+          return position - thickness;
+        }
+      }
+
+      break;
+    case SkTextDecoration::kOverline:
+      return 0;
+      break;
+    case SkTextDecoration::kLineThrough:
+      if (!metrics.hasStrikeoutPosition(&position)) {
+        return position - metrics.fAscent;
+      } else {
+        position = (metrics.fDescent - metrics.fAscent) / 2;
+      }
+      break;
+    default:
+      SkASSERT(false);
+  }
+
+  return position;
+}
+
+void SkParagraph::ComputeDecorationPaint(Block block, SkPaint& paint, SkPath& path, SkScalar width) {
+
   paint.setStyle(SkPaint::kStroke_Style);
-  // Set color
   if (block.textStyle.getDecorationColor() == SK_ColorTRANSPARENT) {
     paint.setColor(block.textStyle.getColor());
   } else {
@@ -295,47 +357,24 @@ void SkParagraph::PaintDecorations(SkCanvas* canvas,
   paint.setAntiAlias(true);
   paint.setLCDRenderText(true);
   paint.setTextSize(block.textStyle.getFontSize());
-  paint.setTypeface(SkTypeface::MakeFromName(block.textStyle.getFontFamily().data(), block.textStyle.getFontStyle()));
+  paint.setTypeface(block.textStyle.getTypeface());
 
-  // This is set to 2 for the double line style
-  int decoration_count = 1;
+  SkScalar scaleFactor = block.textStyle.getFontSize() / 14.f;
 
-  // Filled when drawing wavy decorations.
-  SkPath path;
-  SkScalar width = block.rect.width();
-  SkFontMetrics metrics;
-  block.textStyle.getFontMetrics(metrics);
-  SkScalar underline_thickness;
-  if (!metrics.hasUnderlineThickness(&underline_thickness)) {
-    underline_thickness = 1;
-  }
-  underline_thickness *= block.textStyle.getFontSize() / 14.0f;
-  paint.setStrokeWidth(underline_thickness * block.textStyle.getDecorationThicknessMultiplier());
-
-  auto bounds = block.rect;
-  SkScalar underlined;
-  if (!metrics.hasUnderlinePosition(&underlined)) {
-    underlined = metrics.fDescent / 2;
-  }
-  SkScalar x = offset.x() + bounds.x();
-  SkScalar y = offset.y() + bounds.y() - metrics.fAscent;
-
-  // Setup the decorations
   switch (block.textStyle.getDecorationStyle()) {
-    case SkTextDecorationStyle::kSolid: {
+    case SkTextDecorationStyle::kSolid:
       break;
-    }
-    case SkTextDecorationStyle::kDouble: {
-      decoration_count = 2;
+
+    case SkTextDecorationStyle::kDouble:
       break;
-    }
+
       // Note: the intervals are scaled by the thickness of the line, so it is
       // possible to change spacing by changing the decoration_thickness
       // property of TextStyle.
     case SkTextDecorationStyle::kDotted: {
-      // Divide by 14pt as it is the default size.
-      const float scale = block.textStyle.getFontSize() / 14.0f;
-      const SkScalar intervals[] = {1.0f * scale, 1.5f * scale, 1.0f * scale, 1.5f * scale};
+      const SkScalar intervals[] =
+          {1.0f * scaleFactor, 1.5f * scaleFactor, 1.0f * scaleFactor,
+           1.5f * scaleFactor};
       size_t count = sizeof(intervals) / sizeof(intervals[0]);
       paint.setPathEffect(SkPathEffect::MakeCompose(
           SkDashPathEffect::Make(intervals, count, 0.0f),
@@ -346,10 +385,9 @@ void SkParagraph::PaintDecorations(SkCanvas* canvas,
       // possible to change spacing by changing the decoration_thickness
       // property of TextStyle.
     case SkTextDecorationStyle::kDashed: {
-      // Divide by 14pt as it is the default size.
-      const float scale = block.textStyle.getFontSize() / 14.0f;
-      const SkScalar intervals[] = {4.0f * scale, 2.0f * scale, 4.0f * scale,
-                                    2.0f * scale};
+      const SkScalar intervals[] =
+          {4.0f * scaleFactor, 2.0f * scaleFactor, 4.0f * scaleFactor,
+           2.0f * scaleFactor};
       size_t count = sizeof(intervals) / sizeof(intervals[0]);
       paint.setPathEffect(SkPathEffect::MakeCompose(
           SkDashPathEffect::Make(intervals, count, 0.0f),
@@ -357,11 +395,12 @@ void SkParagraph::PaintDecorations(SkCanvas* canvas,
       break;
     }
     case SkTextDecorationStyle::kWavy: {
+
       int wave_count = 0;
       double x_start = 0;
-      double wavelength = underline_thickness * block.textStyle.getDecorationThicknessMultiplier() * 2;
+      double wavelength = 2 * scaleFactor;
 
-      path.moveTo(x, y);
+      path.moveTo(0, 0);
       while (x_start + wavelength * 2 < width) {
         path.rQuadTo(wavelength, wave_count % 2 != 0 ? wavelength : -wavelength,
                      wavelength * 2, 0);
@@ -371,73 +410,81 @@ void SkParagraph::PaintDecorations(SkCanvas* canvas,
       break;
     }
   }
+}
 
-  // Draw the decorations.
-  // Use a for loop for "kDouble" decoration style
-  for (int i = 0; i < decoration_count; i++) {
-    double y_offset = i * underline_thickness * kDoubleDecorationSpacing;
-    double y_offset_original = y_offset;
-    // Underline
-    if (block.textStyle.getDecoration() & SkTextDecoration::kUnderline) {
-      y_offset += block.rect.height() - metrics.fDescent;
-      y_offset +=
-          (metrics.fFlags &
-              SkFontMetrics::FontMetricsFlags::kUnderlinePositionIsValid_Flag)
-          ? metrics.fUnderlinePosition
-          : underline_thickness;
-      if (block.textStyle.getDecorationStyle() != SkTextDecorationStyle::kWavy) {
-        canvas->drawLine(x, y + y_offset, x + width, y + y_offset, paint);
-      } else {
-        SkPath offsetPath = path;
-        offsetPath.offset(0, y_offset);
-        canvas->drawPath(offsetPath, paint);
-      }
-      y_offset = y_offset_original;
-    }
-    // Overline
-    if (block.textStyle.getDecoration() & SkTextDecoration::kOverline) {
-      // We subtract fAscent here because for double overlines, we want the
-      // second line to be above, not below the first.
-      y_offset += metrics.fAscent;
-      if (block.textStyle.getDecorationStyle() != SkTextDecorationStyle::kWavy) {
-        canvas->drawLine(x, y - y_offset, x + width, y - y_offset, paint);
-      } else {
-        SkPath offsetPath = path;
-        offsetPath.offset(0, -y_offset);
-        canvas->drawPath(offsetPath, paint);
-      }
-      y_offset = y_offset_original;
-    }
-    // Strikethrough
-    if (block.textStyle.getDecoration() & SkTextDecoration::kLineThrough) {
-      SkScalar thickness;
-      if (!metrics.hasStrikeoutThickness(&thickness)) {
-        thickness = 1;
-      }
-      thickness *= block.textStyle.getDecorationThicknessMultiplier();
-      y_offset = i * thickness;
+void SkParagraph::PaintDecorations(SkCanvas* canvas, const Line& line, SkPoint offset) {
 
-      // Make sure the double line is "centered" vertically.
-      //y_offset += (decoration_count - 1.0) * underline_thickness *
-      //    kDoubleDecorationSpacing / -2.0;
-     SkScalar offs;
-     if (!metrics.hasStrikeoutPosition(&offs)) {
-       offs = (metrics.fDescent - metrics.fAscent) / -2.0;
-     }
-      y_offset += offs;
-      if (block.textStyle.getDecorationStyle() != SkTextDecorationStyle::kWavy) {
-        canvas->drawLine(x, y + y_offset, x + width, y + y_offset, paint);
-      } else {
-        SkPath offsetPath = path;
-        offsetPath.offset(0, y_offset);
-        canvas->drawPath(offsetPath, paint);
-      }
-      y_offset = y_offset_original;
+  std::vector<Block>::const_iterator start = line.blocks.begin();
+  SkScalar width = 0;
+  for (auto block = line.blocks.begin(); block != line.blocks.end(); ++block) {
+    if (start == block) {
+      width += block->rect.width();
+    } else if (start->textStyle == block->textStyle) {
+      width += block->rect.width();
+    } else {
+      PaintDecorations(canvas, start, block, offset, width);
+      start = block;
+      width += block->rect.width();
     }
+  }
+
+  if (start != line.blocks.end()) {
+    PaintDecorations(canvas, start, line.blocks.end(), offset, width);
   }
 }
 
-void SkParagraph::PaintBackground(SkCanvas* canvas, Block block, SkPoint offset) const {
+void SkParagraph::PaintDecorations(SkCanvas* canvas,
+                                   std::vector<Block>::const_iterator begin,
+                                   std::vector<Block>::const_iterator end,
+                                   SkPoint offset,
+                                   SkScalar width) {
+
+  if (begin == end) {
+    return;
+  }
+
+  auto block = *begin;
+  if (block.textStyle.getDecoration() == SkTextDecoration::kNone) {
+    return;
+  }
+
+  // Decoration thickness
+  SkScalar thickness = ComputeDecorationThickness(block.textStyle);
+
+  // Decoration position
+  SkScalar position = ComputeDecorationPosition(block, thickness);
+
+  // Decoration paint (for now) and/or path
+  SkPaint paint;
+  SkPath path;
+  ComputeDecorationPaint(block, paint, path, width);
+  paint.setStrokeWidth(thickness);
+
+  // Draw the decoration
+  SkScalar x = offset.x() + block.rect.left() + block.shift;
+  SkScalar y = offset.y() + block.rect.top() + position;
+  switch (block.textStyle.getDecorationStyle()) {
+    case SkTextDecorationStyle::kWavy:
+      path.offset(x, y);
+      canvas->drawPath(path, paint);
+      break;
+    case SkTextDecorationStyle::kDouble: {
+      canvas->drawLine(x, y, x + width, y, paint);
+      SkScalar bottom = y + thickness * 2;
+      canvas->drawLine(x, bottom, x + width, bottom, paint);
+      break;
+    }
+    case SkTextDecorationStyle::kDashed:
+    case SkTextDecorationStyle::kDotted:
+    case SkTextDecorationStyle::kSolid:
+      canvas->drawLine(x, y, x + width, y, paint);
+      break;
+    default:
+      break;
+  }
+}
+
+void SkParagraph::PaintBackground(SkCanvas* canvas, Block block, SkPoint offset) {
 
   if (!block.textStyle.hasBackground()) {
     return;
@@ -446,7 +493,7 @@ void SkParagraph::PaintBackground(SkCanvas* canvas, Block block, SkPoint offset)
   canvas->drawRect(block.rect, block.textStyle.getBackground());
 }
 
-void SkParagraph::PaintShadow(SkCanvas* canvas, Block block, SkPoint offset) const {
+void SkParagraph::PaintShadow(SkCanvas* canvas, Block block, SkPoint offset) {
   if (block.textStyle.getShadowNumber() == 0) {
     return;
   }

@@ -85,7 +85,7 @@ class SkTextStyle {
   void resetShadows() { _textShadows.clear(); }
 
   void getFontMetrics(SkFontMetrics& metrics) const {
-    SkFont font(_typeface, -_fontSize);
+    SkFont font(_typeface, _fontSize);
     font.getMetrics(&metrics);
   }
 

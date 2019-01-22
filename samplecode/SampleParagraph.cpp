@@ -127,7 +127,6 @@ protected:
               style.setDecoration((SkTextDecoration)decoration);
               style.setDecorationStyle(std::get<7>(para));
               style.setDecorationColor(std::get<5>(para));
-              style.setDecorationThicknessMultiplier(4);
             }
             builder.PushStyle(style);
             std::string name = " " +
@@ -154,13 +153,17 @@ protected:
     }
 
     void drawSimpleTest(SkCanvas* canvas, SkScalar w, SkScalar h,
-                        SkColor fg = SK_ColorDKGRAY,
-                        SkColor bg = SK_ColorWHITE,
-                        std::string ff = "sans-serif",
-                        SkScalar fs = 40,
-                        bool shadow = false,
-                        bool decoration = false
+                        SkTextDecoration decoration,
+                        SkTextDecorationStyle decorationStyle
                         ) {
+
+    SkColor fg = SK_ColorDKGRAY;
+    SkColor bg = SK_ColorWHITE;
+    std::string ff = "sans-serif";
+    SkScalar fs = 20;
+    bool shadow = false;
+    bool has_decoration = true;
+      
     SkAutoCanvasRestore acr(canvas, true);
 
     canvas->clipRect(SkRect::MakeWH(w, h));
@@ -196,11 +199,10 @@ protected:
       style.addShadow(SkTextShadow(SK_ColorBLACK, SkPoint::Make(5, 5), 2));
     }
 
-    if (decoration) {
-      style.setDecoration(SkTextDecoration::kOverline);
-      style.setDecorationStyle(SkTextDecorationStyle::kWavy);
+    if (has_decoration) {
+      style.setDecoration(decoration);
+      style.setDecorationStyle(decorationStyle);
       style.setDecorationColor(SK_ColorBLACK);
-      style.setDecorationThicknessMultiplier(4);
     }
     builder.PushStyle(style);
     builder.AddText(gText);
@@ -303,7 +305,17 @@ protected:
 
     void onDrawContent(SkCanvas* canvas) override {
       //drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
-      //drawSimpleTest(canvas, this->width(), this->height());
+
+      SkScalar height = this->height() / 5;
+      drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kSolid);
+      canvas->translate(0, height);
+      drawSimpleTest(canvas, width(), height, SkTextDecoration::kUnderline, SkTextDecorationStyle::kWavy);
+      canvas->translate(0, height);
+      drawSimpleTest(canvas, width(), height, SkTextDecoration::kLineThrough, SkTextDecorationStyle::kWavy);
+      canvas->translate(0, height);
+      drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kDouble);
+      canvas->translate(0, height);
+      drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kWavy);
       /*
         SkScalar width = this->width() / 3;
         drawTest(canvas, width, this->height(), SK_ColorBLACK, SK_ColorWHITE);
@@ -341,6 +353,7 @@ protected:
            ");"
         };
       //drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
+      /*
       SkScalar height = this->height() / 4;
       std::string line = "Hesitation is always easy rarely useful.";
       std::string str(gText);
@@ -351,6 +364,7 @@ protected:
       drawLine(canvas, this->width(), height, str, SkTextAlign::center);
       canvas->translate(0, height);
       drawLine(canvas, this->width(), height, str, SkTextAlign::justify);
+       */
 
     }
 

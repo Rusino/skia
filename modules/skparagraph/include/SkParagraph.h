@@ -80,14 +80,20 @@ class SkParagraph {
 
   void RecordPicture();
 
-  // Creates and draws the decorations onto the canvas.
-  void PaintDecorations(SkCanvas* canvas, Block block, SkPoint offset) const;
+  // Creates and draws the decorations onto the canvas for all the blocks with the same style at once
+  void PaintDecorations(SkCanvas* canvas, const Line& line, SkPoint offset);
+
+  void PaintDecorations(SkCanvas* canvas,
+                        std::vector<Block>::const_iterator begin,
+                        std::vector<Block>::const_iterator end,
+                        SkPoint offset,
+                        SkScalar width);
 
   // Draws the background onto the canvas.
-  void PaintBackground(SkCanvas* canvas, Block block, SkPoint offset) const;
+  void PaintBackground(SkCanvas* canvas, Block block, SkPoint offset);
 
   // Draws the shadows onto the canvas.
-  void PaintShadow(SkCanvas* canvas, Block block, SkPoint offset) const;
+  void PaintShadow(SkCanvas* canvas, Block block, SkPoint offset);
 
   // Break the text by explicit line breaks
   void BreakLines();
@@ -99,7 +105,11 @@ class SkParagraph {
   void FormatLine(Line& line, bool lastLine, SkScalar width);
 
   // Paint one line (produced with explicit line break or shaper)
-  void PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& line) const;
+  void PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& line);
+
+  SkScalar ComputeDecorationThickness(SkTextStyle textStyle);
+  SkScalar ComputeDecorationPosition(Block block, SkScalar thickness);
+  void ComputeDecorationPaint(Block block, SkPaint& paint, SkPath& path, SkScalar width);
 
   SkScalar _alphabeticBaseline;
   SkScalar _height;
