@@ -227,6 +227,9 @@ void SkParagraph::FormatLine(Line& line, bool lastLine, SkScalar width) {
       SkScalar shift = 0;
       for (auto& block : line.blocks) {
         block.shift += shift;
+        if (&block != &line.blocks.back()) {
+          block.rect.fRight += step;
+        }
         shift += step;
       }
       break;
@@ -266,10 +269,10 @@ void SkParagraph::PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& lin
     paint.setTextSize(block.textStyle.getFontSize());
     paint.setTypeface(block.textStyle.getTypeface());
 
-    //PaintBackground(textCanvas, block, point);
-    //PaintShadow(textCanvas, block, point);
+    PaintBackground(textCanvas, block, point);
+    PaintShadow(textCanvas, block, point);
     textCanvas->drawTextBlob(block.blob, point.x() + block.shift, point.y(), paint);
-    //PaintDecorations(textCanvas, block, point);
+    PaintDecorations(textCanvas, block, point);
   }
 }
 
@@ -439,6 +442,7 @@ void SkParagraph::PaintBackground(SkCanvas* canvas, Block block, SkPoint offset)
   if (!block.textStyle.hasBackground()) {
     return;
   }
+  block.rect.offset(block.shift, 0);
   canvas->drawRect(block.rect, block.textStyle.getBackground());
 }
 

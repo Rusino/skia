@@ -99,8 +99,6 @@ SkShaper::SkShaper(const UChar* utf16, size_t utf16Bytes,
 
   initialize();
 
-  sk_sp<SkFontMgr> fontMgr = SkFontMgr::RefDefault();
-
   fFontIterator = FontRunIterator::Make(utf16, utf16Bytes, begin, end, defaultStyle);
   FontRunIterator* font = fFontIterator.getMaybeNull();
   if (!font) {
