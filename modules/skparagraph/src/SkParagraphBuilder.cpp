@@ -23,7 +23,7 @@
 
 SkParagraphBuilder::SkParagraphBuilder(
     SkParagraphStyle style,
-    std::shared_ptr<SkFontCollection> font_collection)
+    sk_sp<SkFontCollection> font_collection)
     : _fontCollection(std::move(font_collection)) {
   SetParagraphStyle(style);
 }
@@ -65,6 +65,17 @@ void SkParagraphBuilder::Pop() {
 
   auto top = _styles.top();
   _runs.emplace_back(_text.size(), _text.size(), top);
+}
+
+SkTextStyle SkParagraphBuilder::PeekStyle() {
+
+  EndRunIfNeeded();
+  if (!_styles.empty()) {
+    return _styles.top();
+  } else {
+    SkDebugf("SkParagraphBuilder._styles is empty.\n");
+    return _style.getTextStyle();
+  }
 }
 
 void SkParagraphBuilder::AddText(const std::u16string& text) {

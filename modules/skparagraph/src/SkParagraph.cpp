@@ -20,8 +20,6 @@
 #include "SkMaskFilter.h"
 #include "SkPictureRecorder.h"
 
-static const float kDoubleDecorationSpacing = 3.0f;
-
 void printText(const std::string& label, const UChar* text, size_t start, size_t end) {
   icu::UnicodeString utf16 = icu::UnicodeString(text + start, end - start);
   std::string str;
@@ -340,7 +338,9 @@ SkScalar SkParagraph::ComputeDecorationPosition(Block block, SkScalar thickness)
       }
       break;
     default:
+      position = 0;
       SkASSERT(false);
+      break;
   }
 
   return position;

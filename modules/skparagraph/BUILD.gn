@@ -10,7 +10,8 @@ declare_args() {
 config("public_config") {
   if (skia_enable_skparagraph) {
     include_dirs = [ "include",
-                     "../skshaper/include"
+                     "../skshaper/include",
+                     "../../include/private",
                 ]
   }
 }
@@ -43,7 +44,6 @@ source_set("skparagraph") {
       "//third_party/icu",
     ]
     configs += [ "../../:skia_private" ]
-
   }
 }
 

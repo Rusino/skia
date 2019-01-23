@@ -45,7 +45,6 @@ source_set("skshaper") {
       ]
     }
     configs += [ "../../:skia_private" ]
-
   }
 }
 

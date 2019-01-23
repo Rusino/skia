@@ -27,7 +27,7 @@
 
 class SkParagraphBuilder {
  public:
-  SkParagraphBuilder(SkParagraphStyle style, std::shared_ptr<SkFontCollection> fontCollection);
+  SkParagraphBuilder(SkParagraphStyle style, sk_sp<SkFontCollection> fontCollection);
 
   ~SkParagraphBuilder();
 
@@ -47,6 +47,8 @@ class SkParagraphBuilder {
   //   builder.Pop();
   //   builder.AddText(" Back to normal again.");
   void Pop();
+
+  SkTextStyle PeekStyle();
 
   // Adds text to the builder. Forms the proper runs to use the upper-most style
   // on the style_stack_;
@@ -72,6 +74,6 @@ class SkParagraphBuilder {
   std::vector<uint16_t> _text;
   std::stack<SkTextStyle> _styles;
   std::vector<StyledText> _runs;
-  std::shared_ptr<SkFontCollection> _fontCollection;
+  sk_sp<SkFontCollection> _fontCollection;
   SkParagraphStyle _style;
 };
