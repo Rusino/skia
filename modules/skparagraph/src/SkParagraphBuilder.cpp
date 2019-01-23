@@ -36,6 +36,9 @@ void SkParagraphBuilder::SetParagraphStyle(const SkParagraphStyle& style) {
 
   auto& textStyle = _style.getTextStyle();
   _fontCollection->findTypeface(textStyle);
+  if (textStyle.getFontSize() == 0) {
+    textStyle.setFontSize(20);
+  }
   _runs.emplace_back(_text.size(), _text.size(), textStyle);
 }
 
@@ -47,7 +50,7 @@ void SkParagraphBuilder::PushStyle(const SkTextStyle& style) {
     // Just continue with the same style
   } else {
     // Resolve the new style and go with it
-    auto textStyle = style;
+    auto& textStyle = _styles.top();
     _fontCollection->findTypeface(textStyle);
     _runs.emplace_back(_text.size(), _text.size(), textStyle);
   }

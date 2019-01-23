@@ -272,11 +272,6 @@ class FontRunIterator : public RunIterator {
       fCurrentStyle = fIterator->textStyle;
     }
 
-    SkDebugf("Font: %s %s %d\n",
-             fCurrentStyle.getTypeface() == nullptr ? "nullptr" : "not null",
-             fCurrentStyle.getFontFamily().c_str(),
-             fCurrentStyle.getFontSize());
-
     fCurrentTypeface = fCurrentStyle.getTypeface();
     SkASSERT(fCurrentTypeface);
     fHarfBuzzFont = create_hb_font(fCurrentTypeface.get());

@@ -71,74 +71,172 @@ void SkFontCollection::SetTestFontManager(sk_sp<SkFontMgr> font_manager) {
 // Return the available font managers in the order they should be queried.
 std::vector<sk_sp<SkFontMgr>> SkFontCollection::GetFontManagerOrder() const {
   std::vector<sk_sp<SkFontMgr>> order;
-  if (_testFontManager)
-    order.push_back(_testFontManager);
   if (_dynamicFontManager)
     order.push_back(_dynamicFontManager);
   if (_assetFontManager)
     order.push_back(_assetFontManager);
+  if (_testFontManager)
+    order.push_back(_testFontManager);
   if (_defaultFontManager && _enableFontFallback)
     order.push_back(_defaultFontManager);
   return order;
 }
-
+/*
 // TODO: default fallback
 SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
 
-  sk_sp<SkTypeface> typeface;
+  SkDebugf("findTypeface %s\n", textStyle.getFontFamily().c_str());
 
   // Look inside the font collections cache first
   FamilyKey familyKey(textStyle.getFontFamily(), "en", textStyle.getFontStyle());
   auto found = _typefaces.find(familyKey);
-  if (found == nullptr) {
-    SkFontStyleSet* set = nullptr;
+  if (found != nullptr) {
+    SkDebugf("Found in cache\n");
+    textStyle.setTypeface(*found);
+    return found->get();
+  }
+
+  sk_sp<SkTypeface> typeface;
+  std::vector<SkFontStyleSet*> sets;
+  for (auto manager : GetFontManagerOrder()) {
+    // Cache the font collection for future queries
+    auto set = manager->matchFamily(textStyle.getFontFamily().c_str());
+    if (set != nullptr && set->count() > 0) {
+      sets.emplace_back(set);
+    }
+  }
+
+  if (sets.empty()) {
+    SkDebugf("Font not found: %s\n", textStyle.getFontFamily().c_str());
     for (auto manager : GetFontManagerOrder()) {
       // Cache the font collection for future queries
-      set = manager->matchFamily(textStyle.getFontFamily().c_str());
-      if (set == nullptr || set->count() == 0) {
-        continue;
+      auto set = manager->matchFamily(DEFAULT_FONT_FAMILY);
+      if (set != nullptr && set->count() > 0) {
+        sets.emplace_back(set);
       }
     }
-
-    if (set == nullptr || set->count() == 0) {
-      for (auto manager : GetFontManagerOrder()) {
-        // Cache the font collection for future queries
-        set = manager->matchFamily(DEFAULT_FONT_FAMILY);
-        if (set != nullptr && set->count() > 0) {
-          break;
-        }
-      }
+    if (!sets.empty()) {
+      SkDebugf("Found in default: %s %d\n", DEFAULT_FONT_FAMILY, sets.size());
     }
+  } else {
+    SkDebugf("Found in managers: %s %d\n", textStyle.getFontFamily().c_str(), sets.size());
+  }
 
-    if (set == nullptr || set->count() == 0) {
-      SkDebugf("Font not found: %s | %s\n", textStyle.getFontFamily().c_str(), DEFAULT_FONT_FAMILY);
-    } else {
+  if (!sets.empty()) {
+    for (auto set : sets) {
       for (int i = 0; i < set->count(); ++i) {
         sk_sp<SkTypeface>(set->createTypeface(i));
       }
 
-      sk_sp<SkTypeface> match(set->matchStyle(textStyle.getFontStyle()));
+      sk_sp <SkTypeface> match(set->matchStyle(textStyle.getFontStyle()));
       if (match != nullptr) {
         typeface = match;
-      } else {
-        SkDebugf("Match not found: %s | %s\n", textStyle.getFontFamily().c_str(), DEFAULT_FONT_FAMILY);
+        break;
       }
     }
+  }
 
-    if (typeface == nullptr) {
-      return nullptr;
+  if (typeface == nullptr) {
+    SkDebugf("Match not found: %s | %s\n", textStyle.getFontFamily().c_str(), DEFAULT_FONT_FAMILY);
+    return nullptr;
+  }
+
+  _typefaces.set(familyKey, typeface);
+  textStyle.setTypeface(typeface);
+
+  return typeface.get();
+}
+*/
+/*
+sk_sp<SkTypeface> SkFontCollection::findByFamilyName(const std::string& familyName, SkFontStyle fontStyle) {
+
+  for (auto manager : GetFontManagerOrder()) {
+    SkFontStyleSet* set = manager->matchFamily(familyName.c_str());
+    if (set == nullptr || set->count() == 0) {
+      continue;
     }
 
-    _typefaces.set(familyKey, typeface);
+    for (int i = 0; i < set->count(); ++i) {
+      sk_sp<SkTypeface>(set->createTypeface(i));
+    }
 
+    sk_sp <SkTypeface> match(set->matchStyle(fontStyle));
+    if (match != nullptr) {
+      return match;
+    }
+  }
+
+  return nullptr;
+}
+
+SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
+
+  // Look inside the font collections cache first
+  FamilyKey familyKey(textStyle.getFontFamily(), "en", textStyle.getFontStyle());
+  auto found = _typefaces.find(familyKey);
+  if (found != nullptr) {
+    textStyle.setTypeface(*found);
+    return found->get();
+  }
+
+  sk_sp<SkTypeface> typeface = findByFamilyName(textStyle.getFontFamily(), textStyle.getFontStyle());
+  if (typeface == nullptr) {
+    typeface = findByFamilyName(DEFAULT_FONT_FAMILY, textStyle.getFontStyle());
+    if (typeface == nullptr) {
+      return nullptr;
+    } else {
+      textStyle.setTypeface(typeface);
+      return typeface.get();
+    }
+  }
+
+  _typefaces.set(familyKey, typeface);
+  textStyle.setTypeface(typeface);
+  return typeface.get();
+}
+*/
+
+SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
+
+  // Look inside the font collections cache first
+  FamilyKey familyKey(textStyle.getFontFamily(), "en", textStyle.getFontStyle());
+  auto found = _typefaces.find(familyKey);
+  if (found != nullptr) {
+    textStyle.setTypeface(*found);
+    return found->get();
+  }
+
+  sk_sp<SkTypeface> typeface = nullptr;
+  size_t n = 0;
+  for (auto manager : GetFontManagerOrder()) {
+    ++n;
+    SkFontStyleSet* set = manager->matchFamily(textStyle.getFontFamily().c_str());
+    if (set == nullptr || set->count() == 0) {
+      continue;
+    }
+
+    for (int i = 0; i < set->count(); ++i) {
+      sk_sp<SkTypeface>(set->createTypeface(i));
+    }
+
+    sk_sp<SkTypeface> match(set->matchStyle(textStyle.getFontStyle()));
+    if (match != nullptr) {
+      typeface = match;
+      break;
+    }
+  }
+
+  if (typeface == nullptr) {
+    typeface.reset(_defaultFontManager->matchFamilyStyle(DEFAULT_FONT_FAMILY, SkFontStyle()));
   } else {
-    typeface = *found;
+    _typefaces.set(familyKey, typeface);
   }
 
   textStyle.setTypeface(typeface);
 
   return typeface.get();
 }
+
 
 void SkFontCollection::DisableFontFallback() {
   _enableFontFallback = false;

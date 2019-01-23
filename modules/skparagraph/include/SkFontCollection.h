@@ -45,6 +45,8 @@ class SkFontCollection : public SkRefCnt {
 
  private:
 
+  sk_sp<SkTypeface> findByFamilyName(const std::string& familyName, SkFontStyle fontStyle);
+
   friend class ParagraphTester;
 
   struct FamilyKey {

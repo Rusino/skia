@@ -463,9 +463,8 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint&
           startWord = glyph;
         }
       }
-      if (startWord != endGlyphIndex - 1) {
-        SkRect
-            backgroundRect = SkRect::MakeXYWH(lineEnd.fX, lineStart.fY, 0, 0);
+      if (startWord != endGlyphIndex) {
+        SkRect backgroundRect = SkRect::MakeXYWH(lineEnd.fX, lineStart.fY, 0, 0);
         SkTextBlobBuilder builder;
         append(&builder, thisRun, startWord, endGlyphIndex, &lineEnd);
 
