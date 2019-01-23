@@ -91,13 +91,28 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
   FamilyKey familyKey(textStyle.getFontFamily(), "en", textStyle.getFontStyle());
   auto found = _typefaces.find(familyKey);
   if (found == nullptr) {
+    SkFontStyleSet* set = nullptr;
     for (auto manager : GetFontManagerOrder()) {
       // Cache the font collection for future queries
-      SkFontStyleSet* set = manager->matchFamily(textStyle.getFontFamily().c_str());
+      set = manager->matchFamily(textStyle.getFontFamily().c_str());
       if (set == nullptr || set->count() == 0) {
         continue;
       }
+    }
 
+    if (set == nullptr || set->count() == 0) {
+      for (auto manager : GetFontManagerOrder()) {
+        // Cache the font collection for future queries
+        set = manager->matchFamily(DEFAULT_FONT_FAMILY);
+        if (set != nullptr && set->count() > 0) {
+          break;
+        }
+      }
+    }
+
+    if (set == nullptr || set->count() == 0) {
+      SkDebugf("Font not found: %s | %s\n", textStyle.getFontFamily().c_str(), DEFAULT_FONT_FAMILY);
+    } else {
       for (int i = 0; i < set->count(); ++i) {
         sk_sp<SkTypeface>(set->createTypeface(i));
       }
@@ -105,16 +120,17 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
       sk_sp<SkTypeface> match(set->matchStyle(textStyle.getFontStyle()));
       if (match != nullptr) {
         typeface = match;
-        break;
+      } else {
+        SkDebugf("Match not found: %s | %s\n", textStyle.getFontFamily().c_str(), DEFAULT_FONT_FAMILY);
       }
     }
 
     if (typeface == nullptr) {
-      // Do something?
       return nullptr;
-    } else {
-      _typefaces.set(familyKey, typeface);
     }
+
+    _typefaces.set(familyKey, typeface);
+
   } else {
     typeface = *found;
   }
