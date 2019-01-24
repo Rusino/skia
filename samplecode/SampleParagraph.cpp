@@ -98,7 +98,7 @@ protected:
 
         for (auto i = 5; i < 6; ++i) {
           paraStyle.getTextStyle().setFontSize(24 * i);
-          SkParagraphBuilder builder(paraStyle, std::make_shared<SkFontCollection>());
+          SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
           builder.AddText("Paragraph:");
           for (auto para : gParagraph) {
             SkTextStyle style;
@@ -183,7 +183,7 @@ protected:
     paraStyle.setTextStyle(style);
 
     paraStyle.getTextStyle().setFontSize(10);
-    SkParagraphBuilder builder(paraStyle, std::make_shared<SkFontCollection>());
+    SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
 
     style.setBackgroundColor(bg);
     style.setForegroundColor(paint);
@@ -241,7 +241,7 @@ protected:
     paraStyle.setTextStyle(style);
 
     paraStyle.getTextStyle().setFontSize(10);
-    SkParagraphBuilder builder(paraStyle, std::make_shared<SkFontCollection>());
+    SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
 
     style.setBackgroundColor(bg);
     style.setForegroundColor(paint);
@@ -291,7 +291,7 @@ protected:
     paraStyle.setTextStyle(style);
     paraStyle.setTextAlign(align);
 
-    SkParagraphBuilder builder(paraStyle, std::make_shared<SkFontCollection>());
+    SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
     builder.AddText(text);
 
     auto paragraph = builder.Build();
@@ -305,7 +305,7 @@ protected:
 
     void onDrawContent(SkCanvas* canvas) override {
       //drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
-
+      /*
       SkScalar height = this->height() / 5;
       drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kSolid);
       canvas->translate(0, height);
@@ -316,6 +316,7 @@ protected:
       drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kDouble);
       canvas->translate(0, height);
       drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kWavy);
+      */
       /*
         SkScalar width = this->width() / 3;
         drawTest(canvas, width, this->height(), SK_ColorBLACK, SK_ColorWHITE);
@@ -353,6 +354,8 @@ protected:
            ");"
         };
       //drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
+      std::vector<std::string> blank = { " " };
+      drawText(canvas, this->width(), this->height(), blank, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
       /*
       SkScalar height = this->height() / 4;
       std::string line = "Hesitation is always easy rarely useful.";

@@ -404,7 +404,6 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint&
   SkScalar maxLineAscent = 0;
   SkScalar maxLineDescent = 0;
   SkScalar maxLineLeading = 0;
-  SkScalar maxBaseline = 0;
 
   int previousRunIndex = -1;
   size_t line_number = 0;
@@ -419,7 +418,6 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint&
       maxLineAscent = SkTMin(maxLineAscent, metrics.fAscent);
       maxLineDescent = SkTMax(maxLineDescent, metrics.fDescent);
       maxLineLeading = SkTMax(maxLineLeading, metrics.fLeading);
-      maxBaseline = SkTMax(maxBaseline, - metrics.fAscent);
       previousRunIndex = runIndex;
     }
 
@@ -479,7 +477,7 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint&
 
     // Callback to notify about one more line
     ++line_number;
-    onLineBreak(nextGlyph == nullptr, lineEnd.fX - lineStart.fX, lineEnd.fY + maxLineDescent + maxLineLeading - lineStart.fY, maxBaseline);
+    onLineBreak(nextGlyph == nullptr, lineEnd.fX - lineStart.fX, lineEnd.fY + maxLineDescent + maxLineLeading - lineStart.fY, - maxLineAscent);
     lineEnd.fY += maxLineDescent + maxLineLeading;
     lineEnd.fX = point.fX;
     lineStart = lineEnd;

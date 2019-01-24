@@ -569,7 +569,7 @@ class ParagraphTester {
 
     SkParagraphStyle ps(commands[0].paragraphStyle);;
 
-    SkParagraphBuilder builder(ps, std::make_shared<SkFontCollection>());
+    SkParagraphBuilder builder(ps, sk_make_sp<SkFontCollection>());
     for (size_t i = 1; i < commands.size(); ++i) {
       auto& command = commands[i];
       switch (command.command) {

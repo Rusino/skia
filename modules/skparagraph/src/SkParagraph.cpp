@@ -104,17 +104,13 @@ bool SkParagraph::Layout(double width) {
   // Break the text into lines (with each one broken into blocks by style)
   BreakLines();
 
-  if (_lines.size() > 1) {
-   SkDebugf("Lines %d\n", _lines.size());
-  }
-
-  auto iter = _lines.begin();
+  std::vector<Line>::iterator iter = _lines.begin();
   while (iter != _lines.end()) {
     if (!LayoutLine(iter, width)) {
       return false;
     }
     ++_linesNumber;
-    ++iter;
+    iter = std::next(iter);
   }
 
   for (size_t i = 0; i < _lines.size(); ++i) {
@@ -140,10 +136,6 @@ void SkParagraph::Paint(SkCanvas* canvas, double x, double y) const {
 }
 
 bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) {
-
-  if (line->IsEmpty()) {
-    return true;
-  }
 
   SkShaper shaper(&_text16[line->Start()], line->Length(),
                   line->blocks.begin(), line->blocks.end(),
@@ -175,9 +167,14 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
         block->rect = rect;
         if (block->end > endWord) {
           // One block (style) can have few runs (words); let's break them here
+          // TODO: deal with the trimmed values
           auto oldEnd = block->end;
           block->end = endWord;
-          block = line->blocks.emplace(std::next(block), endWord, oldEnd, block->blob, block->rect, block->textStyle);
+          block->endTrimmed = endWord;
+          block = line->blocks.emplace(std::next(block),
+              endWord, oldEnd,
+              endWord, oldEnd,
+              block->blob, block->rect, block->textStyle);
         } else {
           // One word is covered by many styles
           // We have 3 solutions here:
@@ -303,7 +300,10 @@ void SkParagraph::PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& lin
   }
 
   PaintDecorations(textCanvas, line, point);
-  textCanvas->translate(0, line.size.height());
+  if (line.hardBreak) {
+    // If we did linebreaking without shaper, we need to draw it ourselves
+    textCanvas->translate(0, line.size.height());
+  }
 }
 
 SkScalar SkParagraph::ComputeDecorationThickness(SkTextStyle textStyle) {
@@ -586,12 +586,22 @@ void SkParagraph::BreakLines() {
     }
 
     // Remove all insignificant characters at the end of the line (whitespaces)
-    while (lastChar > firstChar) {
-      int32_t character = *(_text16.begin() + lastChar - 1);
+    auto lastCharTrimmed = lastChar;
+    while (lastCharTrimmed > firstChar) {
+      int32_t character = *(_text16.begin() + lastCharTrimmed - 1);
       if (!u_isWhitespace(character)) {
         break;
       }
-      lastChar -= 1;
+      lastCharTrimmed -= 1;
+    }
+
+    auto firstCharTrimmed = firstChar;
+    while (firstCharTrimmed < lastCharTrimmed) {
+      int32_t character = *(_text16.begin() + firstCharTrimmed);
+      if (!u_isWhitespace(character)) {
+        break;
+      }
+      firstCharTrimmed += 1;
     }
 
     // Find the first style that is related to the line
@@ -606,28 +616,19 @@ void SkParagraph::BreakLines() {
 
     // Generate blocks for future use
     std::vector<Block> blocks;
-    if (firstChar != lastChar) {
-      blocks.reserve(lastStyle - firstStyle);
-      for (auto s = firstStyle; s < lastStyle; ++s) {
-        auto& style = _styles[s];
-        blocks.emplace_back(
-            SkTMax(style.start, firstChar),
-            SkTMin(style.end, lastChar),
-            style.textStyle);
-      }
+    blocks.reserve(lastStyle - firstStyle);
+    for (auto s = firstStyle; s < lastStyle; ++s) {
+      auto& style = _styles[s];
+      blocks.emplace_back(
+          SkTMax(style.start, firstChar),
+          SkTMin(style.end, lastChar),
+          SkTMax(style.start, firstCharTrimmed),
+          SkTMin(style.end, lastCharTrimmed),
+          style.textStyle);
     }
 
     // Add one more string to the list
     _lines.emplace(_lines.begin(), blocks, breaker->getRuleStatus() == UBRK_LINE_HARD);
-
-    if (blocks.empty()) {
-      // For empty lines we will lose all the styles info after this point, so let's do it here
-      auto& textStyle = _styles[firstStyle].textStyle;
-      SkFont font(textStyle.getTypeface(), textStyle.getFontSize());
-      SkFontMetrics metrics;
-      font.getMetrics(&metrics);
-      _lines.begin()->size = SkSize::Make(0, metrics.fDescent + metrics.fLeading - metrics.fAscent);
-    }
 
     // Move on
     lastChar = firstChar;
