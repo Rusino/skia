@@ -661,14 +661,26 @@ void SkParagraph::BreakLines() {
   */
 }
 
+// TODO: implement properly (currently it only works as an indicator that something changed in the text)
 std::vector<SkTextBox> SkParagraph::GetRectsForRange(
     unsigned start,
     unsigned end,
     RectHeightStyle rect_height_style,
     RectWidthStyle rect_width_style) {
-  // TODO: implement
-  //SkASSERT(false);
   std::vector<SkTextBox> result;
+  for (auto& line : _lines) {
+    if (line.End() <= start ) {
+      continue;
+    } else if (line.Start() >= end) {
+      break;
+    }
+    for (auto& block : line.blocks) {
+      if (block.end <= start || block.start >= end) {
+        continue;
+      }
+      result.emplace_back(block.rect, SkTextDirection::rtl);
+    }
+  }
   return result;
 }
 
