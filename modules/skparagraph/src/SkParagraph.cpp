@@ -49,7 +49,6 @@ double SkParagraph::GetMaxIntrinsicWidth() {
 }
 
 double SkParagraph::GetAlphabeticBaseline() {
-  // TODO: implement
   return SkScalarToDouble(_alphabeticBaseline);
 }
 
@@ -194,10 +193,12 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
         }
       },
       // Create extra lines if required by Shaper
-      [&line, &block, this](bool endOfText, SkScalar width, SkScalar height) {
+      [&line, &block, this](bool endOfText, SkScalar width, SkScalar height, SkScalar baseline) {
         line->size = SkSize::Make(width, height);
         _height += height;
         _width = SkMaxScalar(_width, width);
+        _ideographicBaseline = baseline;
+        _alphabeticBaseline = baseline;
         //SkDebugf("EOL: %f, %f\n", _width, _height);
         _maxIntrinsicWidth += width;
         if (!endOfText) {

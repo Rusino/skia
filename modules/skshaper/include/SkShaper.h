@@ -64,7 +64,7 @@ public:
            SkTextStyle defaultStyle);
   ~SkShaper();
 
-  typedef std::function<void(bool endOfText, SkScalar width, SkScalar height)> OnLineBreak;
+  typedef std::function<void(bool endOfText, SkScalar width, SkScalar height, SkScalar baseline)> OnLineBreak;
   typedef std::function<void(sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect)> OnWordBreak;
 
   bool good() const;
