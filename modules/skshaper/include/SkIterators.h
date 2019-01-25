@@ -296,12 +296,15 @@ class FontRunIterator : public RunIterator {
     if (fIterator == fLast) {
       return;
     }
-
+    // This is a semi-solution allows flutter to run correctly:
+    // we break runs on every style change even if the font is still the same
+    ++fNext;
+    /*
     auto typeface = fIterator->textStyle.getTypeface();
-    while (fNext != fLast &&
-        SkTypeface::Equal(typeface.get(), fNext->textStyle.getTypeface().get())) {
+    while (fNext != fLast && SkTypeface::Equal(typeface.get(), fNext->textStyle.getTypeface().get())) {
       ++fNext;
     }
+   */
   }
 
   const UChar* endOfCurrentRun() const override {

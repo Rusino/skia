@@ -32,13 +32,9 @@ SkParagraphBuilder::~SkParagraphBuilder() = default;
 
 void SkParagraphBuilder::SetParagraphStyle(const SkParagraphStyle& style) {
   _style = style;
-  _styles.push(_style.getTextStyle());
-
   auto& textStyle = _style.getTextStyle();
   _fontCollection->findTypeface(textStyle);
-  if (textStyle.getFontSize() == 0) {
-    textStyle.setFontSize(20);
-  }
+  _styles.push(textStyle);
   _runs.emplace_back(_text.size(), _text.size(), textStyle);
 }
 

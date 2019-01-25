@@ -77,6 +77,97 @@ protected:
         return this->INHERITED::onQuery(evt);
     }
 
+    void drawCode(SkCanvas* canvas, SkScalar w, SkScalar h) {
+
+      SkPaint comment; comment.setColor(SK_ColorGRAY);
+      SkPaint constant; constant.setColor(SK_ColorMAGENTA);
+      SkPaint null; null.setColor(SK_ColorMAGENTA);
+      SkPaint literal; literal.setColor(SK_ColorGREEN);
+      SkPaint code; code.setColor(SK_ColorDKGRAY);
+      SkPaint number; number.setColor(SK_ColorBLUE);
+      SkPaint name; name.setColor(SK_ColorRED);
+
+      SkTextStyle defaultStyle;
+      defaultStyle.setBackgroundColor(SK_ColorWHITE);
+      defaultStyle.setForegroundColor(code);
+      defaultStyle.setFontFamily("monospace");
+      defaultStyle.setFontSize(30);
+      SkParagraphStyle paraStyle;
+      paraStyle.setTextStyle(defaultStyle);
+
+      std::string line01 = "// Create a raised button.\n";
+      std::string line02 = "RaisedButton(\n";
+      std::string line03 = "  child: const Text('BUTTON TITLE'),\n";
+      std::string line04 = "  onPressed: () {\n";
+      std::string line05 = "    // Perform some action\n";
+      std::string line06 = "  }\n";
+      std::string line07 = ");\n";
+      std::string line08 = "\n";
+      std::string line09 = "// Create a disabled button.\n";
+      std::string line10 = "// Buttons are disabled when onPressed isn't\n";
+      std::string line11 = "// specified or is null.\n";
+      std::string line12 = "const RaisedButton(\n";
+      std::string line13 = "  child: Text('BUTTON TITLE'),\n";
+      std::string line14 = "  onPressed: null\n";
+      std::string line15 = ");\n";
+      std::string line16 = "\n";
+      std::string line17 = "// Create a button with an icon and a\n";
+      std::string line18 = "// title.\n";
+      std::string line19 = "RaisedButton.icon(\n";
+      std::string line20 = "  icon: const Icon(Icons.add, size: 18.0),\n";
+      std::string line21 = "  label: const Text('BUTTON TITLE'),\n";
+      std::string line22 = "  onPressed: () {\n";
+      std::string line23 = "    // Perform some action\n";
+      std::string line24 = "  },\n";
+      std::string line25 = ");";
+
+      std::vector<std::string> lines = {
+                  line01, line02, line03, line04, line05, line06, line07, line08, line09,
+          line10, line11, line12, line13, line14, line15, line16, line17, line18, line19,
+          line20, line21, line22, line23, line24, line25,
+      };
+
+      SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
+
+      //builder.PushStyle(style(comment));
+      //builder.AddText("// Create a raised button.\n");
+      //builder.Pop();
+
+      builder.PushStyle(style(name));
+      builder.AddText("RaisedButton");
+      builder.Pop();
+      builder.AddText("(\n");
+      builder.AddText("  child: ");
+      builder.PushStyle(style(constant));
+      builder.AddText("const");
+      builder.Pop();
+      builder.AddText(" ");
+      builder.PushStyle(style(name));
+      builder.AddText("Text");
+      builder.Pop();
+      builder.AddText("(");
+      builder.PushStyle(style(literal));
+      builder.AddText("'BUTTON TITLE'");
+      builder.Pop();
+      builder.AddText("),\n");
+
+      auto paragraph = builder.Build();
+      paragraph->Layout(w - 20);
+
+      paragraph->Paint(canvas, 20, 20);
+    }
+
+    SkTextStyle style(SkPaint paint) {
+      SkTextStyle style;
+      paint.setAntiAlias(true);
+      paint.setLCDRenderText(true);
+      style.setForegroundColor(paint);
+      style.setFontFamily("monospace");
+      style.setFontSize(30);
+
+      return style;
+    }
+
     void drawTest(SkCanvas* canvas, SkScalar w, SkScalar h, SkColor fg, SkColor bg) {
         SkAutoCanvasRestore acr(canvas, true);
 
@@ -354,8 +445,8 @@ protected:
            ");"
         };
       //drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
-      std::vector<std::string> blank = { " " };
-      drawText(canvas, this->width(), this->height(), blank, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
+      //std::vector<std::string> blank = { " " };
+      //drawText(canvas, this->width(), this->height(), blank, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
       /*
       SkScalar height = this->height() / 4;
       std::string line = "Hesitation is always easy rarely useful.";
@@ -368,7 +459,7 @@ protected:
       canvas->translate(0, height);
       drawLine(canvas, this->width(), height, str, SkTextAlign::justify);
        */
-
+      drawCode(canvas, width(), height());
     }
 
 private:

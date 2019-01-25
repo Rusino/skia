@@ -220,7 +220,6 @@ bool SkShaper::generateGlyphs() {
     while (utf16Current < utf16End) {
       unsigned int cluster = utf16Current - utf16Start;
       hb_codepoint_t u = utf16_next(&utf16Current, utf16End);
-      SkDebugf("code=%d\n", u);
       hb_buffer_add(buffer, u, cluster);
     }
 
@@ -278,10 +277,11 @@ bool SkShaper::generateGlyphs() {
       glyph.fAdvance.fY = pos[i].y_advance * textSizeY;
       glyph.fMustLineBreakBefore = false;
       glyph.fHasVisual = true; //!font->currentTypeface()->glyphBoundsAreZero(glyph.fID);
-
+/*
       char glyphname[32];
       hb_font_get_glyph_name(font->currentHBFont(), glyph.fID, glyphname, sizeof(glyphname));
       SkDebugf ("glyph='%s' %d/%d [%d] %d\n", glyphname, glyph.fID, info[i].codepoint, i, u_charType(glyph.fID));
+*/
     }
 
     int32_t clusterOffset = utf16Start - fUtf16;

@@ -123,11 +123,6 @@ bool SkParagraph::Layout(double width) {
 
 void SkParagraph::Paint(SkCanvas* canvas, double x, double y) const {
 
-  icu::UnicodeString uni = icu::UnicodeString(_text16.data(), _text16.size());
-  std::string str;
-  uni.toUTF8String(str);
-  SkDebugf("Paint: '%s' (%d)\n", str.c_str(), _text16.size());
-  SkDebugf("Point: %f, %f\n", x, y);
   SkMatrix matrix = SkMatrix::MakeTrans(SkDoubleToScalar(x), SkDoubleToScalar(y));
   canvas->drawPicture(_picture, &matrix, nullptr);
 }
@@ -172,12 +167,12 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
       (sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect) {
         _minIntrinsicWidth = SkMaxScalar(_minIntrinsicWidth, rect.width());
         size_t endWord = run.fUtf16Start - &_text16[0] + e;
-        //printText("Word", run.fUtf16Start, s, e);
 
-        //SkDebugf("EOW: %f\n", rect.width());
         SkASSERT(block != line->blocks.end());
         block->blob = blob;
         block->rect = rect;
+
+        //printText("Word", run.fUtf16Start, s, e);
         if (block->end > endWord) {
           // One block (style) can have few runs (words); let's break them here
           // TODO: deal with the trimmed values
@@ -185,9 +180,16 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
           block->end = endWord;
           block->endTrimmed = endWord;
           block = line->blocks.emplace(std::next(block),
-              endWord, oldEnd,
-              endWord, oldEnd,
-              block->blob, block->rect, block->textStyle);
+                                       endWord,
+                                       oldEnd,
+                                       endWord,
+                                       oldEnd,
+                                       block->blob,
+                                       block->rect,
+                                       block->textStyle);
+        } else if (block->end == endWord) {
+          block->blob = blob;
+          ++block;
         } else {
           // One word is covered by many styles
           // We have 3 solutions here:
@@ -197,20 +199,18 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
           block->blob = blob;
           ++block;
           // Remove all the other styles that cover only this word
-          while (block != line->blocks.end() && block->end < endWord) {
+          while (block != line->blocks.end() && block->end <= endWord) {
             block = line->blocks.erase(block);
           }
         }
       },
       // Create extra lines if required by Shaper
       [&line, &block, this](bool endOfText, SkScalar width, SkScalar height, SkScalar baseline) {
-        SkDebugf("Line %f:%f\n", width, height);
         line->size = SkSize::Make(width, height);
         _height += height;
         _width = SkMaxScalar(_width, width);
         _ideographicBaseline = baseline;
         _alphabeticBaseline = baseline;
-        //SkDebugf("EOL: %f, %f\n", _width, _height);
         _maxIntrinsicWidth += width;
         if (!endOfText) {
           // Break blocks between two lines
@@ -281,7 +281,6 @@ void SkParagraph::FormatLine(Line& line, bool lastLine, SkScalar width) {
 void SkParagraph::RecordPicture() {
 
   SkPictureRecorder recorder;
-  SkDebugf("Start record %f:%f\n", _width, _height);
   SkCanvas* textCanvas = recorder.beginRecording(_width, _height, nullptr, 0);
 
   SkPoint point = SkPoint::Make(0, 0);
@@ -293,22 +292,12 @@ void SkParagraph::RecordPicture() {
       point.fY = height;
     }
 
-    icu::UnicodeString utf16 = icu::UnicodeString(&_text16[line.Start()], line.End() - line.Start());
-    std::string str;
-    utf16.toUTF8String(str);
-    SkDebugf("%s[%d]: @%f/%f %d:%d '%s'\n", line.hardBreak ? "break" : "shape", linenum, point.fY, height, line.Start(), line.End(), str.c_str());
-
     PaintLine(textCanvas, point, line);
-
-    if (line.IsEmpty()) {
-      SkDebugf("Empty line %d: %f\n", linenum, line.size.height());
-    }
 
     height += line.size.height();
     ++linenum;
   }
 
-  SkDebugf("End record %f %f %f\n", height, _minIntrinsicWidth, _maxIntrinsicWidth);
   _picture = recorder.finishRecordingAsPicture();
 }
 
