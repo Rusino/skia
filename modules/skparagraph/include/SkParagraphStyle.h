@@ -38,8 +38,8 @@ class SkParagraphStyle {
   }
 
   SkTextStyle& getTextStyle() { return _textStyle; }
-  size_t getMaxLines() { return _maxLines; }
-  SkTextDirection getTextDirection() { return _textDirection; }
+  size_t getMaxLines() const { return _maxLines; }
+  SkTextDirection getTextDirection() const { return _textDirection; }
 
   void setTextStyle(SkTextStyle textStyle) {
     _textStyle = textStyle;

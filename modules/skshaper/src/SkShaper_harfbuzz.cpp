@@ -220,6 +220,7 @@ bool SkShaper::generateGlyphs() {
     while (utf16Current < utf16End) {
       unsigned int cluster = utf16Current - utf16Start;
       hb_codepoint_t u = utf16_next(&utf16Current, utf16End);
+      SkDebugf("code=%d\n", u);
       hb_buffer_add(buffer, u, cluster);
     }
 
@@ -236,7 +237,6 @@ bool SkShaper::generateGlyphs() {
     hb_buffer_set_direction(buffer, direction);
     // TODO: language
     hb_buffer_guess_segment_properties(buffer);
-    // TODO: features
     if (!font->currentHBFont()) {
       continue;
     }
@@ -263,9 +263,6 @@ bool SkShaper::generateGlyphs() {
     ShapedRun& run = _runs.emplace_back(utf16Start, utf16End, len, srcFont, bidi->currentLevel(),
                                         std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]));
 
-    hb_codepoint_t space;
-    hb_font_get_glyph_from_name (font->currentHBFont(), "space", -1, &space);
-
     int scaleX, scaleY;
     scaleX = scaleY = 1;
     hb_font_get_scale(font->currentHBFont(), &scaleX, &scaleY);
@@ -281,12 +278,10 @@ bool SkShaper::generateGlyphs() {
       glyph.fAdvance.fY = pos[i].y_advance * textSizeY;
       glyph.fMustLineBreakBefore = false;
       glyph.fHasVisual = true; //!font->currentTypeface()->glyphBoundsAreZero(glyph.fID);
-      if (glyph.fID == 0) {
-        // TODO: how to substitute any control characters with space
-        // TODO: better yet, only whitespaces
-        glyph.fID = space;
-      }
-      //info->mask safe_to_break;
+
+      char glyphname[32];
+      hb_font_get_glyph_name(font->currentHBFont(), glyph.fID, glyphname, sizeof(glyphname));
+      SkDebugf ("glyph='%s' %d/%d [%d] %d\n", glyphname, glyph.fID, info[i].codepoint, i, u_charType(glyph.fID));
     }
 
     int32_t clusterOffset = utf16Start - fUtf16;
@@ -306,13 +301,6 @@ bool SkShaper::generateGlyphs() {
       }
       glyph.fMayLineBreakBefore = glyph.fCluster != previousCluster && breakIteratorCurrent == glyphCluster;
       previousCluster = glyph.fCluster;
-
-      char glyphname[32];
-      hb_font_get_glyph_name (font->currentHBFont(), glyph.fID, glyphname, sizeof(glyphname));
-      //SkDebugf ("glyph='%s' %d [%d] %d %s %s\n", glyphname, glyph.fID, i, u_charType(glyph.fID),
-      //glyph.fMayLineBreakBefore ? "word" : "",
-      //    glyph.fMustLineBreakBefore ? "line" : "");
-
     }
   }
 

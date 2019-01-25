@@ -94,13 +94,12 @@ bool SkParagraph::Layout(double width) {
   _maxIntrinsicWidth = 0;
   _minIntrinsicWidth = 0;
   _linesNumber = 0;
-
-
+  /*
   icu::UnicodeString uni = icu::UnicodeString(_text16.data(), _text16.size());
   std::string str;
   uni.toUTF8String(str);
   SkDebugf("Shape: '%s' (%d)\n", str.c_str(), _text16.size());
-
+  */
   // Break the text into lines (with each one broken into blocks by style)
   BreakLines();
 
@@ -119,8 +118,6 @@ bool SkParagraph::Layout(double width) {
 
   RecordPicture();
 
-  SkDebugf("Size: %f * %f %f : %f\n", _width, _height, _minIntrinsicWidth, _maxIntrinsicWidth);
-
   return true;
 }
 
@@ -136,6 +133,22 @@ void SkParagraph::Paint(SkCanvas* canvas, double x, double y) const {
 }
 
 bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) {
+
+  if (line->IsEmpty()) {
+
+    SkFontMetrics metrics;
+    line->blocks[0].textStyle.getFontMetrics(metrics);
+    auto height = metrics.fDescent + -metrics.fAscent + metrics.fLeading;
+    auto baseline = - metrics.fAscent;
+
+    line->size = SkSize::Make(0, height);
+    _height += height;
+    _ideographicBaseline = baseline;
+    _alphabeticBaseline = baseline;
+
+    SkDebugf("Empty line %f\n", height);
+    return true;
+  }
 
   SkShaper shaper(&_text16[line->Start()], line->Length(),
                   line->blocks.begin(), line->blocks.end(),
@@ -191,6 +204,7 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
       },
       // Create extra lines if required by Shaper
       [&line, &block, this](bool endOfText, SkScalar width, SkScalar height, SkScalar baseline) {
+        SkDebugf("Line %f:%f\n", width, height);
         line->size = SkSize::Make(width, height);
         _height += height;
         _width = SkMaxScalar(_width, width);
@@ -216,8 +230,8 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
 void SkParagraph::FormatLine(Line& line, bool lastLine, SkScalar width) {
 
   SkScalar delta = width - line.size.width();
-  //SkAssertResult(delta >= 0);
-  if (delta <= 0) {
+  SkAssertResult(delta >= 0);
+  if (delta == 0) {
     // Nothing to do
     return;
   }
@@ -267,14 +281,34 @@ void SkParagraph::FormatLine(Line& line, bool lastLine, SkScalar width) {
 void SkParagraph::RecordPicture() {
 
   SkPictureRecorder recorder;
+  SkDebugf("Start record %f:%f\n", _width, _height);
   SkCanvas* textCanvas = recorder.beginRecording(_width, _height, nullptr, 0);
 
   SkPoint point = SkPoint::Make(0, 0);
+  SkScalar height = 0;
+  size_t linenum = 1;
   for (auto& line : _lines) {
 
+    if (line.hardBreak) {
+      point.fY = height;
+    }
+
+    icu::UnicodeString utf16 = icu::UnicodeString(&_text16[line.Start()], line.End() - line.Start());
+    std::string str;
+    utf16.toUTF8String(str);
+    SkDebugf("%s[%d]: @%f/%f %d:%d '%s'\n", line.hardBreak ? "break" : "shape", linenum, point.fY, height, line.Start(), line.End(), str.c_str());
+
     PaintLine(textCanvas, point, line);
+
+    if (line.IsEmpty()) {
+      SkDebugf("Empty line %d: %f\n", linenum, line.size.height());
+    }
+
+    height += line.size.height();
+    ++linenum;
   }
 
+  SkDebugf("End record %f %f %f\n", height, _minIntrinsicWidth, _maxIntrinsicWidth);
   _picture = recorder.finishRecordingAsPicture();
 }
 
@@ -294,16 +328,13 @@ void SkParagraph::PaintLine(SkCanvas* textCanvas, SkPoint point, const Line& lin
     paint.setTextSize(block.textStyle.getFontSize());
     paint.setTypeface(block.textStyle.getTypeface());
 
-    PaintBackground(textCanvas, block, point);
-    PaintShadow(textCanvas, block, point);
-    textCanvas->drawTextBlob(block.blob, point.x() + block.shift, point.y(), paint);
+    SkPoint start = SkPoint::Make(point.x() + block.shift, point.y());
+    PaintBackground(textCanvas, block, start);
+    PaintShadow(textCanvas, block, start);
+    textCanvas->drawTextBlob(block.blob, start.x(), start.y(), paint);
   }
 
   PaintDecorations(textCanvas, line, point);
-  if (line.hardBreak) {
-    // If we did linebreaking without shaper, we need to draw it ourselves
-    textCanvas->translate(0, line.size.height());
-  }
 }
 
 SkScalar SkParagraph::ComputeDecorationThickness(SkTextStyle textStyle) {
@@ -520,7 +551,7 @@ void SkParagraph::PaintBackground(SkCanvas* canvas, Block block, SkPoint offset)
   if (!block.textStyle.hasBackground()) {
     return;
   }
-  block.rect.offset(block.shift, 0);
+  block.rect.offset(offset.fY, offset.fY);
   canvas->drawRect(block.rect, block.textStyle.getBackground());
 }
 
@@ -585,6 +616,11 @@ void SkParagraph::BreakLines() {
       }
     }
 
+    if (lastChar > 0 && u_charType(*(_text16.begin() + lastChar - 1)) == U_CONTROL_CHAR) {
+      // Remove the line break
+      --lastChar;
+    }
+
     // Remove all insignificant characters at the end of the line (whitespaces)
     auto lastCharTrimmed = lastChar;
     while (lastCharTrimmed > firstChar) {
@@ -614,6 +650,21 @@ void SkParagraph::BreakLines() {
       ++lastStyle;
     }
 
+    switch (_style.effective_align()) {
+      case SkTextAlign::left:
+        break;
+      case SkTextAlign::center:
+        firstChar = firstCharTrimmed;
+      case SkTextAlign::right:
+        lastChar = lastCharTrimmed;
+        break;
+      case SkTextAlign::justify:
+        firstChar = firstCharTrimmed;
+        lastChar = lastCharTrimmed;
+      default:
+        SkASSERT(false);
+    }
+
     // Generate blocks for future use
     std::vector<Block> blocks;
     blocks.reserve(lastStyle - firstStyle);
@@ -635,7 +686,7 @@ void SkParagraph::BreakLines() {
   }
 /*
   // Print all lines
-  size_t linenum = 0;
+  size_t linenum = 1;
   for (auto& line : _lines) {
     auto start = line.Start();
     auto end = line.End();
@@ -654,7 +705,7 @@ void SkParagraph::BreakLines() {
         icu::UnicodeString utf16 = icu::UnicodeString(&_text16[start], end - start);
         std::string str;
         utf16.toUTF8String(str);
-        SkDebugf("Block: %d:%d '%s'\n", start, end, str.c_str());
+        SkDebugf("Block:   %d:%d '%s'\n", start, end, str.c_str());
       }
     }
   }
@@ -669,7 +720,7 @@ std::vector<SkTextBox> SkParagraph::GetRectsForRange(
     RectWidthStyle rect_width_style) {
   std::vector<SkTextBox> result;
   for (auto& line : _lines) {
-    if (line.End() <= start ) {
+    if (line.End() <= start) {
       continue;
     } else if (line.Start() >= end) {
       break;
@@ -678,7 +729,7 @@ std::vector<SkTextBox> SkParagraph::GetRectsForRange(
       if (block.end <= start || block.start >= end) {
         continue;
       }
-      result.emplace_back(block.rect, SkTextDirection::rtl);
+      result.emplace_back(block.rect, SkTextDirection::ltr);
     }
   }
   return result;
