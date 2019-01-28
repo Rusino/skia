@@ -8,6 +8,9 @@
 #include <vector>
 #include "SkParagraphBuilder.h"
 #include "Sample.h"
+#include <string>
+#include <locale>
+#include <codecvt>
 
 #include "SkBlurMaskFilter.h"
 #include "SkCanvas.h"
@@ -312,7 +315,9 @@ protected:
                   SkColor fg = SK_ColorDKGRAY,
                   SkColor bg = SK_ColorWHITE,
                   std::string ff = "sans-serif",
-                  SkScalar fs = 24) {
+                  SkScalar fs = 24,
+                  size_t lineLimit = std::numeric_limits<size_t>::max(),
+                  const std::u16string& ellipsis = u"\u2026") {
     SkAutoCanvasRestore acr(canvas, true);
 
     canvas->clipRect(SkRect::MakeWH(w, h));
@@ -330,7 +335,9 @@ protected:
     style.setForegroundColor(paint);
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
+    paraStyle.setMaxLines(lineLimit);
 
+    paraStyle.setEllipsis(ellipsis);
     paraStyle.getTextStyle().setFontSize(10);
     SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
 
@@ -445,8 +452,8 @@ protected:
            ");"
         };
       //drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
-      //std::vector<std::string> blank = { " " };
-      //drawText(canvas, this->width(), this->height(), blank, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
+      std::vector<std::string> blank = { "A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text" };
+      drawText(canvas, this->width(), this->height(), blank, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
       /*
       SkScalar height = this->height() / 4;
       std::string line = "Hesitation is always easy rarely useful.";
@@ -459,7 +466,7 @@ protected:
       canvas->translate(0, height);
       drawLine(canvas, this->width(), height, str, SkTextAlign::justify);
        */
-      drawCode(canvas, width(), height());
+      //drawCode(canvas, width(), height());
     }
 
 private:

@@ -64,17 +64,23 @@ public:
            SkTextStyle defaultStyle);
   ~SkShaper();
 
-  typedef std::function<void(bool endOfText, SkScalar width, SkScalar height, SkScalar baseline)> OnLineBreak;
+  typedef std::function<void(size_t lineNumber, bool endOfText, SkScalar width, SkScalar height, SkScalar baseline)> OnLineBreak;
   typedef std::function<void(sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect)> OnWordBreak;
 
   bool good() const;
   static SkPoint shape(SkTextBlobBuilder* builder,
                        const char* utf8,
                        size_t utf8Bytes,
-                       const SkFont& srcPaint,
+                       const SkFont& srcFont,
                        bool leftToRight,
                        SkPoint point,
                        SkScalar width);
+
+  static SkRect shape(SkTextBlobBuilder* builder,
+                      const uint16_t* text,
+                      size_t textSize,
+                      SkPoint point,
+                      SkTextStyle textStyle);
 
   bool generateGlyphs();
 

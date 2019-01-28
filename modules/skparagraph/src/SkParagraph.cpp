@@ -28,7 +28,8 @@ void printText(const std::string& label, const UChar* text, size_t start, size_t
 }
 
 SkParagraph::SkParagraph()
-    : _picture(nullptr) {}
+    : _exceededLimits(false)
+    , _picture(nullptr) {}
 
 SkParagraph::~SkParagraph() = default;
 
@@ -160,11 +161,14 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
   // Start iterating from the first block in the line
   auto block = line->blocks.begin();
 
-  SkTextBlobBuilder bigBuilder;
-  shaper.refineLineBreaks(&bigBuilder, {0, 0},
+  shaper.refineLineBreaks(nullptr, {0, 0},
       // Match blocks (styles) and runs (words)
       [this, &block, &line]
       (sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect) {
+
+        if (_exceededLimits) {
+          return;
+        }
         _minIntrinsicWidth = SkMaxScalar(_minIntrinsicWidth, rect.width());
         size_t endWord = run.fUtf16Start - &_text16[0] + e;
 
@@ -205,24 +209,67 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
         }
       },
       // Create extra lines if required by Shaper
-      [&line, &block, this](bool endOfText, SkScalar width, SkScalar height, SkScalar baseline) {
+      [&line, &block, width, this](size_t lineNumber, bool endOfText, SkScalar lineWidth, SkScalar height, SkScalar baseline) {
         line->size = SkSize::Make(width, height);
         _height += height;
-        _width = SkMaxScalar(_width, width);
+        _width = SkMaxScalar(_width, lineWidth);
         _ideographicBaseline = baseline;
         _alphabeticBaseline = baseline;
         _maxIntrinsicWidth += width;
-        if (!endOfText) {
-          // Break blocks between two lines
-          std::vector<Block> tail;
-          if (block != line->blocks.end()) {
-            std::move(block, line->blocks.end(), std::back_inserter(tail));
-            line->blocks.erase(block, line->blocks.end());
+
+        // Check if we can and should use ellipsis
+        if (isinf(width)) {
+          // Just continue - there is no limit on width
+        } else if (_exceededLimits) {
+          // We already exceeded the limits - just ignore everything
+        } else if (!endOfText &&                        // We still have some text to shape
+            (_style.unlimited_lines() ||                // One line with limit
+             _style.getMaxLines() == lineNumber + 1)) {      // The last line
+          // This is the last allowed line
+          if (_style.ellipsized()) {
+            // The line width exceeds the constraint
+            while (!line->blocks.empty()) {
+              auto& lastBlock = line->blocks.back();
+              // Create ellipsis blob to measure it and possibly to add
+              SkPoint point = SkPoint::Make(lastBlock.rect.right(), lastBlock.rect.top());
+              SkTextBlobBuilder ellipsisBuilder;
+              // We cannot create an ellipsis here because it must match the font of the last run
+              // We cannot find out the last run until we measure the ellipsis :)
+              const std::u16string& ellipsis = _style.getEllipsis();
+              SkRect ellipsisRect = SkShaper::shape(&ellipsisBuilder,
+                                                    reinterpret_cast<const uint16_t*>(ellipsis.data()),
+                                                    ellipsis.size(),
+                                                    point,
+                                                    lastBlock.textStyle);
+              if (ellipsisRect.right() <= width || line->blocks.size() == 1) {
+                line->blocks.emplace_back(0, 0, 0, 0,
+                                          ellipsisBuilder.make(),
+                                          ellipsisRect,
+                                          lastBlock.textStyle);
+                break;
+              }
+              line->blocks.pop_back();
+            }
+            // There might be a case when not even one block fits; nothing is drawn then
+            _exceededLimits = true;
+            // Remove all the othe lines and ignore the output from Shaper for the rest
+            _lines.erase(std::next(line), _lines.end());
+          } else {
+            // Normal process
+            if (!endOfText) {
+              // Break blocks between two lines
+              std::vector<Block> tail;
+              if (block != line->blocks.end()) {
+                std::move(block, line->blocks.end(), std::back_inserter(tail));
+                line->blocks.erase(block, line->blocks.end());
+              }
+              // Add one more line and start from the it's first block again
+              line = _lines.emplace(std::next(line), tail, false);
+              block = line->blocks.begin();
+            }
           }
-          // Add one more line and start from the it's first block again
-          line = _lines.emplace(std::next(line), tail, false);
-          block = line->blocks.begin();
         }
+
       });
   return true;
 }

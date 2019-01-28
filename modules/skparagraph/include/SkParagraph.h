@@ -120,6 +120,7 @@ class SkParagraph {
   SkScalar _maxIntrinsicWidth;
   SkScalar _minIntrinsicWidth;
   size_t   _linesNumber;
+  bool     _exceededLimits;
 
   // Input
   std::vector<uint16_t> _text16;

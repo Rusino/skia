@@ -109,6 +109,61 @@ SkShaper::SkShaper(const UChar* utf16, size_t utf16Bytes,
 
 }
 
+
+// Simple static method that shapes 8-bytes text
+SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
+                        const char* utf8,
+                        size_t utf8Bytes,
+                        const SkFont& font,
+                        bool leftToRight,
+                        SkPoint point,
+                        SkScalar width) {
+
+  icu::UnicodeString utf16 = icu::UnicodeString::fromUTF8(icu::StringPiece(utf8, utf8Bytes));
+
+  std::vector<Block> dummy;
+  SkShaper shaper((UChar*) utf16.getBuffer(),  utf16.length(),
+                  dummy.begin(), dummy.end(), SkTextStyle());
+  if (!shaper.generateGlyphs()) {
+    return point;
+  }
+
+  // Iterate over the glyphs in logical order to mark line endings.
+  shaper.generateLineBreaks(width);
+
+  // Reorder the runs and glyphs per line and write them out.
+  return shaper.refineLineBreaks(builder,
+                                 point,
+                                 [](sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect) {},
+                                 [](size_t lineNumber, bool endOfText, SkScalar width, SkScalar height, SkScalar baseline) {});
+}
+
+SkRect SkShaper::shape(SkTextBlobBuilder* builder,
+                       const uint16_t* text,
+                       size_t textSize,
+                       SkPoint point,
+                       SkTextStyle textStyle) {
+  std::vector<Block> dummy;
+  SkShaper shaper((UChar*) text, textSize, dummy.begin(), dummy.end(), textStyle);
+  if (!shaper.generateGlyphs()) {
+    return { 0, 0, 0, 0 };
+  }
+
+  // Iterate over the glyphs in logical order to mark line endings.
+  shaper.generateLineBreaks(std::numeric_limits<SkScalar>::max());
+
+  // Reorder the runs and glyphs per line and write them out.
+  SkRect rect;
+  shaper.refineLineBreaks(
+                    builder,
+                    point,
+                    [](sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect) {},
+                    [&rect, point](size_t lineNumber, bool endOfText, SkScalar width, SkScalar height, SkScalar baseline) {
+                      rect.setXYWH(point.x(), point.y(), width, height);
+                    });
+  return rect;
+}
+
 SkShaper::~SkShaper() {}
 
 bool SkShaper::initialize() {
@@ -147,34 +202,6 @@ bool SkShaper::good() const {
       fScriptIterator.get()->getBuffer() &&
       fFontIterator.get()->currentTypeface() &&
       fBreakIterator;
-}
-
-// Simple static method that shapes 8-bytes text
-SkPoint SkShaper::shape(SkTextBlobBuilder* builder,
-                        const char* utf8,
-                        size_t utf8Bytes,
-                        const SkFont& font,
-                        bool leftToRight,
-                        SkPoint point,
-                        SkScalar width) {
-
-  icu::UnicodeString utf16 = icu::UnicodeString::fromUTF8(icu::StringPiece(utf8, utf8Bytes));
-
-  std::vector<Block> dummy;
-  SkShaper shaper((UChar*) utf16.getBuffer(),  utf16.length(),
-                  dummy.begin(), dummy.end(), SkTextStyle());
-  if (!shaper.generateGlyphs()) {
-    return point;
-  }
-
-  // Iterate over the glyphs in logical order to mark line endings.
-  shaper.generateLineBreaks(width);
-
-  // Reorder the runs and glyphs per line and write them out.
-  return shaper.refineLineBreaks(builder,
-                  point,
-                  [](sk_sp<SkTextBlob> blob, const ShapedRun& run, size_t s, size_t e, SkRect rect) {},
-                  [](bool endOfText, SkScalar width, SkScalar height, SkScalar baseline) {});
 }
 
 bool SkShaper::generateGlyphs() {
@@ -441,7 +468,7 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint&
           // Found a word
           SkRect backgroundRect = SkRect::MakeXYWH(lineEnd.fX, lineStart.fY, 0, 0);
           SkTextBlobBuilder builder;
-          append(&builder, thisRun, startWord, glyph, &lineEnd);
+          append(bigBuilder == nullptr ? &builder : bigBuilder, thisRun, startWord, glyph, &lineEnd);
 
           SkFontMetrics metrics;
           backgroundRect.fRight = lineEnd.fX;
@@ -454,7 +481,7 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint&
       if (startWord != endGlyphIndex) {
         SkRect backgroundRect = SkRect::MakeXYWH(lineEnd.fX, lineStart.fY, 0, 0);
         SkTextBlobBuilder builder;
-        append(&builder, thisRun, startWord, endGlyphIndex, &lineEnd);
+        append(bigBuilder == nullptr ? &builder : bigBuilder, thisRun, startWord, endGlyphIndex, &lineEnd);
 
         SkFontMetrics metrics;
         backgroundRect.fRight = lineEnd.fX;
@@ -464,8 +491,7 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint&
     }
 
     // Callback to notify about one more line
-    ++line_number;
-    onLineBreak(nextGlyph == nullptr, lineEnd.fX - lineStart.fX, lineEnd.fY + maxLineDescent + maxLineLeading - lineStart.fY, - maxLineAscent);
+    onLineBreak(line_number, nextGlyph == nullptr, lineEnd.fX - lineStart.fX, lineEnd.fY + maxLineDescent + maxLineLeading - lineStart.fY, - maxLineAscent);
     lineEnd.fY += maxLineDescent + maxLineLeading;
     lineEnd.fX = point.fX;
     lineStart = lineEnd;
@@ -474,6 +500,7 @@ SkPoint SkShaper::refineLineBreaks(SkTextBlobBuilder* bigBuilder, const SkPoint&
     maxLineLeading = 0;
     previousRunIndex = -1;
     previousBreak = glyphIterator;
+    ++line_number;
   }
 
   return lineEnd;

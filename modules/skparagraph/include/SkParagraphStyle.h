@@ -40,6 +40,7 @@ class SkParagraphStyle {
   SkTextStyle& getTextStyle() { return _textStyle; }
   size_t getMaxLines() const { return _maxLines; }
   SkTextDirection getTextDirection() const { return _textDirection; }
+  std::u16string getEllipsis() const { return _ellipsis; }
 
   void setTextStyle(SkTextStyle textStyle) {
     _textStyle = textStyle;
