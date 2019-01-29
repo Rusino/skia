@@ -20,7 +20,7 @@ SkParagraphStyle::SkParagraphStyle() {
   _textAlign = SkTextAlign::start;
   _textDirection = SkTextDirection::ltr;
   _maxLines = std::numeric_limits<size_t>::max();
-  _ellipsis = u"\u2026";
+  //_ellipsis = u"\u2026";
   _line_height = 1;
 }
 
