@@ -171,6 +171,11 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
 
         _minIntrinsicWidth = SkMaxScalar(_minIntrinsicWidth, rect.width());
         size_t endWord = run.fUtf16Start - &_text16[0] + e;
+        size_t startWord = run.fUtf16Start - &_text16[0] + s;
+
+        while (block != line->blocks.end() && startWord >= block->end) {
+          ++block;
+        }
 
         SkASSERT(block != line->blocks.end());
         block->blob = blob;
@@ -181,7 +186,7 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
           // One block (style) can have few runs (words); let's break them here
           // TODO: deal with the trimmed values
           auto oldEnd = block->end;
-          block->end = endWord;;
+          block->end = endWord;
           block = line->blocks.emplace(std::next(block),
                                        endWord,
                                        oldEnd,
@@ -189,16 +194,13 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
                                        block->rect,
                                        block->textStyle);
         } else if (block->end == endWord) {
-          block->blob = blob;
-          ++block;
+          // Nothing else
         } else {
           // One word is covered by many styles
           // We have 3 solutions here:
           // 1. Stop it by separating runs by any style, not only font-related
           // 2. Take the first style for the entire word (implemented)
           // 3. TODO: Make each run a glyph, not a "word" and deal with it appropriately
-          block->blob = blob;
-          ++block;
           // Remove all the other styles that cover only this word
           while (block != line->blocks.end() && block->end <= endWord) {
             block = line->blocks.erase(block);
@@ -274,14 +276,7 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
 }
 
 void SkParagraph::FormatLine(Line& line, bool lastLine, SkScalar width) {
-/*
-  auto start = line.Start();
-  auto end = line.End();
-  icu::UnicodeString utf16 = icu::UnicodeString(&_text16[start], end - start);
-  std::string str;
-  utf16.toUTF8String(str);
-  SkDebugf("Format line: %d:%d '%s'\n", start, end, str.c_str());
-*/
+
   SkScalar delta = width - line.size.width();
   if (delta == 0) {
     // Nothing to do
@@ -658,31 +653,21 @@ void SkParagraph::BreakLines() {
       }
     }
 
-    if (lastChar > 0 && u_charType(*(_text16.begin() + lastChar - 1)) == U_CONTROL_CHAR) {
-      // Remove the line break
-      --lastChar;
-    }
+    //if (lastChar > 0 && u_charType(*(_text16.begin() + lastChar - 1)) == U_CONTROL_CHAR) {
+    //  // Remove the line break
+    //  --lastChar;
+    //}
 
     // Remove all insignificant characters at the end of the line (whitespaces)
+    // TODO: we keep at least one space in case the line is all spaces for now
+    // TODO: since Flutter is using a space character to measure things;
+    // TODO: need to fix it later
     while (lastChar > firstChar) {
       int32_t character = *(_text16.begin() + lastChar - 1);
       if (!u_isWhitespace(character)) {
         break;
       }
       lastChar -= 1;
-    }
-
-    while (firstChar < lastChar) {
-      int32_t character = *(_text16.begin() + firstChar);
-      if (!u_isWhitespace(character)) {
-        break;
-      }
-      firstChar += 1;
-    }
-
-    if (firstChar == lastChar) {
-      // TODO: draw the empty line, but keep one space for now since Flutter is using it
-      ++lastChar;
     }
 
     // Find the first style that is related to the line
@@ -712,8 +697,9 @@ void SkParagraph::BreakLines() {
     // Move on
     lastChar = firstChar;
   }
-/*
+
   // Print all lines
+  /*
   size_t linenum = 1;
   for (auto& line : _lines) {
     auto start = line.Start();
@@ -737,7 +723,7 @@ void SkParagraph::BreakLines() {
       }
     }
   }
-*/
+  */
 }
 
 // TODO: implement properly (currently it only works as an indicator that something changed in the text)
