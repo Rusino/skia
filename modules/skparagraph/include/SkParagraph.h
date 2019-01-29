@@ -29,9 +29,7 @@ struct Line {
   size_t Start() const { return blocks.empty() ? 0 : blocks.front().start; };
   size_t End() const { return blocks.empty() ? 0 : blocks.back().end; };
   size_t Length() const { return blocks.empty() ? 0 :  blocks.back().end - blocks.front().start; }
-  size_t LengthTrimmed() const { return blocks.empty() ? 0 :  blocks.back().endTrimmed - blocks.front().startTrimmed; }
   bool IsEmpty() const { return blocks.empty() || Length() == 0; }
-  bool IsEmptyTrimmed() const { return blocks.empty() || LengthTrimmed() == 0; }
 };
 
 class SkCanvas;

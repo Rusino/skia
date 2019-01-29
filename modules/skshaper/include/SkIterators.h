@@ -62,29 +62,22 @@ struct StyledText {
 struct Block {
   Block(
       size_t start, size_t end,
-      size_t startTrimmed, size_t endTrimmed,
       sk_sp<SkTextBlob> blob, SkRect rect, SkTextStyle style)
       : start(start)
       , end(end)
-      , startTrimmed(startTrimmed)
-      , endTrimmed(endTrimmed)
       , textStyle(style)
       , blob(blob)
       , rect(rect)
       , shift(0)
   {}
-  Block(size_t start, size_t end, size_t startTrimmed, size_t endTrimmed, SkTextStyle style)
+  Block(size_t start, size_t end, SkTextStyle style)
       : start(start)
       , end(end)
-      , startTrimmed(startTrimmed)
-      , endTrimmed(endTrimmed)
       , textStyle(style)
       , shift(0)
   {}
   size_t start;
   size_t end;
-  size_t startTrimmed;
-  size_t endTrimmed;
   SkTextStyle textStyle;
   sk_sp<SkTextBlob> blob;
   SkRect rect;

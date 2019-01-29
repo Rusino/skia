@@ -181,11 +181,8 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
           // One block (style) can have few runs (words); let's break them here
           // TODO: deal with the trimmed values
           auto oldEnd = block->end;
-          block->end = endWord;
-          block->endTrimmed = endWord;
+          block->end = endWord;;
           block = line->blocks.emplace(std::next(block),
-                                       endWord,
-                                       oldEnd,
                                        endWord,
                                        oldEnd,
                                        block->blob,
@@ -245,7 +242,7 @@ bool SkParagraph::LayoutLine(std::vector<Line>::iterator& line, SkScalar width) 
                                                   point,
                                                   lastBlock.textStyle);
             if (ellipsisRect.right() <= width || line->blocks.size() == 1) {
-              line->blocks.emplace_back(0, 0, 0, 0,
+              line->blocks.emplace_back(0, 0,
                                         ellipsisBuilder.make(),
                                         ellipsisRect,
                                         lastBlock.textStyle);
@@ -667,22 +664,25 @@ void SkParagraph::BreakLines() {
     }
 
     // Remove all insignificant characters at the end of the line (whitespaces)
-    auto lastCharTrimmed = lastChar;
-    while (lastCharTrimmed > firstChar) {
-      int32_t character = *(_text16.begin() + lastCharTrimmed - 1);
+    while (lastChar > firstChar) {
+      int32_t character = *(_text16.begin() + lastChar - 1);
       if (!u_isWhitespace(character)) {
         break;
       }
-      lastCharTrimmed -= 1;
+      lastChar -= 1;
     }
 
-    auto firstCharTrimmed = firstChar;
-    while (firstCharTrimmed < lastCharTrimmed) {
-      int32_t character = *(_text16.begin() + firstCharTrimmed);
+    while (firstChar < lastChar) {
+      int32_t character = *(_text16.begin() + firstChar);
       if (!u_isWhitespace(character)) {
         break;
       }
-      firstCharTrimmed += 1;
+      firstChar += 1;
+    }
+
+    if (firstChar == lastChar) {
+      // TODO: draw the empty line, but keep one space for now since Flutter is using it
+      ++lastChar;
     }
 
     // Find the first style that is related to the line
@@ -695,21 +695,6 @@ void SkParagraph::BreakLines() {
       ++lastStyle;
     }
 
-    switch (_style.effective_align()) {
-      case SkTextAlign::left:
-        break;
-      case SkTextAlign::center:
-        firstChar = firstCharTrimmed;
-      case SkTextAlign::right:
-        lastChar = lastCharTrimmed;
-        break;
-      case SkTextAlign::justify:
-        firstChar = firstCharTrimmed;
-        lastChar = lastCharTrimmed;
-      default:
-        SkASSERT(false);
-    }
-
     // Generate blocks for future use
     std::vector<Block> blocks;
     blocks.reserve(lastStyle - firstStyle);
@@ -718,8 +703,6 @@ void SkParagraph::BreakLines() {
       blocks.emplace_back(
           SkTMax(style.start, firstChar),
           SkTMin(style.end, lastChar),
-          SkTMax(style.start, firstCharTrimmed),
-          SkTMin(style.end, lastCharTrimmed),
           style.textStyle);
     }
 
