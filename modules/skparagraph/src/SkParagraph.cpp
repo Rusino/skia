@@ -653,11 +653,6 @@ void SkParagraph::BreakLines() {
       }
     }
 
-    //if (lastChar > 0 && u_charType(*(_text16.begin() + lastChar - 1)) == U_CONTROL_CHAR) {
-    //  // Remove the line break
-    //  --lastChar;
-    //}
-
     // Remove all insignificant characters at the end of the line (whitespaces)
     // TODO: we keep at least one space in case the line is all spaces for now
     // TODO: since Flutter is using a space character to measure things;
