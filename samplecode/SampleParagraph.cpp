@@ -12,6 +12,7 @@
 #include <locale>
 #include <codecvt>
 
+#include "Resources.h"
 #include "SkBlurMaskFilter.h"
 #include "SkCanvas.h"
 #include "SkColorFilter.h"
@@ -54,6 +55,99 @@ static const std::vector<std::tuple<std::string, bool, bool, int, SkColor, SkCol
     { "sans-serif", false,  false, 8, SK_ColorWHITE, SK_ColorRED, false, SkTextDecorationStyle::kWavy}
 };
 
+namespace {
+
+
+class TestFontStyleSet : public SkFontStyleSet {
+ public:
+  TestFontStyleSet() { }
+
+  ~TestFontStyleSet() override { }
+
+  void registerTypeface(sk_sp<SkTypeface> typeface) {
+    _typeface = std::move(typeface);
+  }
+
+  int count() override {
+    return 1;
+  }
+
+  void getStyle(int index, SkFontStyle* style, SkString* name) override {
+
+    if (style != nullptr) *style = _typeface->fontStyle();
+    if (name != nullptr) _typeface->getFamilyName(name);
+  }
+
+  SkTypeface* createTypeface(int index) override {
+    return SkRef(_typeface.get());
+  }
+
+  SkTypeface* matchStyle(const SkFontStyle& pattern) override {
+    return SkRef(_typeface.get());
+  }
+
+ private:
+  sk_sp<SkTypeface> _typeface;
+};
+
+class TestFontProvider : public SkFontMgr {
+ public:
+  TestFontProvider(sk_sp<SkTypeface> typeface) {
+    RegisterTypeface(std::move(typeface));
+  }
+  ~TestFontProvider() override { }
+
+  void RegisterTypeface(sk_sp<SkTypeface> typeface) {
+    _set.registerTypeface(std::move(typeface));
+    _set.getStyle(0, nullptr, &_familyName);
+  }
+
+  void RegisterTypeface(sk_sp<SkTypeface> typeface, std::string family_name_alias) {
+    RegisterTypeface(std::move(typeface));
+  }
+
+  int onCountFamilies() const override {
+    return 1;
+  }
+
+  void onGetFamilyName(int index, SkString* familyName) const override {
+    *familyName = _familyName;
+  }
+
+  SkFontStyleSet* onMatchFamily(const char familyName[]) const override {
+    if (std::strncmp(familyName, _familyName.c_str(), _familyName.size()) == 0) {
+      return (SkFontStyleSet*)&_set;
+    }
+    return nullptr;
+  }
+
+  SkFontStyleSet* onCreateStyleSet(int index) const override { return nullptr; }
+  SkTypeface* onMatchFamilyStyle(const char familyName[],
+                                 const SkFontStyle& style) const override { return nullptr; }
+  SkTypeface* onMatchFamilyStyleCharacter(const char familyName[],
+                                          const SkFontStyle& style,
+                                          const char* bcp47[], int bcp47Count,
+                                          SkUnichar character) const override { return nullptr; }
+  SkTypeface* onMatchFaceStyle(const SkTypeface* tf,
+                               const SkFontStyle& style) const override { return nullptr; }
+
+  sk_sp<SkTypeface> onMakeFromData(sk_sp<SkData>, int ttcIndex) const override { return nullptr; }
+  sk_sp<SkTypeface> onMakeFromStreamIndex(std::unique_ptr<SkStreamAsset>,
+                                          int ttcIndex) const override { return nullptr; }
+  sk_sp<SkTypeface> onMakeFromStreamArgs(std::unique_ptr<SkStreamAsset>,
+                                         const SkFontArguments&) const override { return nullptr; }
+  sk_sp<SkTypeface> onMakeFromFontData(std::unique_ptr<SkFontData>) const override { return nullptr; }
+  sk_sp<SkTypeface> onMakeFromFile(const char path[], int ttcIndex) const override { return nullptr; }
+
+  sk_sp<SkTypeface> onLegacyMakeTypeface(const char familyName[],
+                                         SkFontStyle style) const override { return nullptr; }
+
+ private:
+  TestFontStyleSet _set;
+  SkString _familyName;
+};
+}
+
 class ParagraphView : public Sample {
  public:
   ParagraphView() {
@@ -69,8 +163,14 @@ class ParagraphView : public Sample {
         tf0->unref();
         tf1->unref();
 #endif
+
+    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/GoogleSans-Regular.ttf", 0));
+
+    fontCollection = sk_make_sp<SkFontCollection>();
   }
 
+  ~ParagraphView() {
+  }
  protected:
   bool onQuery(Sample::Event* evt) override {
     if (Sample::TitleQ(*evt)) {
@@ -316,6 +416,7 @@ class ParagraphView : public Sample {
                 SkScalar fs = 24,
                 size_t lineLimit = std::numeric_limits<size_t>::max(),
                 const std::u16string& ellipsis = u"\u2026") {
+
     SkAutoCanvasRestore acr(canvas, true);
 
     canvas->clipRect(SkRect::MakeWH(w, h));
@@ -330,23 +431,21 @@ class ParagraphView : public Sample {
     SkTextStyle style;
     style.setBackgroundColor(SK_ColorBLUE);
     style.setForegroundColor(paint);
+    style.setFontFamily(ff);
+    style.setFontSize(fs);
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
     paraStyle.setMaxLines(lineLimit);
 
     paraStyle.setEllipsis(ellipsis);
     paraStyle.getTextStyle().setFontSize(10);
-    SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
+    fontCollection->SetTestFontManager(testFontProvider);
+    SkParagraphBuilder builder(paraStyle, fontCollection);
 
-    style.setBackgroundColor(bg);
-    style.setForegroundColor(paint);
-    style.setFontFamily(ff);
-    style.setFontStyle(SkFontStyle());
-    style.setFontSize(fs);
-    style.setBackgroundColor(bg);
     SkPaint foreground;
     foreground.setColor(fg);
     style.setForegroundColor(foreground);
+    style.setBackgroundColor(bg);
 
     for (auto& part : text) {
       builder.PushStyle(style);
@@ -355,7 +454,7 @@ class ParagraphView : public Sample {
     }
 
     auto paragraph = builder.Build();
-    paragraph->Layout(w - margin);
+    paragraph->Layout(180);
 
     paragraph->Paint(canvas, margin, margin);
 
@@ -421,7 +520,7 @@ class ParagraphView : public Sample {
       canvas->translate(0, this->height()/2);
       drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
     */
-    std::vector<std::string> cupertino = { "Cupertino" };
+    std::vector<std::string> cupertino = { "google_logogoogle_gsuper_g_logo" };
     std::vector<std::string>  text = {
         "My neighbor came over to say,\n"
         "Although not in a neighborly way,\n\n"
@@ -448,8 +547,8 @@ class ParagraphView : public Sample {
         ");"
     };
     std::vector<std::string> very_long = { "A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text" };
-    //drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
-    drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
+    drawText(canvas, this->width(), this->height(), cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 16);
+    //drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
     /*
     SkScalar height = this->height() / 4;
     std::string line = "Hesitation is always easy rarely useful.";
@@ -467,6 +566,9 @@ class ParagraphView : public Sample {
 
  private:
   typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
 };
 
 //////////////////////////////////////////////////////////////////////////////

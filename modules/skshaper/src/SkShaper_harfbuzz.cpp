@@ -1077,24 +1077,29 @@ SkPoint SkShaper::Impl::shapeOk(RunHandler* handler,
         const auto& run = runs[logicalIndex];
         const RunHandler::RunInfo info = { lineIndex, run.fAdvance, maxAscent, maxDescent, maxLeading };
 
-        // Break the run into words
-        int startWord = startGlyphIndex;
-        for (int glyph = startGlyphIndex; glyph < endGlyphIndex; ++glyph) {
-          if (run.fGlyphs[glyph].fMayLineBreakBefore && glyph != startGlyphIndex) {
-            // Found a word
-            SkPoint start = SkPoint::Make(currentPoint.fX, lineStart.fY);
-            append(handler, info, run, startWord, glyph, &currentPoint);
-            SkPoint end = SkPoint::Make(currentPoint.fX, currentPoint.fY + maxDescent + maxLeading);;
-            handler->addWord(run.fUtf8Start + startWord, run.fUtf8Start + glyph, start, end - start, - maxAscent);
-            // Continue
-            startWord = glyph;
+        // Break the run into words keeping in mind that
+        // there glyphs are not characters and we need to keep track of both
+        int startGlyphWord = startGlyphIndex;
+        int startCharWord = run.fGlyphs[0].fCluster;
+        for (int glyph = startGlyphIndex + 1; glyph < endGlyphIndex; ++glyph) {
+          if (!run.fGlyphs[glyph].fMayLineBreakBefore) {
+            continue;
           }
-        }
-        if (startWord != endGlyphIndex) {
+          // Found a word
           SkPoint start = SkPoint::Make(currentPoint.fX, lineStart.fY);
-          append(handler, info, run, startWord, endGlyphIndex, &currentPoint);
+          append(handler, info, run, startGlyphWord, glyph, &currentPoint);
           SkPoint end = SkPoint::Make(currentPoint.fX, currentPoint.fY + maxDescent + maxLeading);
-          handler->addWord(run.fUtf8Start + startWord, run.fUtf8End, start, end - start, - maxAscent);
+          int endCharWord = run.fGlyphs[glyph].fCluster;
+          handler->addWord(run.fUtf8Start + startCharWord, run.fUtf8Start + endCharWord, start, end - start, - maxAscent);
+          // Continue
+          startGlyphWord = glyph;
+          startCharWord = endCharWord;
+        }
+        if (startGlyphWord != endGlyphIndex) {
+          SkPoint start = SkPoint::Make(currentPoint.fX, lineStart.fY);
+          append(handler, info, run, startGlyphWord, endGlyphIndex, &currentPoint);
+          SkPoint end = SkPoint::Make(currentPoint.fX, currentPoint.fY + maxDescent + maxLeading);
+          handler->addWord(run.fUtf8Start + startCharWord, run.fUtf8End, start, end - start, - maxAscent);
         }
       }
 

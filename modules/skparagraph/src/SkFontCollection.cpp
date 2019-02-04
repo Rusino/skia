@@ -203,7 +203,7 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
   auto found = _typefaces.find(familyKey);
   if (found != nullptr) {
     textStyle.setTypeface(*found);
-    return found->get();
+    return SkRef(found->get());
   }
 
   sk_sp<SkTypeface> typeface = nullptr;
@@ -216,12 +216,12 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
     }
 
     for (int i = 0; i < set->count(); ++i) {
-      sk_sp<SkTypeface>(set->createTypeface(i));
+      set->createTypeface(i);
     }
 
     sk_sp<SkTypeface> match(set->matchStyle(textStyle.getFontStyle()));
     if (match != nullptr) {
-      typeface = match;
+      typeface = std::move(match);
       break;
     }
   }
@@ -234,7 +234,7 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
 
   textStyle.setTypeface(typeface);
 
-  return typeface.get();
+  return SkRef(typeface.get());
 }
 
 
