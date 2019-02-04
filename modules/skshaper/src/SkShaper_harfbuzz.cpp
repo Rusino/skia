@@ -42,6 +42,22 @@
 #include <cstring>
 
 namespace {
+enum hb_buffer_scratch_flags_t {
+  HB_BUFFER_SCRATCH_FLAG_DEFAULT			= 0x00000000u,
+  HB_BUFFER_SCRATCH_FLAG_HAS_NON_ASCII			= 0x00000001u,
+  HB_BUFFER_SCRATCH_FLAG_HAS_DEFAULT_IGNORABLES		= 0x00000002u,
+  HB_BUFFER_SCRATCH_FLAG_HAS_SPACE_FALLBACK		= 0x00000004u,
+  HB_BUFFER_SCRATCH_FLAG_HAS_GPOS_ATTACHMENT		= 0x00000008u,
+  HB_BUFFER_SCRATCH_FLAG_HAS_UNSAFE_TO_BREAK		= 0x00000010u,
+  HB_BUFFER_SCRATCH_FLAG_HAS_CGJ			= 0x00000020u,
+
+  /* Reserved for complex shapers' internal use. */
+      HB_BUFFER_SCRATCH_FLAG_COMPLEX0			= 0x01000000u,
+  HB_BUFFER_SCRATCH_FLAG_COMPLEX1			= 0x02000000u,
+  HB_BUFFER_SCRATCH_FLAG_COMPLEX2			= 0x04000000u,
+  HB_BUFFER_SCRATCH_FLAG_COMPLEX3			= 0x08000000u,
+};
+
 template <class T, void(*P)(T*)> using resource = std::unique_ptr<T, SkFunctionWrapper<void, T, P>>;
 using HBBlob   = resource<hb_blob_t     , hb_blob_destroy  >;
 using HBFace   = resource<hb_face_t     , hb_face_destroy  >;
@@ -728,7 +744,7 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
         SkVector advance = {0, 0};
         std::unique_ptr<TextProps[]> modelText(new TextProps[utf8End - utf8Start + 1]());
         for (int i = 0; i < model.fNumGlyphs; ++i) {
-            SkASSERT(model.fGlyphs[i].fCluster < utf8End - utf8Start);
+            SkASSERT((int)model.fGlyphs[i].fCluster < utf8End - utf8Start);
             if (!model.fGlyphs[i].fUnsafeToBreak) {
                 modelText[model.fGlyphs[i].fCluster].glyphLen = i;
                 modelText[model.fGlyphs[i].fCluster].advance = advance;
@@ -827,7 +843,7 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
                     SkVector advance = {0, 0};
                     modelText.reset(new TextProps[utf8End - best.fUtf8End + 1]());
                     for (int i = 0; i < model.fNumGlyphs; ++i) {
-                        SkASSERT(model.fGlyphs[i].fCluster < utf8End - utf8Start);
+                        SkASSERT((int)model.fGlyphs[i].fCluster < utf8End - utf8Start);
                         if (!model.fGlyphs[i].fUnsafeToBreak) {
                             modelText[model.fGlyphs[i].fCluster].glyphLen = i;
                             modelText[model.fGlyphs[i].fCluster].advance = advance;
@@ -1068,7 +1084,7 @@ SkPoint SkShaper::Impl::shapeOk(RunHandler* handler,
             // Found a word
             SkPoint start = SkPoint::Make(currentPoint.fX, lineStart.fY);
             append(handler, info, run, startWord, glyph, &currentPoint);
-            SkPoint end = SkPoint::Make(currentPoint.fX, currentPoint.fY + maxDescent + maxLeading);
+            SkPoint end = SkPoint::Make(currentPoint.fX, currentPoint.fY + maxDescent + maxLeading);;
             handler->addWord(run.fUtf8Start + startWord, run.fUtf8Start + glyph, start, end - start, - maxAscent);
             // Continue
             startWord = glyph;
@@ -1078,7 +1094,7 @@ SkPoint SkShaper::Impl::shapeOk(RunHandler* handler,
           SkPoint start = SkPoint::Make(currentPoint.fX, lineStart.fY);
           append(handler, info, run, startWord, endGlyphIndex, &currentPoint);
           SkPoint end = SkPoint::Make(currentPoint.fX, currentPoint.fY + maxDescent + maxLeading);
-          handler->addWord(run.fUtf8Start + startWord, run.fUtf8Start + endGlyphIndex, start, end - start, - maxAscent);
+          handler->addWord(run.fUtf8Start + startWord, run.fUtf8End, start, end - start, - maxAscent);
         }
       }
 
@@ -1162,7 +1178,7 @@ ShapedRun SkShaper::Impl::shape(const char* utf8,
     }
 
     // Add postcontext.
-    hb_buffer_add_utf8(buffer, utf8Current, utf8 + utf8Bytes - utf8Current, 0, 0);
+    hb_buffer_add_utf8(buffer, utf8Current, utf8 + utf8Bytes - utf8Current, 0, 0);;
 
     size_t utf8runLength = utf8End - utf8Start;
     if (!SkTFitsIn<int>(utf8runLength)) {

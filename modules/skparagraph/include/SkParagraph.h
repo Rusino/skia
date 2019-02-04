@@ -193,7 +193,15 @@ class ShapedParagraph final : public SkShaper::RunHandler {
   : _currentWord(builder)
   , _style(style)
   , _blocks(std::move(blocks))
-   { }
+   {
+     _alphabeticBaseline = 0;
+     _ideographicBaseline = 0;
+     _height = 0;
+     _width = 0;
+     _maxIntrinsicWidth = 0;
+     _minIntrinsicWidth = 0;
+     _linesNumber = 0;
+   }
 
   SkShaper::RunHandler::Buffer newRunBuffer(const RunInfo&, const SkFont& font, int glyphCount, int textCount) override {
     const auto& runBuffer = SkTextBlobBuilderPriv::AllocRunTextPos
@@ -235,10 +243,30 @@ class ShapedParagraph final : public SkShaper::RunHandler {
     }
   }
 
+  void printBlocks(size_t linenum) {
+      SkDebugf("Paragraph #%d\n", linenum);
+      SkDebugf("Lost blocks\n");
+      for (auto& block : _blocks) {
+        std::string str(block.start, block.end - block.start);
+        SkDebugf("Block: '%s'\n", str.c_str());
+      }
+      int i = 0;
+      for (auto& line : _lines) {
+        SkDebugf("Line: %d (%d)\n", i, line.blocks.size());
+        for (auto& block : line.blocks) {
+          std::string str(block.start, block.end - block.start);
+          SkDebugf("Block: '%s'\n", str.c_str());
+        }
+        ++i;
+      }
+  }
+
   void format() {
 
+    size_t lineIndex = 0;
     for (auto& line : _lines) {
 
+      ++lineIndex;
       SkScalar delta = _maxWidth - line.size.width();
       if (delta <= 0) {
         // Delta can be < 0 if there are extra whitespaces at the end of the line;
@@ -254,6 +282,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
             block.shift += delta;
           }
           line.size.fWidth = _maxWidth;
+          _width = _maxWidth;
           break;
         case SkTextAlign::center: {
           auto half = delta / 2;
@@ -261,6 +290,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
             block.shift += half;
           }
           line.size.fWidth = _maxWidth;
+          _width = _maxWidth;
           break;
         }
         case SkTextAlign::justify: {
@@ -274,6 +304,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
             if (&block != &line.blocks.back()) {
               block.rect.fRight += step;
               line.size.fWidth = _maxWidth;
+              _width = _maxWidth;
             }
             shift += step;
           }
@@ -284,6 +315,11 @@ class ShapedParagraph final : public SkShaper::RunHandler {
       }
     }
 
+    SkDebugf("Layout results:\n");
+    SkDebugf("Size: %f * %f\n", _width, _height);
+    SkDebugf("Intrinsic: %f * %f\n", _minIntrinsicWidth, _maxIntrinsicWidth);
+    SkDebugf("Constrants: %f * %d\n", _maxWidth, _maxLines);
+    printBlocks(_linesNumber);
   }
 
   void paint(SkCanvas* textCanvas, SkPoint& point) {
@@ -302,6 +338,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
         SkPoint start = SkPoint::Make(point.x() + block.shift, point.y());
         block.PaintBackground(textCanvas, start);
         block.PaintShadow(textCanvas, start);
+
         textCanvas->drawTextBlob(block.blob, start.x(), start.y(), paint);
       }
 
@@ -348,6 +385,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
     _block->rect = SkRect::MakeXYWH(point.fX, point.fY, advance.fX, advance.fY);
 
     if (_block->end > endWord) {
+      std::string str(startWord, endWord - startWord);
       // One block (style) can have few runs (words); let's break them here
       // TODO: deal with the trimmed values
       auto oldEnd = _block->end;
@@ -381,7 +419,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
     }
     _linesNumber = lineIndex;
     //SkString line(start, end - start);
-    //SkDebugf("Line #%d: '%s'\n", lineIndex, line.c_str());
+    //SkDebugf("addLine #%d: '%s'\n", lineIndex, line.c_str());
 
     _advance = advance;
     _height += advance.fY;
@@ -411,7 +449,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
         auto size = ellipsisEnd - ellipsisStart;
 
         if (ellipsisEnd.fX <= _maxWidth || _blocks.size() == 1) {
-          _block = _blocks.emplace(_block, nullptr, nullptr,
+          _block = _blocks.emplace(_block, _block->start, _block->start,
                                    handler.makeBlob(),
                                    SkRect::MakeXYWH(ellipsisStart.x(), ellipsisStart.y(), size.x(), size.y()),
                                    ellipsisStyle);
@@ -430,6 +468,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
     _blocks.erase(_blocks.begin(), _block);
     // Add one more line and start from the it's first block again
     _lines.emplace_back(first, advance);
+
     _block = _blocks.begin();
   }
 

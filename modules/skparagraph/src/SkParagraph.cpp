@@ -89,6 +89,8 @@ void SkParagraph::SetParagraphStyle(SkParagraphStyle style) {
 
 bool SkParagraph::Layout(double width) {
 
+  SkDebugf("Layout requirements: %f * %d\n", width, _style.getMaxLines());
+
   // Break the text into lines (with each one broken into blocks by style)
   BreakTextIntoParagraphs();
 
@@ -109,6 +111,10 @@ bool SkParagraph::Layout(double width) {
     if (!_style.unlimited_lines()) {
       maxLines -= paragraph.lineNumber();
     }
+  }
+
+  for (auto& paragraph : _paragraphs) {
+    paragraph.format();
 
     _alphabeticBaseline = 0;
     _ideographicBaseline = 0;
@@ -116,10 +122,6 @@ bool SkParagraph::Layout(double width) {
     _width = SkMaxScalar(_width, paragraph.width());
     _maxIntrinsicWidth = SkMaxScalar(_maxIntrinsicWidth, paragraph.maxIntrinsicWidth());
     _minIntrinsicWidth = SkMaxScalar(_minIntrinsicWidth, paragraph.minIntrinsicWidth());
-  }
-
-  for (auto& paragraph : _paragraphs) {
-    paragraph.format();
   }
 
   RecordPicture();
@@ -228,32 +230,13 @@ void SkParagraph::BreakTextIntoParagraphs() {
     lastChar = firstChar;
   }
 
+  SkDebugf("Paragraphs:\n");
   // Print all lines
-  /*
-  size_t linenum = 1;
-  for (auto& line : _lines) {
-    auto start = line.Start();
-    auto end = line.End();
-    icu::UnicodeString utf16 = icu::UnicodeString(&_text16[start], end - start);
-    std::string str;
-    utf16.toUTF8String(str);
-    SkDebugf("Line[%d]: %d:%d '%s'\n", linenum, start, end, str.c_str());
+  size_t linenum = 0;
+  for (auto& line : _paragraphs) {
     ++linenum;
-
-    if (line.blocks.empty()) {
-      SkDebugf("Empty line\n");
-    } else {
-      for (auto& block : line.blocks) {
-        auto start = block.start;
-        auto end = block.end;
-        icu::UnicodeString utf16 = icu::UnicodeString(&_text16[start], end - start);
-        std::string str;
-        utf16.toUTF8String(str);
-        SkDebugf("Block:   %d:%d '%s'\n", start, end, str.c_str());
-      }
-    }
+    line.printBlocks(linenum);
   }
-  */
 }
 
 // TODO: implement properly (currently it only works as an indicator that something changed in the text)
