@@ -60,10 +60,6 @@ double SkParagraph::GetIdeographicBaseline() {
   return SkScalarToDouble(_ideographicBaseline);
 }
 
-bool SkParagraph::DidExceedMaxLines() {
-  return _linesNumber > _style.getMaxLines();
-}
-
 void SkParagraph::SetText(const std::u16string& utf16text) {
 
   icu::UnicodeString unicode((UChar*)utf16text.data(), utf16text.size());
@@ -89,8 +85,6 @@ void SkParagraph::SetParagraphStyle(SkParagraphStyle style) {
 
 bool SkParagraph::Layout(double width) {
 
-  SkDebugf("Layout requirements: %f * %d\n", width, _style.getMaxLines());
-
   // Break the text into lines (with each one broken into blocks by style)
   BreakTextIntoParagraphs();
 
@@ -106,10 +100,14 @@ bool SkParagraph::Layout(double width) {
   // Take care of line limitation across all the paragraphs
   size_t maxLines = _style.getMaxLines();
   for (auto& paragraph : _paragraphs) {
+    SkDebugf("Layout requirements: #%d %f * %d\n", _linesNumber, width, maxLines);
     paragraph.layout(width, maxLines);
     _linesNumber += paragraph.lineNumber();
     if (!_style.unlimited_lines()) {
       maxLines -= paragraph.lineNumber();
+    }
+    if (maxLines <= 0) {
+      break;
     }
   }
 
@@ -229,7 +227,7 @@ void SkParagraph::BreakTextIntoParagraphs() {
     // Move on
     lastChar = firstChar;
   }
-
+/*
   SkDebugf("Paragraphs:\n");
   // Print all lines
   size_t linenum = 0;
@@ -237,6 +235,7 @@ void SkParagraph::BreakTextIntoParagraphs() {
     ++linenum;
     line.printBlocks(linenum);
   }
+*/
 }
 
 // TODO: implement properly (currently it only works as an indicator that something changed in the text)

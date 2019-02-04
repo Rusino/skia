@@ -1099,7 +1099,10 @@ SkPoint SkShaper::Impl::shapeOk(RunHandler* handler,
           SkPoint start = SkPoint::Make(currentPoint.fX, lineStart.fY);
           append(handler, info, run, startGlyphWord, endGlyphIndex, &currentPoint);
           SkPoint end = SkPoint::Make(currentPoint.fX, currentPoint.fY + maxDescent + maxLeading);
-          handler->addWord(run.fUtf8Start + startCharWord, run.fUtf8End, start, end - start, - maxAscent);
+          int endCharWord = nextGlyph == nullptr
+                            ? run.fUtf8End - run.fUtf8Start
+                            : run.fGlyphs[endGlyphIndex - 1].fCluster;
+          handler->addWord(run.fUtf8Start + startCharWord, run.fUtf8Start + endCharWord, start, end - start, - maxAscent);
         }
       }
 

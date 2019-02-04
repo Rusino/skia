@@ -201,6 +201,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
      _maxIntrinsicWidth = 0;
      _minIntrinsicWidth = 0;
      _linesNumber = 0;
+     _exceededLimits = false;
    }
 
   SkShaper::RunHandler::Buffer newRunBuffer(const RunInfo&, const SkFont& font, int glyphCount, int textCount) override {
@@ -219,20 +220,26 @@ class ShapedParagraph final : public SkShaper::RunHandler {
     _maxLines = maxLines;
     _block = _blocks.begin();
     _linesNumber = 0;
-    auto start = _blocks.begin()->start;
-    auto end = std::prev(_blocks.end())->end;
-    MultipleFontRunIterator font(start, end - start,
-                                 _blocks.begin(),
-                                 _blocks.end(),
-                                 _style.getTextStyle());
 
-    if (start < end) {
-      SkShaper shaper;
-      shaper.shape(this, &font, start, end - start, true, {0, 0}, maxWidth);
-    } else {
+    if (!_blocks.empty()) {
+      auto start = _blocks.begin()->start;
+      auto end = _blocks.empty() ? start - 1 : std::prev(_blocks.end())->end;
+
+      if (start < end) {
+        MultipleFontRunIterator font(start, end - start,
+                                     _blocks.begin(),
+                                     _blocks.end(),
+                                     _style.getTextStyle());
+        SkShaper shaper;
+        SkDebugf("Shape: %d\n", end - start);
+        shaper.shape(this, &font, start, end - start, true, {0, 0}, maxWidth);
+        return;
+      }
+
       // Shaper does not shape empty lines
+      SkDebugf("Shape: empty\n");
       SkFontMetrics metrics;
-      font.currentFont()->getMetrics(&metrics);
+      _block->textStyle.getFontMetrics(metrics);
       _alphabeticBaseline = - metrics.fAscent;
       _ideographicBaseline = - metrics.fAscent;
       _height = metrics.fDescent + metrics.fLeading - metrics.fAscent;
@@ -240,15 +247,25 @@ class ShapedParagraph final : public SkShaper::RunHandler {
       _maxIntrinsicWidth = 0;
       _minIntrinsicWidth = 0;
       _linesNumber = 1;
+      return;
     }
+
+    // Shaper does not shape empty lines
+    SkDebugf("Shape: nothing\n");
+    _height = 0;
+    _width = 0;
+    _maxIntrinsicWidth = 0;
+    _minIntrinsicWidth = 0;
   }
 
   void printBlocks(size_t linenum) {
       SkDebugf("Paragraph #%d\n", linenum);
-      SkDebugf("Lost blocks\n");
-      for (auto& block : _blocks) {
-        std::string str(block.start, block.end - block.start);
-        SkDebugf("Block: '%s'\n", str.c_str());
+      if (!_blocks.empty()) {
+        SkDebugf("Lost blocks\n");
+        for (auto& block : _blocks) {
+          std::string str(block.start, block.end - block.start);
+          SkDebugf("Block: '%s'\n", str.c_str());
+        }
       }
       int i = 0;
       for (auto& line : _lines) {
@@ -319,7 +336,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
     SkDebugf("Size: %f * %f\n", _width, _height);
     SkDebugf("Intrinsic: %f * %f\n", _minIntrinsicWidth, _maxIntrinsicWidth);
     SkDebugf("Constrants: %f * %d\n", _maxWidth, _maxLines);
-    printBlocks(_linesNumber);
+    //printBlocks(_linesNumber);
   }
 
   void paint(SkCanvas* textCanvas, SkPoint& point) {
@@ -384,8 +401,8 @@ class ShapedParagraph final : public SkShaper::RunHandler {
     _block->blob = _currentWord->make();
     _block->rect = SkRect::MakeXYWH(point.fX, point.fY, advance.fX, advance.fY);
 
+    std::string str(startWord, endWord - startWord);
     if (_block->end > endWord) {
-      std::string str(startWord, endWord - startWord);
       // One block (style) can have few runs (words); let's break them here
       // TODO: deal with the trimmed values
       auto oldEnd = _block->end;
@@ -406,23 +423,25 @@ class ShapedParagraph final : public SkShaper::RunHandler {
       // 2. Take the first style for the entire word (implemented)
       // 3. TODO: Make each run a glyph, not a "word" and deal with it appropriately
       // Remove all the other styles that cover only this word
+      int n = 0;
       while (_block != _blocks.end() && _block->end <= endWord) {
         _block = _blocks.erase(_block);
+        ++n;
       }
     }
   }
 
   void addLine(const char* start, const char* end, SkPoint point, SkVector advance, size_t lineIndex, bool lastLine) override {
-    if (_linesNumber >= _maxLines) {
+    if (_linesNumber >= _maxLines || _exceededLimits) {
       // We already exceeded the limits - just ignore everything
       return;
     }
     _linesNumber = lineIndex;
     //SkString line(start, end - start);
-    //SkDebugf("addLine #%d: '%s'\n", lineIndex, line.c_str());
+    //SkDebugf("addLine #%d: %f '%s'\n", lineIndex, advance.fY, line.c_str());
 
     _advance = advance;
-    _height += advance.fY;
+    _height = advance.fY;
     _width = SkMaxScalar(_width, advance.fX);
     _maxIntrinsicWidth += advance.fX;
 
@@ -454,12 +473,12 @@ class ShapedParagraph final : public SkShaper::RunHandler {
                                    SkRect::MakeXYWH(ellipsisStart.x(), ellipsisStart.y(), size.x(), size.y()),
                                    ellipsisStyle);
           ++_block;
+          _exceededLimits = true;
           break;
         }
         --_block;
         _advance.fX -= _block->rect.width();
       }
-      _exceededLimits = true;
     }
 
     // Move shaped blocks to the line
@@ -678,6 +697,10 @@ class ShapedParagraph final : public SkShaper::RunHandler {
     }
   }
 
+  bool DidExceedMaxLines() {
+    return _exceededLimits;
+  }
+
  private:
   SkTextBlobBuilder* _currentWord;
   SkScalar _maxWidth;
@@ -715,7 +738,9 @@ class SkParagraph {
 
   double GetIdeographicBaseline();
 
-  bool DidExceedMaxLines();
+  bool DidExceedMaxLines() {
+    return _exceededLimits;
+  }
 
   bool Layout(double width);
 
