@@ -4,22 +4,9 @@
  * Use of this source code is governed by a BSD-style license that can be
  * found in the LICENSE file.
  */
-#include <algorithm>
 
 #include <unicode/brkiter.h>
-#include "unicode/utypes.h"
-#include "unicode/unistr.h"
-
 #include "SkParagraph.h"
-#include "SkCanvas.h"
-#include "SkSize.h"
-#include "SkPath.h"
-
-#include <unicode/ubrk.h>
-
-#include "SkDashPathEffect.h"
-#include "SkDiscretePathEffect.h"
-#include "SkMaskFilter.h"
 #include "SkPictureRecorder.h"
 
 void printText(const std::string& label, const UChar* text, size_t start, size_t end) {
@@ -30,8 +17,7 @@ void printText(const std::string& label, const UChar* text, size_t start, size_t
 }
 
 SkParagraph::SkParagraph()
-    : _exceededLimits(false)
-    , _picture(nullptr) {}
+    : _picture(nullptr) {}
 
 SkParagraph::~SkParagraph() = default;
 

@@ -18,10 +18,7 @@
 #include <memory>
 #include <set>
 #include <string>
-
-//#include "SkTHash.h"
 #include "../private/SkTHash.h"
-
 #include "SkFontMgr.h"
 #include "SkRefCnt.h"
 #include "SkTextStyle.h"
