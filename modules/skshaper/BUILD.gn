@@ -11,7 +11,14 @@ import("../../gn/skia.gni")
 
 config("public_config") {
   if (skia_enable_skshaper) {
-    include_dirs = [ "include" ]
+    include_dirs = [ "include",
+            "../../third_party/icu",
+            "../../third_party/externals/harfbuzz/src",
+            "../../third_party/externals/icu/source/common",
+            "../../src/utils",
+            "../../src/core",
+            "../../include/private",
+      ]
   }
 }
 
