@@ -1836,6 +1836,7 @@ if (skia_enable_tools) {
     deps = [
       ":skia",
       "modules/skshaper",
+      "modules/skparagraph",
     ]
   }
 
@@ -2283,6 +2284,7 @@ if (skia_enable_tools) {
         ":tool_utils",
         "modules/skottie",
         "modules/skshaper",
+        "modules/skparagraph",
       ]
     }
   }

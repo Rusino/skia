@@ -79,8 +79,8 @@ class SkParagraph {
   SkParagraphStyle _style;
   std::vector<StyledText> _styles;
   // Shaping
-  SkTextBlobBuilder _builder;
   std::vector<ShapedParagraph> _paragraphs;
+  SkTextBlobBuilder _builder;
   // Painting
   sk_sp<SkPicture> _picture;
 };

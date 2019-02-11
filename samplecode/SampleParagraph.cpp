@@ -547,7 +547,7 @@ class ParagraphView : public Sample {
         ");"
     };
     std::vector<std::string> very_long = { "A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text" };
-    drawText(canvas, this->width(), this->height(), cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 16);
+    drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 16);
     //drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
     /*
     SkScalar height = this->height() / 4;

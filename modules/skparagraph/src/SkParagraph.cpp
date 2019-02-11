@@ -187,28 +187,28 @@ void SkParagraph::BreakTextIntoParagraphs() {
     }
 
     // Find the first style that is related to the line
-    while (firstStyle > 0 && (int32_t)_styles[firstStyle].start > firstChar) {
+    while (firstStyle > 0 && _styles[firstStyle].start > _utf8 + firstChar) {
       --firstStyle;
     }
 
     size_t lastStyle = firstStyle;
-    while (lastStyle != _styles.size() && (int32_t)_styles[lastStyle].start < lastChar) {
+    while (lastStyle != _styles.size() && _styles[lastStyle].start < _utf8 + lastChar) {
       ++lastStyle;
     }
 
     // Generate blocks for future use
-    std::vector<Block> blocks;
-    blocks.reserve(lastStyle - firstStyle);
+    std::vector<StyledText> styles;
+    styles.reserve(lastStyle - firstStyle);
     for (auto s = firstStyle; s < lastStyle; ++s) {
       auto& style = _styles[s];
-      blocks.emplace_back(
-          _utf8 + SkTMax((int32_t)style.start, firstChar),
-          _utf8 + SkTMin((int32_t)style.end, lastChar),
+      styles.emplace_back(
+          _utf8 + SkTMax((int32_t)(style.start - _utf8), firstChar),
+          _utf8 + SkTMin((int32_t)(style.end - _utf8), lastChar),
           style.textStyle);
     }
 
     // Add one more string to the list;
-    _paragraphs.emplace(_paragraphs.begin(), &_builder, _style, std::move(blocks));
+    _paragraphs.emplace(_paragraphs.begin(), &_builder, _style, std::move(styles));
 
     // Move on
     lastChar = firstChar;

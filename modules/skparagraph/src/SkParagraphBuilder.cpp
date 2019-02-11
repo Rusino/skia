@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 #include <list>
+#include <algorithm>
 
 #include "SkParagraphBuilder.h"
 #include "SkParagraphStyle.h"
 #include "SkPaint.h"
-
 
 SkParagraphBuilder::SkParagraphBuilder(
     SkParagraphStyle style,
@@ -115,7 +115,11 @@ std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
   std::unique_ptr<SkParagraph> paragraph = std::make_unique<SkParagraph>();
 
   paragraph->SetText(_text);
-  paragraph->SetRuns(std::move(_runs));
+  std::vector<StyledText> styles;
+  std::transform(_runs.cbegin(), _runs.cend(), std::back_inserter(styles), [this](const Run& value) {
+    return StyledText((const char*)&_text[0] + value.start, (const char*)&_text[0] + value.end, value.textStyle);
+  });
+  paragraph->SetRuns(std::move(styles));
   paragraph->SetParagraphStyle(_style);
 
   return paragraph;

@@ -28,11 +28,9 @@ class RunIterator {
   }
 };
 
-struct hb_font_t;
 class FontRunIterator : public RunIterator {
  public:
   virtual const SkFont* currentFont() const = 0;
-  virtual hb_font_t* currentHBFont() const;
 };
 
 /**

@@ -340,9 +340,7 @@ class SingleFontRunIterator : public FontRunIterator {
   SkFont* currentFont() const override {
     return fCurrentFont;
   }
-  hb_font_t* currentHBFont() const override {
-    return fCurrentHBFont;
-  }
+
  private:
   const char* fCurrent;
   const char* fEnd;
@@ -585,16 +583,6 @@ struct ShapedRunGlyphIterator {
 };
 
 }  // namespace
-
-hb_font_t* FontRunIterator::currentHBFont() const {
-  HBFont hbFont = create_hb_font(currentFont()->getTypeface());
-  if (!hbFont) {
-    SkDebugf("create_hb_font failed!\n");
-    return nullptr;
-  }
-
-  return hbFont.get();
-}
 
 struct SkShaper::Impl {
   HBFont fHarfBuzzFont;
@@ -1160,11 +1148,17 @@ ShapedRun SkShaper::Impl::shape(const char* utf8,
   hb_buffer_set_script(buffer, script->currentScript());
   hb_buffer_set_language(buffer, language->currentLanguage());
   hb_buffer_guess_segment_properties(buffer);
-  // TODO: features
-  if (!font->currentHBFont()) {
+
+  HBFont hbFont = create_hb_font(font->currentFont()->getTypeface());
+  if (!hbFont) {
     return run;
   }
-  hb_shape(font->currentHBFont(), buffer, nullptr, 0);
+  hb_font_t* currentHBFont = hbFont.get();
+  if (!currentHBFont) {
+    return run;
+  }
+
+  hb_shape(currentHBFont, buffer, nullptr, 0);
   unsigned len = hb_buffer_get_length(buffer);
   if (len == 0) {
     // TODO: this isn't an error, make it look different
@@ -1188,7 +1182,7 @@ ShapedRun SkShaper::Impl::shape(const char* utf8,
                   bidi->currentLevel(),
                   std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]));
   int scaleX, scaleY;
-  hb_font_get_scale(font->currentHBFont(), &scaleX, &scaleY);
+  hb_font_get_scale(currentHBFont, &scaleX, &scaleY);
   double textSizeY = run.fFont.getSize() / scaleY;
   double textSizeX = run.fFont.getSize() / scaleX * run.fFont.getScaleX();
   SkVector runAdvance = { 0, 0 };

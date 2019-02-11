@@ -10,11 +10,11 @@
 #include "SkDashPathEffect.h"
 #include "SkDiscretePathEffect.h"
 
-ShapedParagraph::ShapedParagraph(SkTextBlobBuilder* builder, SkParagraphStyle style, std::vector<Block> blocks)
-: _currentWord(builder)
-, _style(style)
-, _blocks(std::move(blocks))
+ShapedParagraph::ShapedParagraph(SkTextBlobBuilder* builder, SkParagraphStyle style, std::vector<StyledText> styles)
+: _style(style)
+, _styles(std::move(styles))
 {
+  _builder = builder;
   _alphabeticBaseline = 0;
   _ideographicBaseline = 0;
   _height = 0;
@@ -23,22 +23,25 @@ ShapedParagraph::ShapedParagraph(SkTextBlobBuilder* builder, SkParagraphStyle st
   _minIntrinsicWidth = 0;
   _linesNumber = 0;
   _exceededLimits = false;
+  _currentChar = start();
+  _maxAscend = 0;
+  _maxDescend = 0;
+  _maxLeading = 0;
 }
 
 void ShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
   _maxWidth = maxWidth;
   _maxLines = maxLines;
-  _block = _blocks.begin();
   _linesNumber = 0;
 
-  if (!_blocks.empty()) {
-    auto start = _blocks.begin()->start;
-    auto end = _blocks.empty() ? start - 1 : std::prev(_blocks.end())->end;
+  if (!_styles.empty()) {
+    auto start = _styles.begin()->start;
+    auto end = _styles.empty() ? start - 1 : std::prev(_styles.end())->end;
 
     if (start < end) {
       MultipleFontRunIterator font(start, end - start,
-                                   _blocks.begin(),
-                                   _blocks.end(),
+                                   _styles.begin(),
+                                   _styles.end(),
                                    _style.getTextStyle());
       SkShaper shaper(nullptr);
       shaper.shape(this, &font, start, end - start, true, {0, 0}, maxWidth);
@@ -47,7 +50,7 @@ void ShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
 
     // Shaper does not shape empty lines
     SkFontMetrics metrics;
-    _block->textStyle.getFontMetrics(metrics);
+    _styles.back().textStyle.getFontMetrics(metrics);
     _alphabeticBaseline = - metrics.fAscent;
     _ideographicBaseline = - metrics.fAscent;
     _height = metrics.fDescent + metrics.fLeading - metrics.fAscent;
@@ -67,18 +70,18 @@ void ShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
 
 void ShapedParagraph::printBlocks(size_t linenum) {
   SkDebugf("Paragraph #%d\n", linenum);
-  if (!_blocks.empty()) {
+  if (!_styles.empty()) {
     SkDebugf("Lost blocks\n");
-    for (auto& block : _blocks) {
+    for (auto& block : _styles) {
       std::string str(block.start, block.end - block.start);
       SkDebugf("Block: '%s'\n", str.c_str());
     }
   }
   int i = 0;
   for (auto& line : _lines) {
-    SkDebugf("Line: %d (%d)\n", i, line.blocks.size());
-    for (auto& block : line.blocks) {
-      std::string str(block.start, block.end - block.start);
+    SkDebugf("Line: %d (%d)\n", i, line.words.size());
+    for (auto& word : line.words) {
+      std::string str(word.start, word.end - word.start);
       SkDebugf("Block: '%s'\n", str.c_str());
     }
     ++i;
@@ -102,16 +105,16 @@ void ShapedParagraph::format() {
       case SkTextAlign::left:
         break;
       case SkTextAlign::right:
-        for (auto& block : line.blocks) {
-          block.shift += delta;
+        for (auto& word : line.words) {
+          word.shift += delta;
         }
         line.size.fWidth = _maxWidth;
         _width = _maxWidth;
         break;
       case SkTextAlign::center: {
         auto half = delta / 2;
-        for (auto& block : line.blocks) {
-          block.shift += half;
+        for (auto& word : line.words) {
+          word.shift += half;
         }
         line.size.fWidth = _maxWidth;
         _width = _maxWidth;
@@ -121,12 +124,12 @@ void ShapedParagraph::format() {
         if (&line == &_lines.back()) {
           break;
         }
-        SkScalar step = delta / (line.blocks.size() - 1);
+        SkScalar step = delta / (line.words.size() - 1);
         SkScalar shift = 0;
-        for (auto& block : line.blocks) {
-          block.shift += shift;
-          if (&block != &line.blocks.back()) {
-            block.rect.fRight += step;
+        for (auto& word : line.words) {
+          word.shift += shift;
+          if (&word != &line.words.back()) {
+            word.rect.fRight += step;
             line.size.fWidth = _maxWidth;
             _width = _maxWidth;
           }
@@ -142,40 +145,31 @@ void ShapedParagraph::format() {
 
 void ShapedParagraph::paint(SkCanvas* textCanvas, SkPoint& point) {
 
+  std::vector<StyledText>::iterator iter = _styles.begin();
   for (auto& line : _lines) {
-    for (auto& block : line.blocks) {
+    for (auto& word : line.words) {
+
+      while (iter != _styles.end() && iter->end < word.end) {
+        ++iter;
+      }
+
+      SkTextStyle style = iter == _styles.end() ? _style.getTextStyle() : iter->textStyle;
       SkPaint paint;
-      if (block.textStyle.hasForeground()) {
-        paint = block.textStyle.getForeground();
+      if (style.hasForeground()) {
+        paint = style.getForeground();
       } else {
         paint.reset();
-        paint.setColor(block.textStyle.getColor());
+        paint.setColor(style.getColor());
       }
       paint.setAntiAlias(true);
 
-      SkPoint start = SkPoint::Make(point.x() + block.shift, point.y());
-      block.PaintBackground(textCanvas, start);
-      block.PaintShadow(textCanvas, start);
+      SkPoint start = SkPoint::Make(point.x() + word.shift, point.y());
+      PaintBackground(textCanvas, word, start);
+      PaintShadow(textCanvas, word, start);
 
-      textCanvas->drawTextBlob(block.blob, start.x(), start.y(), paint);
-    }
+      textCanvas->drawTextBlob(word.blob, start.x(), start.y(), paint);
 
-    std::vector<Block>::const_iterator start = line.blocks.begin();
-    SkScalar width = 0;
-    for (auto block = line.blocks.begin(); block != line.blocks.end(); ++block) {
-      if (start == block) {
-        width += block->rect.width();
-      } else if (start->textStyle == block->textStyle) {
-        width += block->rect.width();
-      } else {
-        PaintDecorations(textCanvas, start, block, point, width);
-        start = block;
-        width = block->rect.width();
-      }
-    }
-
-    if (start != line.blocks.end()) {
-      PaintDecorations(textCanvas, start, line.blocks.end(), point, width);
+      PaintDecorations(textCanvas, word, start, word.rect.width());
     }
   }
   point.fY += _height;
@@ -210,21 +204,21 @@ SkScalar ShapedParagraph::ComputeDecorationThickness(SkTextStyle textStyle) {
   return thickness * textStyle.getDecorationThicknessMultiplier();
 }
 
-SkScalar ShapedParagraph::ComputeDecorationPosition(Block block, SkScalar thickness) {
+SkScalar ShapedParagraph::ComputeDecorationPosition(Word word, SkScalar thickness) {
 
   SkFontMetrics metrics;
-  block.textStyle.getFontMetrics(metrics);
+  word.textStyle.getFontMetrics(metrics);
 
   SkScalar position;
 
-  switch (block.textStyle.getDecoration()) {
+  switch (word.textStyle.getDecoration()) {
     case SkTextDecoration::kUnderline:
       if (metrics.hasUnderlinePosition(&position)) {
         return position - metrics.fAscent;
       } else {
         position = metrics.fDescent - metrics.fAscent;
-        if (block.textStyle.getDecorationStyle() == SkTextDecorationStyle::kWavy ||
-            block.textStyle.getDecorationStyle() == SkTextDecorationStyle::kDouble
+        if (word.textStyle.getDecorationStyle() == SkTextDecorationStyle::kWavy ||
+            word.textStyle.getDecorationStyle() == SkTextDecorationStyle::kDouble
             ) {
           return position - thickness * 3;
         } else {
@@ -237,7 +231,7 @@ SkScalar ShapedParagraph::ComputeDecorationPosition(Block block, SkScalar thickn
       return 0;
       break;
     case SkTextDecoration::kLineThrough: {
-      SkScalar delta = block.rect.height() - (metrics.fDescent - metrics.fAscent + metrics.fLeading);
+      SkScalar delta = word.rect.height() - (metrics.fDescent - metrics.fAscent + metrics.fLeading);
       position = SkTMax(0.0f, delta) + (metrics.fDescent - metrics.fAscent) / 2;
       break;
     }
@@ -250,19 +244,19 @@ SkScalar ShapedParagraph::ComputeDecorationPosition(Block block, SkScalar thickn
   return position;
 }
 
-void ShapedParagraph::ComputeDecorationPaint(Block block, SkPaint& paint, SkPath& path, SkScalar width) {
+void ShapedParagraph::ComputeDecorationPaint(Word word, SkPaint& paint, SkPath& path, SkScalar width) {
 
   paint.setStyle(SkPaint::kStroke_Style);
-  if (block.textStyle.getDecorationColor() == SK_ColorTRANSPARENT) {
-    paint.setColor(block.textStyle.getColor());
+  if (word.textStyle.getDecorationColor() == SK_ColorTRANSPARENT) {
+    paint.setColor(word.textStyle.getColor());
   } else {
-    paint.setColor(block.textStyle.getDecorationColor());
+    paint.setColor(word.textStyle.getDecorationColor());
   }
   paint.setAntiAlias(true);
 
-  SkScalar scaleFactor = block.textStyle.getFontSize() / 14.f;
+  SkScalar scaleFactor = word.textStyle.getFontSize() / 14.f;
 
-  switch (block.textStyle.getDecorationStyle()) {
+  switch (word.textStyle.getDecorationStyle()) {
     case SkTextDecorationStyle::kSolid:
       break;
 
@@ -314,36 +308,30 @@ void ShapedParagraph::ComputeDecorationPaint(Block block, SkPaint& paint, SkPath
 }
 
 void ShapedParagraph::PaintDecorations(SkCanvas* canvas,
-                      std::vector<Block>::const_iterator begin,
-                      std::vector<Block>::const_iterator end,
+                      Word word,
                       SkPoint offset,
                       SkScalar width) {
 
-  if (begin == end) {
-    return;
-  }
-
-  auto block = *begin;
-  if (block.textStyle.getDecoration() == SkTextDecoration::kNone) {
+  if (word.textStyle.getDecoration() == SkTextDecoration::kNone) {
     return;
   }
 
   // Decoration thickness
-  SkScalar thickness = ComputeDecorationThickness(block.textStyle);
+  SkScalar thickness = ComputeDecorationThickness(word.textStyle);
 
   // Decoration position
-  SkScalar position = ComputeDecorationPosition(block, thickness);
+  SkScalar position = ComputeDecorationPosition(word, thickness);
 
   // Decoration paint (for now) and/or path
   SkPaint paint;
   SkPath path;
-  ComputeDecorationPaint(block, paint, path, width);
+  ComputeDecorationPaint(word, paint, path, width);
   paint.setStrokeWidth(thickness);
 
   // Draw the decoration
-  SkScalar x = offset.x() + block.rect.left() + block.shift;
-  SkScalar y = offset.y() + block.rect.top() + position;
-  switch (block.textStyle.getDecorationStyle()) {
+  SkScalar x = offset.x() + word.rect.left() + word.shift;
+  SkScalar y = offset.y() + word.rect.top() + position;
+  switch (word.textStyle.getDecorationStyle()) {
     case SkTextDecorationStyle::kWavy:
       path.offset(x, y);
       canvas->drawPath(path, paint);
@@ -366,11 +354,11 @@ void ShapedParagraph::PaintDecorations(SkCanvas* canvas,
 
 void ShapedParagraph::GetRectsForRange(const char* start, const char* end, std::vector<SkTextBox>& result) {
   for (auto& line : _lines) {
-    for (auto& block : line.blocks) {
-      if (block.end <= start || block.start >= end) {
+    for (auto& word : line.words) {
+      if (word.end <= start || word.start >= end) {
         continue;
       }
-      result.emplace_back(block.rect, SkTextDirection::ltr); // TODO: the right direction
+      result.emplace_back(word.rect, SkTextDirection::ltr); // TODO: the right direction
     }
   }
 }
