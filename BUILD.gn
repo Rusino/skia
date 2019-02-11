@@ -1724,6 +1724,7 @@ if (skia_enable_tools) {
         ":flags",
         ":xml",
         "modules/skshaper",
+        "modules/skparagraph",
       ]
 
       # NIMA does not build on Windows clang
