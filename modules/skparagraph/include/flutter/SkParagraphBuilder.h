@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc.
+ * Copyright 2019 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,54 +28,55 @@
 #include "SkTextStyle.h"
 
 class SkParagraphBuilder {
- public:
-  SkParagraphBuilder(SkParagraphStyle style, sk_sp<SkFontCollection> fontCollection);
+  public:
+    SkParagraphBuilder(SkParagraphStyle style,
+                       sk_sp<SkFontCollection> fontCollection);
 
-  ~SkParagraphBuilder();
+    ~SkParagraphBuilder();
 
-  // Push a style to the stack. The corresponding text added with AddText will
-  // use the top-most style.
-  void PushStyle(const SkTextStyle& style);
+    // Push a style to the stack. The corresponding text added with AddText will
+    // use the top-most style.
+    void PushStyle(const SkTextStyle& style);
 
-  // Remove a style from the stack. Useful to apply different styles to chunks
-  // of text such as bolding.
-  // Example:
-  //   builder.PushStyle(normal_style);
-  //   builder.AddText("Hello this is normal. ");
-  //
-  //   builder.PushStyle(bold_style);
-  //   builder.AddText("And this is BOLD. ");
-  //
-  //   builder.Pop();
-  //   builder.AddText(" Back to normal again.");
-  void Pop();
+    // Remove a style from the stack. Useful to apply different styles to chunks
+    // of text such as bolding.
+    // Example:
+    //   builder.PushStyle(normal_style);
+    //   builder.AddText("Hello this is normal. ");
+    //
+    //   builder.PushStyle(bold_style);
+    //   builder.AddText("And this is BOLD. ");
+    //
+    //   builder.Pop();
+    //   builder.AddText(" Back to normal again.");
+    void Pop();
 
-  SkTextStyle PeekStyle();
+    SkTextStyle PeekStyle();
 
-  // Adds text to the builder. Forms the proper runs to use the upper-most style
-  // on the style_stack_;
-  void AddText(const std::u16string& text);
+    // Adds text to the builder. Forms the proper runs to use the upper-most style
+    // on the style_stack_;
+    void AddText(const std::u16string& text);
 
-  // Converts to u16string before adding.
-  void AddText(const std::string& text);
+    // Converts to u16string before adding.
+    void AddText(const std::string& text);
 
-  // Converts to u16string before adding.
-  void AddText(const char* text);
+    // Converts to u16string before adding.
+    void AddText(const char* text);
 
-  void SetParagraphStyle(const SkParagraphStyle& style);
+    void SetParagraphStyle(const SkParagraphStyle& style);
 
-  // Constructs a SkParagraph object that can be used to layout and paint the text to a SkCanvas.
-  std::unique_ptr<SkParagraph> Build();
+    // Constructs a SkParagraph object that can be used to layout and paint the text to a SkCanvas.
+    std::unique_ptr<SkParagraph> Build();
 
- private:
+  private:
 
-  friend class ParagraphTester;
+    friend class ParagraphTester;
 
-  void EndRunIfNeeded();
+    void EndRunIfNeeded();
 
-  std::string _text;
-  std::stack<SkTextStyle> _styles;
-  std::vector<Block> _blocks;
-  sk_sp<SkFontCollection> _fontCollection;
-  SkParagraphStyle _style;
+    std::string fUtf8;
+    std::stack<SkTextStyle> fTextStyles;
+    std::vector<Block> fStyledBlocks;
+    sk_sp<SkFontCollection> fFontCollection;
+    SkParagraphStyle fParagraphStyle;
 };

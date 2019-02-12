@@ -273,10 +273,10 @@ inline SkScalar double_to_clamped_scalar(double d) {
 }
 
 // A line equation in implicit form. fA * x + fB * y + fC = 0, for all points (x, y) on the line.
-struct Line {
-    Line(double a, double b, double c) : fA(a), fB(b), fC(c) {}
-    Line(Vertex* p, Vertex* q) : Line(p->fPoint, q->fPoint) {}
-    Line(const SkPoint& p, const SkPoint& q)
+struct SkShapedLine {
+    SkShapedLine(double a, double b, double c) : fA(a), fB(b), fC(c) {}
+    SkShapedLine(Vertex* p, Vertex* q) : SkShapedLine(p->fPoint, q->fPoint) {}
+    SkShapedLine(const SkPoint& p, const SkPoint& q)
         : fA(static_cast<double>(q.fY) - p.fY)      // a = dY
         , fB(static_cast<double>(p.fX) - q.fX)      // b = -dX
         , fC(static_cast<double>(p.fY) * q.fX -     // c = cross(q, p)
@@ -284,8 +284,8 @@ struct Line {
     double dist(const SkPoint& p) const {
         return fA * p.fX + fB * p.fY + fC;
     }
-    Line operator*(double v) const {
-        return Line(fA * v, fB * v, fC * v);
+    SkShapedLine operator*(double v) const {
+        return SkShapedLine(fA * v, fB * v, fC * v);
     }
     double magSq() const {
         return fA * fA + fB * fB;
@@ -300,12 +300,12 @@ struct Line {
         fB *= scale;
         fC *= scale;
     }
-    bool nearParallel(const Line& o) const {
+    bool nearParallel(const SkShapedLine& o) const {
         return fabs(o.fA - fA) < 0.00001 && fabs(o.fB - fB) < 0.00001;
     }
 
     // Compute the intersection of two (infinite) Lines.
-    bool intersect(const Line& other, SkPoint* point) const {
+    bool intersect(const SkShapedLine& other, SkPoint* point) const {
         double denom = fA * other.fB - fB * other.fA;
         if (denom == 0.0) {
             return false;
@@ -382,7 +382,7 @@ struct Edge {
     bool     fOverlap;          // True if there's an overlap region adjacent to this edge.
     bool     fUsedInLeftPoly;
     bool     fUsedInRightPoly;
-    Line     fLine;
+    SkShapedLine     fLine;
     double dist(const SkPoint& p) const {
         return fLine.dist(p);
     }
@@ -393,7 +393,7 @@ struct Edge {
         return fLine.dist(v->fPoint) > 0.0;
     }
     void recompute() {
-        fLine = Line(fTop, fBottom);
+        fLine = SkShapedLine(fTop, fBottom);
     }
     bool intersect(const Edge& other, SkPoint* p, uint8_t* alpha = nullptr) const {
         LOG("intersecting %g -> %g with %g -> %g\n",
@@ -1250,8 +1250,8 @@ bool check_for_intersection(Edge* left, Edge* right, EdgeList* activeEdges, Vert
         } else {
             v = create_sorted_vertex(p, alpha, mesh, top, c, alloc);
             if (left->fTop->fPartner) {
-                Line line1 = left->fLine;
-                Line line2 = right->fLine;
+                SkShapedLine line1 = left->fLine;
+                SkShapedLine line2 = right->fLine;
                 int dir = left->fType == Edge::Type::kOuter ? -1 : 1;
                 line1.fC += sqrt(left->fLine.magSq()) * (left->fWinding > 0 ? 1 : -1) * dir;
                 line2.fC += sqrt(right->fLine.magSq()) * (right->fWinding > 0 ? 1 : -1) * dir;
@@ -1291,7 +1291,7 @@ void sanitize_contours(VertexList* contours, int contourCnt, bool approximate) {
             } else if (!v->fPoint.isFinite()) {
                 LOG("vertex %g,%g non-finite; removing\n", v->fPoint.fX, v->fPoint.fY);
                 contour->remove(v);
-            } else if (Line(prev->fPoint, nextWrap->fPoint).dist(v->fPoint) == 0.0) {
+            } else if (SkShapedLine(prev->fPoint, nextWrap->fPoint).dist(v->fPoint) == 0.0) {
                 LOG("vertex %g,%g collinear; removing\n", v->fPoint.fX, v->fPoint.fY);
                 contour->remove(v);
             } else {
@@ -1876,9 +1876,9 @@ void stroke_boundary(EdgeList* boundary, VertexList* innerMesh, VertexList* oute
     SkVector prevNormal;
     get_edge_normal(prevEdge, &prevNormal);
     double radius = 0.5;
-    Line prevInner(prevEdge->fLine);
+    SkShapedLine prevInner(prevEdge->fLine);
     prevInner.fC -= radius;
-    Line prevOuter(prevEdge->fLine);
+    SkShapedLine prevOuter(prevEdge->fLine);
     prevOuter.fC += radius;
     VertexList innerVertices;
     VertexList outerVertices;
@@ -1888,9 +1888,9 @@ void stroke_boundary(EdgeList* boundary, VertexList* innerMesh, VertexList* oute
         Vertex* v = e->fWinding > 0 ? e->fTop : e->fBottom;
         SkVector normal;
         get_edge_normal(e, &normal);
-        Line inner(e->fLine);
+        SkShapedLine inner(e->fLine);
         inner.fC -= radius;
-        Line outer(e->fLine);
+        SkShapedLine outer(e->fLine);
         outer.fC += radius;
         SkPoint innerPoint, outerPoint;
         LOG("stroking vertex %g (%g, %g)\n", v->fID, v->fPoint.fX, v->fPoint.fY);
@@ -1901,14 +1901,14 @@ void stroke_boundary(EdgeList* boundary, VertexList* innerMesh, VertexList* oute
                 Vertex* nextV = e->fWinding > 0 ? e->fBottom : e->fTop;
 
                 // This is a pointy vertex whose angle is smaller than the threshold; miter it.
-                Line bisector(innerPoint, outerPoint);
-                Line tangent(v->fPoint, v->fPoint + SkPoint::Make(bisector.fA, bisector.fB));
+                SkShapedLine bisector(innerPoint, outerPoint);
+                SkShapedLine tangent(v->fPoint, v->fPoint + SkPoint::Make(bisector.fA, bisector.fB));
                 if (tangent.fA == 0 && tangent.fB == 0) {
                     continue;
                 }
                 tangent.normalize();
-                Line innerTangent(tangent);
-                Line outerTangent(tangent);
+                SkShapedLine innerTangent(tangent);
+                SkShapedLine outerTangent(tangent);
                 innerTangent.fC -= 0.5;
                 outerTangent.fC += 0.5;
                 SkPoint innerPoint1, innerPoint2, outerPoint1, outerPoint2;
@@ -1919,9 +1919,9 @@ void stroke_boundary(EdgeList* boundary, VertexList* innerMesh, VertexList* oute
                         !outerTangent.intersect(bisector, &outerPoint)) {
                         continue;
                     }
-                    Line prevTangent(prevV->fPoint,
+                    SkShapedLine prevTangent(prevV->fPoint,
                                      prevV->fPoint + SkVector::Make(prevOuter.fA, prevOuter.fB));
-                    Line nextTangent(nextV->fPoint,
+                    SkShapedLine nextTangent(nextV->fPoint,
                                      nextV->fPoint + SkVector::Make(outer.fA, outer.fB));
                     if (prevTangent.dist(outerPoint) > 0) {
                         bisector.intersect(prevTangent, &outerPoint);
@@ -1936,9 +1936,9 @@ void stroke_boundary(EdgeList* boundary, VertexList* innerMesh, VertexList* oute
                         !outerTangent.intersect(outer, &outerPoint2)) {
                         continue;
                     }
-                    Line prevTangent(prevV->fPoint,
+                    SkShapedLine prevTangent(prevV->fPoint,
                                      prevV->fPoint + SkVector::Make(prevInner.fA, prevInner.fB));
-                    Line nextTangent(nextV->fPoint,
+                    SkShapedLine nextTangent(nextV->fPoint,
                                      nextV->fPoint + SkVector::Make(inner.fA, inner.fB));
                     if (prevTangent.dist(innerPoint) > 0) {
                         bisector.intersect(prevTangent, &innerPoint);

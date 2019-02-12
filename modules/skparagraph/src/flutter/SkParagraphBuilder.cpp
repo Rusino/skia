@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc.
+ * Copyright 2019 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,103 +24,95 @@
 SkParagraphBuilder::SkParagraphBuilder(
     SkParagraphStyle style,
     sk_sp<SkFontCollection> font_collection)
-    : _fontCollection(std::move(font_collection))
-{
-  SetParagraphStyle(style);
+    : fFontCollection(std::move(font_collection)) {
+    SetParagraphStyle(style);
 }
 
 SkParagraphBuilder::~SkParagraphBuilder() = default;
 
-void SkParagraphBuilder::SetParagraphStyle(const SkParagraphStyle& style)
-{
-  _style = style;
-  auto& textStyle = _style.getTextStyle();
-  _fontCollection->findTypeface(textStyle);
-  _styles.push(textStyle);
-  _blocks.emplace_back(_text.size(), _text.size(), textStyle);
+void SkParagraphBuilder::SetParagraphStyle(const SkParagraphStyle& style) {
+    fParagraphStyle = style;
+    auto& textStyle = fParagraphStyle.getTextStyle();
+    fFontCollection->findTypeface(textStyle);
+    fTextStyles.push(textStyle);
+    fStyledBlocks.emplace_back(fUtf8.size(), fUtf8.size(), textStyle);
 }
 
-void SkParagraphBuilder::PushStyle(const SkTextStyle& style)
-{
-  EndRunIfNeeded();
+void SkParagraphBuilder::PushStyle(const SkTextStyle& style) {
+    EndRunIfNeeded();
 
-  _styles.push(style);
-  if (!_blocks.empty() && _blocks.back().end == _text.size() && _blocks.back().textStyle == style) {
-    // Just continue with the same style
-  } else {
-    // Resolve the new style and go with it
-    auto& textStyle = _styles.top();
-    _fontCollection->findTypeface(textStyle);
-    _blocks.emplace_back(_text.size(), _text.size(), textStyle);
-  }
+    fTextStyles.push(style);
+    if (!fStyledBlocks.empty() && fStyledBlocks.back().end == fUtf8.size()
+        && fStyledBlocks.back().textStyle == style) {
+        // Just continue with the same style
+    } else {
+        // Resolve the new style and go with it
+        auto& textStyle = fTextStyles.top();
+        fFontCollection->findTypeface(textStyle);
+        fStyledBlocks.emplace_back(fUtf8.size(), fUtf8.size(), textStyle);
+    }
 }
 
-void SkParagraphBuilder::Pop()
-{
+void SkParagraphBuilder::Pop() {
 
-  EndRunIfNeeded();
-  if (_styles.size() > 1) {
-    _styles.pop();
-  } else {
-    // In this case we use paragraph style and skip Pop operation
-    SkDebugf("SkParagraphBuilder.Pop() called too many times.\n");
-  }
+    EndRunIfNeeded();
+    if (fTextStyles.size() > 1) {
+        fTextStyles.pop();
+    } else {
+        // In this case we use paragraph style and skip Pop operation
+        SkDebugf("SkParagraphBuilder.Pop() called too many times.\n");
+    }
 
-  auto top = _styles.top();
-  _blocks.emplace_back(_text.size(), _text.size(), top);
+    auto top = fTextStyles.top();
+    fStyledBlocks.emplace_back(fUtf8.size(), fUtf8.size(), top);
 }
 
-SkTextStyle SkParagraphBuilder::PeekStyle()
-{
+SkTextStyle SkParagraphBuilder::PeekStyle() {
 
-  EndRunIfNeeded();
-  if (!_styles.empty()) {
-    return _styles.top();
-  } else {
-    SkDebugf("SkParagraphBuilder._styles is empty.\n");
-    return _style.getTextStyle();
-  }
+    EndRunIfNeeded();
+    if (!fTextStyles.empty()) {
+        return fTextStyles.top();
+    } else {
+        SkDebugf("SkParagraphBuilder._styles is empty.\n");
+        return fParagraphStyle.getTextStyle();
+    }
 }
 
-void SkParagraphBuilder::AddText(const std::u16string& text)
-{
+void SkParagraphBuilder::AddText(const std::u16string& text) {
 
-  icu::UnicodeString unicode;
-  unicode.setTo((UChar*)text.data());
-  unicode.toUTF8String(_text);
+    icu::UnicodeString unicode;
+    unicode.setTo((UChar*) text.data());
+    unicode.toUTF8String(fUtf8);
 }
 
-void SkParagraphBuilder::AddText(const std::string& text)
-{
+void SkParagraphBuilder::AddText(const std::string& text) {
 
-  icu::UnicodeString unicode;
-  unicode.setTo(text.data());
-  unicode.toUTF8String(_text);
+    icu::UnicodeString unicode;
+    unicode.setTo(text.data());
+    unicode.toUTF8String(fUtf8);
 }
 
 void SkParagraphBuilder::AddText(const char* text) {
-  icu::UnicodeString unicode;
-  unicode.setTo(text);
-  unicode.toUTF8String(_text);
+    icu::UnicodeString unicode;
+    unicode.setTo(text);
+    unicode.toUTF8String(fUtf8);
 }
 
-void SkParagraphBuilder::EndRunIfNeeded()
-{
-  if (_blocks.empty()) {
-    return;
-  }
+void SkParagraphBuilder::EndRunIfNeeded() {
+    if (fStyledBlocks.empty()) {
+        return;
+    }
 
-  auto& last = _blocks.back();
-  if (last.start == _text.size()) {
-    _blocks.pop_back();
-  } else {
-    last.end = _text.size();
-  }
+    auto& last = fStyledBlocks.back();
+    if (last.start == fUtf8.size()) {
+        fStyledBlocks.pop_back();
+    } else {
+        last.end = fUtf8.size();
+    }
 }
 
-std::unique_ptr<SkParagraph> SkParagraphBuilder::Build()
-{
-  EndRunIfNeeded();
-  return std::make_unique<SkParagraph>(_text, _style, _blocks);
+std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
+    EndRunIfNeeded();
+    return std::make_unique<SkParagraph>(fUtf8, fParagraphStyle, fStyledBlocks);
 }
 

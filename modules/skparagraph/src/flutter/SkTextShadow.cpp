@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google, Inc.
+ * Copyright 2019 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,29 +18,29 @@
 #include "SkColor.h"
 
 SkTextShadow::SkTextShadow() {}
-SkTextShadow::SkTextShadow(SkColor color, SkPoint offset, double blur_radius)
-    : color(color), offset(offset), blur_radius(blur_radius) {}
+SkTextShadow::SkTextShadow(SkColor color, SkPoint offset, double blurFadius)
+    : fColor(color), fOffset(offset), fBlurRadius(blurFadius) {}
 
 bool SkTextShadow::operator==(const SkTextShadow& other) const {
-  if (color != other.color)
-    return false;
-  if (offset != other.offset)
-    return false;
-  if (blur_radius != other.blur_radius)
-    return false;
+    if (fColor != other.fColor)
+        return false;
+    if (fOffset != other.fOffset)
+        return false;
+    if (fBlurRadius != other.fBlurRadius)
+        return false;
 
-  return true;
+    return true;
 }
 
 bool SkTextShadow::operator!=(const SkTextShadow& other) const {
-  return !(*this == other);
+    return !(*this == other);
 }
 
 bool SkTextShadow::hasShadow() const {
-  if (!offset.isZero())
-    return true;
-  if (blur_radius != 0.0)
-    return true;
+    if (!fOffset.isZero())
+        return true;
+    if (fBlurRadius != 0.0)
+        return true;
 
-  return false;
+    return false;
 }

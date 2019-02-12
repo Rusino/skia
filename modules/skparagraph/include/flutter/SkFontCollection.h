@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc.
+ * Copyright 2019 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,56 +18,60 @@
 #include <memory>
 #include <set>
 #include <string>
-#include "SkTHash.h"
+#include "../private/SkTHash.h"
 #include "SkFontMgr.h"
 #include "SkRefCnt.h"
-#include "SkTextStyle.h"
+#include "../SkTextStyle.h"
 #include "SkFontMgr.h"
 
 class SkFontCollection : public SkRefCnt {
- public:
-  SkFontCollection();
+  public:
+    SkFontCollection();
 
-  ~SkFontCollection();
+    ~SkFontCollection();
 
-  size_t GetFontManagersCount() const;
+    size_t GetFontManagersCount() const;
 
-  void SetAssetFontManager(sk_sp<SkFontMgr> fontManager);
-  void SetDynamicFontManager(sk_sp<SkFontMgr> fontManager);
-  void SetTestFontManager(sk_sp<SkFontMgr> fontManager);
+    void SetAssetFontManager(sk_sp<SkFontMgr> fontManager);
+    void SetDynamicFontManager(sk_sp<SkFontMgr> fontManager);
+    void SetTestFontManager(sk_sp<SkFontMgr> fontManager);
 
-  SkTypeface* findTypeface(SkTextStyle& textStyle);
+    SkTypeface* findTypeface(SkTextStyle& textStyle);
 
-  void DisableFontFallback();
+    void DisableFontFallback();
 
- private:
+  private:
 
-  sk_sp<SkTypeface> findByFamilyName(const std::string& familyName, SkFontStyle fontStyle);
+    sk_sp<SkTypeface>
+    findByFamilyName(const std::string& familyName, SkFontStyle fontStyle);
 
-  friend class ParagraphTester;
+    std::vector<sk_sp<SkFontMgr>> GetFontManagerOrder() const;
 
-  struct FamilyKey {
-    FamilyKey(const std::string& family, const std::string& loc, SkFontStyle style)
-        : font_family(family), locale(loc), font_style(style) {}
+    friend class ParagraphTester;
 
-    FamilyKey() {}
+    struct FamilyKey {
+        FamilyKey(const std::string& family,
+                  const std::string& loc,
+                  SkFontStyle style)
+            : font_family(family), locale(loc), font_style(style) {}
 
-    std::string font_family;
-    std::string locale;
-    SkFontStyle font_style;
+        FamilyKey() {}
 
-    bool operator==(const FamilyKey& other) const;
+        std::string font_family;
+        std::string locale;
+        SkFontStyle font_style;
 
-    struct Hasher {
-      size_t operator()(const FamilyKey& key) const;
+        bool operator==(const FamilyKey& other) const;
+
+        struct Hasher {
+            size_t operator()(const FamilyKey& key) const;
+        };
     };
-  };
 
-  bool _enableFontFallback;
-  SkTHashMap<FamilyKey, sk_sp<SkTypeface>, FamilyKey::Hasher> _typefaces;
-  sk_sp<SkFontMgr> _defaultFontManager;
-  sk_sp<SkFontMgr> _assetFontManager;
-  sk_sp<SkFontMgr> _dynamicFontManager;
-  sk_sp<SkFontMgr> _testFontManager;
-  std::vector<sk_sp<SkFontMgr>> GetFontManagerOrder() const;
+    bool fEnableFontFallback;
+    SkTHashMap<FamilyKey, sk_sp<SkTypeface>, FamilyKey::Hasher> fTypefaces;
+    sk_sp<SkFontMgr> fDefaultFontManager;
+    sk_sp<SkFontMgr> fAssetFontManager;
+    sk_sp<SkFontMgr> fDynamicFontManager;
+    sk_sp<SkFontMgr> fTestFontManager;
 };

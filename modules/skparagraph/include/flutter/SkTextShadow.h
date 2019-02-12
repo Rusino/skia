@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc.
+ * Copyright 2019 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,18 +20,18 @@
 #include "SkPoint.h"
 
 class SkTextShadow {
- public:
-  SkColor color = SK_ColorBLACK;
-  SkPoint offset;
-  double blur_radius = 0.0;
+  public:
+    SkColor fColor = SK_ColorBLACK;
+    SkPoint fOffset;
+    double fBlurRadius = 0.0;
 
-  SkTextShadow();
+    SkTextShadow();
 
-  SkTextShadow(SkColor color, SkPoint offset, double blur_radius);
+    SkTextShadow(SkColor color, SkPoint offset, double blurRadius);
 
-  bool operator==(const SkTextShadow& other) const;
+    bool operator==(const SkTextShadow& other) const;
 
-  bool operator!=(const SkTextShadow& other) const;
+    bool operator!=(const SkTextShadow& other) const;
 
-  bool hasShadow() const;
+    bool hasShadow() const;
 };

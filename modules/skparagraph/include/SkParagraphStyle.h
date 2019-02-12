@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc.
+ * Copyright 2019 Google Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,40 +25,42 @@
 
 // TODO: Introduce line break strategy later
 struct SkParagraphStyle {
-  SkParagraphStyle();
+    SkParagraphStyle();
 
-  bool operator==(const SkParagraphStyle& rhs) const {
-    return this->_line_height == rhs._line_height &&
-           this->_ellipsis == rhs._ellipsis &&
-           this->_textDirection == rhs._textDirection &&
-           this->_textAlign == rhs._textAlign &&
-           this->_textStyle == rhs._textStyle;
-  }
+    bool operator==(const SkParagraphStyle& rhs) const {
+        return this->fLineHeight == rhs.fLineHeight &&
+            this->fEllipsis == rhs.fEllipsis &&
+            this->fTextDirection == rhs.fTextDirection &&
+            this->fTextAlign == rhs.fTextAlign &&
+            this->fDefaultTextStyle == rhs.fDefaultTextStyle;
+    }
 
-  SkTextStyle& getTextStyle() { return _textStyle; }
-  size_t getMaxLines() const { return _maxLines; }
-  SkTextDirection getTextDirection() const { return _textDirection; }
-  std::string getEllipsis() const { return _ellipsis; }
+    SkTextStyle& getTextStyle() { return fDefaultTextStyle; }
+    size_t getMaxLines() const { return fLinesLimit; }
+    SkTextDirection getTextDirection() const { return fTextDirection; }
+    std::string getEllipsis() const { return fEllipsis; }
 
-  void setTextStyle(SkTextStyle textStyle) {
-    _textStyle = textStyle;
-  }
-  void setTextAlign(SkTextAlign align) { _textAlign = align; }
-  void setTextDirection(SkTextDirection direction) { _textDirection = direction; }
-  void setMaxLines(size_t maxLines) { _maxLines = maxLines; }
-  void setEllipsis(const std::u16string& ellipsis);
-  void setLineHeight(SkScalar line_height) { _line_height = line_height; }
+    void setTextStyle(SkTextStyle textStyle) {
+        fDefaultTextStyle = textStyle;
+    }
+    void setTextAlign(SkTextAlign align) { fTextAlign = align; }
+    void setTextDirection(SkTextDirection direction) {
+        fTextDirection = direction;
+    }
+    void setMaxLines(size_t maxLines) { fLinesLimit = maxLines; }
+    void setEllipsis(const std::u16string& ellipsis);
+    void setLineHeight(SkScalar lineHeight) { fLineHeight = lineHeight; }
 
-  bool unlimited_lines() const;
-  bool ellipsized() const;
-  SkTextAlign effective_align() const;
+    bool unlimited_lines() const;
+    bool ellipsized() const;
+    SkTextAlign effective_align() const;
 
- private:
+  private:
 
-  SkTextStyle _textStyle;
-  SkTextAlign _textAlign;
-  SkTextDirection _textDirection;
-  size_t _maxLines;
-  std::string _ellipsis;
-  SkScalar _line_height;
+    SkTextStyle fDefaultTextStyle;
+    SkTextAlign fTextAlign;
+    SkTextDirection fTextDirection;
+    size_t fLinesLimit;
+    std::string fEllipsis;
+    SkScalar fLineHeight;
 };

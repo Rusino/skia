@@ -442,8 +442,8 @@ struct ShapedGlyph {
   bool fGraphemeBreakBefore;
   bool fUnsafeToBreak;
 };
-struct ShapedRun {
-    ShapedRun(SkSpan<const char> utf8, const SkFont& font, UBiDiLevel level,
+struct SkShapedRun {
+    SkShapedRun(SkSpan<const char> utf8, const SkFont& font, UBiDiLevel level,
               std::unique_ptr<ShapedGlyph[]> glyphs, int numGlyphs)
         : fUtf8(utf8), fFont(font), fLevel(level)
         , fGlyphs(std::move(glyphs)), fNumGlyphs(numGlyphs)
@@ -457,7 +457,7 @@ struct ShapedRun {
     SkVector fAdvance = { 0, 0 };
 };
 struct ShapedLine {
-  SkTArray<ShapedRun> runs;
+  SkTArray<SkShapedRun> runs;
   SkVector fAdvance = { 0, 0 };
 };
 
@@ -466,7 +466,7 @@ static constexpr bool is_LTR(UBiDiLevel level) {
 }
 
 static void append(SkShaper::RunHandler* handler, const SkShaper::RunHandler::RunInfo& runInfo,
-                   const ShapedRun& run, int start, int end,
+                   const SkShapedRun& run, int start, int end,
                    SkPoint* p) {
     const unsigned len = end - start;
 
@@ -496,7 +496,7 @@ static void emit(const ShapedLine& line, SkShaper::RunHandler* handler,
   SkScalar maxAscent = 0;
   SkScalar maxDescent = 0;
   SkScalar maxLeading = 0;
-  for (const ShapedRun& run : line.runs) {
+  for (const SkShapedRun& run : line.runs) {
     SkFontMetrics metrics;
     run.fFont.getMetrics(&metrics);
     maxAscent = SkTMin(maxAscent, metrics.fAscent);
@@ -534,7 +534,7 @@ static void emit(const ShapedLine& line, SkShaper::RunHandler* handler,
 }
 
 struct ShapedRunGlyphIterator {
-  ShapedRunGlyphIterator(const SkTArray<ShapedRun>& origRuns)
+  ShapedRunGlyphIterator(const SkTArray<SkShapedRun>& origRuns)
       : fRuns(&origRuns), fRunIndex(0), fGlyphIndex(0)
   { }
 
@@ -552,7 +552,7 @@ struct ShapedRunGlyphIterator {
   }
 
   ShapedGlyph* next() {
-    const SkTArray<ShapedRun>& runs = *fRuns;
+    const SkTArray<SkShapedRun>& runs = *fRuns;
     SkASSERT(fRunIndex < runs.count());
     SkASSERT(fGlyphIndex < runs[fRunIndex].fNumGlyphs);
 
@@ -568,14 +568,14 @@ struct ShapedRunGlyphIterator {
   }
 
   ShapedGlyph* current() {
-    const SkTArray<ShapedRun>& runs = *fRuns;
+    const SkTArray<SkShapedRun>& runs = *fRuns;
     if (fRunIndex >= runs.count()) {
       return nullptr;
     }
     return &runs[fRunIndex].fGlyphs[fGlyphIndex];
   }
 
-  const SkTArray<ShapedRun>* fRuns;
+  const SkTArray<SkShapedRun>* fRuns;
   int fRunIndex;
   int fGlyphIndex;
 };
@@ -611,7 +611,7 @@ struct SkShaper::Impl {
                   const ScriptRunIterator* script,
                   const FontRunIterator* font) const;
 
-  ShapedRun shape(const char* utf8,
+  SkShapedRun shape(const char* utf8,
                   size_t utf8Bytes,
                   const char* utf8Start,
                   const char* utf8End,
@@ -744,7 +744,7 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
     utf8Start = utf8End;
     utf8End = runSegmenter.endOfCurrentRun();
 
-    ShapedRun model(SkSpan<const char>(), SkFont(), 0, nullptr, 0);
+    SkShapedRun model(SkSpan<const char>(), SkFont(), 0, nullptr, 0);
     bool modelNeedsRegenerated = true;
     int modelOffset = 0;
 
@@ -802,7 +802,7 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
         }
       }
 
-      ShapedRun best(SkSpan<const char>(), SkFont(), 0, nullptr, 0);
+      SkShapedRun best(SkSpan<const char>(), SkFont(), 0, nullptr, 0);
       best.fAdvance = { SK_ScalarNegativeInfinity, SK_ScalarNegativeInfinity };
       SkScalar widthLeft = width - line.fAdvance.fX;
 
@@ -813,8 +813,8 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
         // TODO: if past a safe to break, future safe to break will be at least as long
 
         // TODO: adjust breakIteratorCurrent by ignorable whitespace
-        ShapedRun candidate = modelText[breakIteratorCurrent + modelTextOffset].glyphLen
-                              ? ShapedRun(SkSpan<const char>(utf8Start, breakIteratorCurrent),
+        SkShapedRun candidate = modelText[breakIteratorCurrent + modelTextOffset].glyphLen
+                              ? SkShapedRun(SkSpan<const char>(utf8Start, breakIteratorCurrent),
                                           *font->currentFont(), bidi->currentLevel(),
                                           std::unique_ptr<ShapedGlyph[]>(),
                                           modelText[breakIteratorCurrent + modelTextOffset].glyphLen - modelOffset)
@@ -828,7 +828,7 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
         if (!candidate.fGlyphs) {
           candidate.fAdvance = modelText[breakIteratorCurrent + modelTextOffset].advance - modelTextAdvanceOffset;
         }
-        auto score = [widthLeft](const ShapedRun& run) -> SkScalar {
+        auto score = [widthLeft](const SkShapedRun& run) -> SkScalar {
           if (run.fAdvance.fX < widthLeft) {
             if (run.fUtf8.data() == nullptr) {
               return SK_ScalarNegativeInfinity;
@@ -888,7 +888,7 @@ SkPoint SkShaper::Impl::shapeOk(RunHandler* handler,
                                 const ScriptRunIterator* script,
                                 const FontRunIterator* font) const
 {
-  SkTArray<ShapedRun> runs;
+  SkTArray<SkShapedRun> runs;
   {
     UBreakIterator& lineBreakIterator = *fLineBreakIterator;
     UBreakIterator& graphemeBreakIterator = *fGraphemeBreakIterator;
@@ -923,7 +923,7 @@ SkPoint SkShaper::Impl::shapeOk(RunHandler* handler,
       runs.emplace_back(shape(utf8, utf8Bytes,
                               utf8Start, utf8End,
                               bidi, language, script, font));
-      ShapedRun& run = runs.back();
+      SkShapedRun& run = runs.back();
 
       int32_t clusterOffset = utf8Start - utf8;
       uint32_t previousCluster = 0xFFFFFFFF;
@@ -1102,7 +1102,7 @@ SkPoint SkShaper::Impl::shapeOk(RunHandler* handler,
 }
 
 
-ShapedRun SkShaper::Impl::shape(const char* utf8,
+SkShapedRun SkShaper::Impl::shape(const char* utf8,
                                 const size_t utf8Bytes,
                                 const char* utf8Start,
                                 const char* utf8End,
@@ -1111,7 +1111,7 @@ ShapedRun SkShaper::Impl::shape(const char* utf8,
                                 const ScriptRunIterator* script,
                                 const FontRunIterator* font) const
 {
-    ShapedRun run(SkSpan<const char>(), SkFont(), 0, nullptr, 0);
+    SkShapedRun run(SkSpan<const char>(), SkFont(), 0, nullptr, 0);
 
   hb_buffer_t* buffer = fBuffer.get();
   SkAutoTCallVProc<hb_buffer_t, hb_buffer_clear_contents> autoClearBuffer(buffer);
@@ -1175,7 +1175,7 @@ ShapedRun SkShaper::Impl::shape(const char* utf8,
         return run;
     }
 
-    run = ShapedRun(SkSpan<const char>(utf8Start, utf8runLength),
+    run = SkShapedRun(SkSpan<const char>(utf8Start, utf8runLength),
                     *font->currentFont(), bidi->currentLevel(),
                     std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]), len);
     int scaleX, scaleY;

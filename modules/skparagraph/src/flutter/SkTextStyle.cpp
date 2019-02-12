@@ -1,5 +1,5 @@
 /*
- * Copyright 2017 Google, Inc.
+ * Copyright 2019 Google, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,69 +22,68 @@
 #define DEFAULT_FONT_FAMILY "Arial"
 
 SkTextStyle::SkTextStyle()
-  : _fontStyle()
-  , _fontFamily(DEFAULT_FONT_FAMILY) {
+    : fFontStyle(), fFontFamily(DEFAULT_FONT_FAMILY) {
 
-  _color = SK_ColorWHITE;
-  _decoration = SkTextDecoration::kNone;
-  // Does not make sense to draw a transparent object, so we use it as a default
-  // value to indicate no decoration color was set.
-  _decorationColor = SK_ColorTRANSPARENT;
-  _decorationStyle = SkTextDecorationStyle::kSolid;
-  // Thickness is applied as a multiplier to the default thickness of the font.
-  _decorationThicknessMultiplier = 1.0;
-  _fontSize = 14.0;
-  _letterSpacing = 0.0;
-  _wordSpacing = 0.0;
-  _height = 1.0;
-  _hasBackground = false;
-  _hasForeground = false;
+    fColor = SK_ColorWHITE;
+    fDecoration = SkTextDecoration::kNone;
+    // Does not make sense to draw a transparent object, so we use it as a default
+    // value to indicate no decoration color was set.
+    fDecorationColor = SK_ColorTRANSPARENT;
+    fDecorationStyle = SkTextDecorationStyle::kSolid;
+    // Thickness is applied as a multiplier to the default thickness of the font.
+    fDecorationThicknessMultiplier = 1.0;
+    fFontSize = 14.0;
+    fLetterSpacing = 0.0;
+    fWordSpacing = 0.0;
+    fFontHeight = 1.0;
+    fHasBackground = false;
+    fHasForeground = false;
 }
 
 // TODO: use font provider to resolve the font
 sk_sp<SkTypeface> SkTextStyle::getTypeface() const {
-  /*
-  if (_typeface == nullptr) {
-    SkDebugf("MakeDefault!!!!!\n");
-    _typeface = SkTypeface::MakeDefault();
-  }
-   */
-  return _typeface; // SkTypeface::MakeFromName(_fontFamily.data(), SkFontStyle());
+    /*
+    if (_typeface == nullptr) {
+      SkDebugf("MakeDefault!!!!!\n");
+      _typeface = SkTypeface::MakeDefault();
+    }
+     */
+    return fTypeface; // SkTypeface::MakeFromName(_fontFamily.data(), SkFontStyle());
 }
 
 bool SkTextStyle::equals(const SkTextStyle& other) const {
-  if (_color != other._color)
-    return false;
-  if (_decoration != other._decoration)
-    return false;
-  if (_decorationColor != other._decorationColor)
-    return false;
-  if (_decorationStyle != other._decorationStyle)
-    return false;
-  if (_decorationThicknessMultiplier != other._decorationThicknessMultiplier)
-    return false;
-  if (!(_fontStyle == other._fontStyle))
-    return false;
-  if (_fontFamily != other._fontFamily)
-    return false;
-  if (_letterSpacing != other._letterSpacing)
-    return false;
-  if (_wordSpacing != other._wordSpacing)
-    return false;
-  if (_height != other._height)
-    return false;
-  if (_locale != other._locale)
-    return false;
-  if (_foreground != other._foreground)
-    return false;
-  if (_textShadows.size() != other._textShadows.size())
-    return false;
+    if (fColor != other.fColor)
+        return false;
+    if (fDecoration != other.fDecoration)
+        return false;
+    if (fDecorationColor != other.fDecorationColor)
+        return false;
+    if (fDecorationStyle != other.fDecorationStyle)
+        return false;
+    if (fDecorationThicknessMultiplier != other.fDecorationThicknessMultiplier)
+        return false;
+    if (!(fFontStyle == other.fFontStyle))
+        return false;
+    if (fFontFamily != other.fFontFamily)
+        return false;
+    if (fLetterSpacing != other.fLetterSpacing)
+        return false;
+    if (fWordSpacing != other.fWordSpacing)
+        return false;
+    if (fFontHeight != other.fFontHeight)
+        return false;
+    if (fLocale != other.fLocale)
+        return false;
+    if (fForeground != other.fForeground)
+        return false;
+    if (fTextShadows.size() != other.fTextShadows.size())
+        return false;
 
-  for (size_t shadow_index = 0; shadow_index < _textShadows.size();
-       ++shadow_index) {
-    if (_textShadows[shadow_index] != other._textShadows[shadow_index])
-      return false;
-  }
+    for (size_t shadow_index = 0; shadow_index < fTextShadows.size();
+         ++shadow_index) {
+        if (fTextShadows[shadow_index] != other.fTextShadows[shadow_index])
+            return false;
+    }
 
-  return true;
+    return true;
 }
