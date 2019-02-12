@@ -136,6 +136,8 @@ void SkParagraph::RecordPicture() {
   for (auto& paragraph : _paragraphs) {
 
     paragraph.paint(textCanvas, point);
+    point.fX = 0;
+    point.fY += paragraph.height();
   }
 
   _picture = recorder.finishRecordingAsPicture();

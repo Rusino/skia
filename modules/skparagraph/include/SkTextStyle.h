@@ -60,7 +60,6 @@ class SkTextStyle {
   }
   void setBackgroundColor(SkColor color) {
     _hasBackground = true;
-    _background = SkPaint();
     _background.setColor(color);
   }
 

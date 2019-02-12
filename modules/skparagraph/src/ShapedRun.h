@@ -29,7 +29,7 @@ class ShapedRun {
             int glyphCount,
             SkSpan<const char> text);
 
-  SkVector finish(SkVector advance);
+  void finish(SkVector advance, SkScalar width);
 
   SkShaper::RunHandler::Buffer newRunBuffer();
 

@@ -107,6 +107,10 @@ void ShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
                                    _style.getTextStyle());
       SkShaper shaper(nullptr);
       shaper.shape(this, &font, start, end - start, true, {0, 0}, maxWidth);
+
+      if (_lines.end()->words().empty()) {
+        _lines.pop_back();
+      }
       return;
     }
 
@@ -185,6 +189,9 @@ void ShapedParagraph::format(SkScalar maxWidth) {
         if (&line == &_lines.back()) {
           break;
         }
+        if (line.words().size() == 1) {
+          break;
+        }
         SkScalar step = delta / (line.words().size() - 1);
         SkScalar shift = 0;
         for (auto& word : line.words()) {
@@ -218,8 +225,9 @@ void ShapedParagraph::paint(SkCanvas* textCanvas, SkPoint& point) {
 
       word.Paint(textCanvas, firstStyle == _styles.end() ? _style.getTextStyle() : firstStyle->textStyle, point);
     }
+    //point.fY += line.advance().fY;
+    point.fX = 0;
   }
-  point.fY += _height;
 }
 
 void ShapedParagraph::GetRectsForRange(const char* start, const char* end, std::vector<SkTextBox>& result) {

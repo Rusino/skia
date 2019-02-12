@@ -22,7 +22,7 @@ ShapedRun::ShapedRun(const SkFont& font,
   fPositions.push_back_n(glyphCount);
 }
 
-SkVector ShapedRun::finish(SkVector advance)
+void ShapedRun::finish(SkVector advance, SkScalar width)
 {
   SkTextBlobBuilder builder;
   const auto wordSize = fGlyphs.size();
@@ -33,17 +33,21 @@ SkVector ShapedRun::finish(SkVector advance)
                     wordSize * sizeof(SkGlyphID));
 
   for (size_t i = 0; i < wordSize; ++i) {
-    blobBuffer.points()[i] = fPositions[SkToInt(i)] + advance;
+    blobBuffer.points()[i] = fPositions[SkToInt(i)];
   }
 
+  fInfo.fAdvance.fX = width;
   fBlob = builder.make();
-  fRect = SkRect::MakeLTRB(
-      advance.fX,
-      advance.fY,
-      advance.fX + fInfo.fAdvance.fX,
-      advance.fY + fInfo.fDescent + fInfo.fLeading - fInfo.fAscent);
 
-  return fInfo.fAdvance;
+  SkVector runAdvance = advance;
+  if (wordSize > 0) {
+    runAdvance = fPositions[0];
+  }
+  fRect = SkRect::MakeLTRB(
+      runAdvance.fX,
+      runAdvance.fY + fInfo.fAscent,
+      runAdvance.fX + fInfo.fAdvance.fX,
+      runAdvance.fY + fInfo.fDescent + fInfo.fLeading);
 }
 
 SkShaper::RunHandler::Buffer ShapedRun::newRunBuffer()
@@ -261,6 +265,7 @@ void ShapedRun::PaintDecorations(SkCanvas* canvas, SkPoint offset, SkScalar widt
 void ShapedRun::Paint(SkCanvas* canvas, SkTextStyle style, SkPoint& point)
 {
   SkPoint start = SkPoint::Make(point.x() + fShift, point.y());
+  textStyle = style;
   PaintBackground(canvas, start);
   PaintShadow(canvas, start);
 
@@ -275,6 +280,4 @@ void ShapedRun::Paint(SkCanvas* canvas, SkTextStyle style, SkPoint& point)
   canvas->drawTextBlob(fBlob, start.x(), start.y(), paint);
 
   PaintDecorations(canvas, start, fRect.width());
-
-  point.fX += fInfo.fAdvance.fX;
 }

@@ -68,13 +68,13 @@ class ShapedParagraph final : SkShaper::RunHandler {
     return word.newRunBuffer();
   }
 
-  void commitRun() override
+  void commitRun(SkScalar width) override
   {
     auto& line = _lines.back();   // Last line
     auto& word = line.lastWord(); // Last word
 
     // Finish the word
-    word.finish(line.advance());
+    word.finish(line.advance(), width);
 
     // Update the line stats
     line.update();
@@ -91,7 +91,7 @@ class ShapedParagraph final : SkShaper::RunHandler {
     line.finish();
 
     // Update the paragraph stats
-    _height = line.advance().fY;
+    _height += line.advance().fY;
     _width = SkMaxScalar(_width, line.advance().fX);
 
     // Add the next line

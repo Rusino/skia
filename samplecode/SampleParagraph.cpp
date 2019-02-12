@@ -51,7 +51,7 @@ static const std::vector<std::tuple<std::string, bool, bool, int, SkColor, SkCol
     { "monospace", true, false, 14, SK_ColorWHITE, SK_ColorRED, true, SkTextDecorationStyle::kDashed},
     { "Assyrian", false, false, 20, SK_ColorWHITE, SK_ColorBLUE, false, SkTextDecorationStyle::kDotted},
     { "serif", true, true, 10, SK_ColorWHITE, SK_ColorRED, true, SkTextDecorationStyle::kDouble},
-    { "Arial", false, true, 16, SK_ColorGRAY, SK_ColorWHITE, true, SkTextDecorationStyle::kSolid},
+    { "Arial", false, true, 16, SK_ColorGRAY, SK_ColorGREEN, true, SkTextDecorationStyle::kSolid},
     { "sans-serif", false,  false, 8, SK_ColorWHITE, SK_ColorRED, false, SkTextDecorationStyle::kWavy}
 };
 
@@ -288,7 +288,7 @@ class ParagraphView : public Sample {
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
 
-    for (auto i = 3; i < 4; ++i) {
+    for (auto i = 1; i < 5; ++i) {
       paraStyle.getTextStyle().setFontSize(24 * i);
       SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
       builder.AddText("Paragraph:");
@@ -454,7 +454,7 @@ class ParagraphView : public Sample {
     }
 
     auto paragraph = builder.Build();
-    paragraph->Layout(180);
+    paragraph->Layout(240);
 
     paragraph->Paint(canvas, margin, margin);
 
@@ -510,7 +510,7 @@ class ParagraphView : public Sample {
     canvas->translate(0, height);
     drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kWavy);
     */
-    /*
+
       SkScalar width = this->width() / 3;
       drawTest(canvas, width, this->height(), SK_ColorBLACK, SK_ColorWHITE);
       canvas->translate(width, 0);
@@ -519,7 +519,7 @@ class ParagraphView : public Sample {
       drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorWHITE);
       canvas->translate(0, this->height()/2);
       drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
-    */
+
     std::vector<std::string> cupertino = { "google_logogoogle_gsuper_g_logo" };
     std::vector<std::string>  text = {
         "My neighbor came over to say,\n"
@@ -547,8 +547,8 @@ class ParagraphView : public Sample {
         ");"
     };
     std::vector<std::string> very_long = { "A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text" };
-    drawText(canvas, this->width(), this->height(), cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-    //drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
+    //drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
+    //drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
     /*
     SkScalar height = this->height() / 4;
     std::string line = "Hesitation is always easy rarely useful.";
