@@ -10,7 +10,7 @@
 #include <vector>
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
-#include "SkShaped.h"
+#include "../src/ShapedParagraph.h"
 
 class SkCanvas;
 class SkParagraph {
@@ -74,13 +74,13 @@ class SkParagraph {
   size_t   _linesNumber;
 
   // Input
-  const char* _utf8;
-  size_t _utf8Bytes;
   SkParagraphStyle _style;
   std::vector<StyledText> _styles;
-  // Shaping
+  SkSpan<const char> _utf8;
+
+  // Shaping (list of paragraphs in Shaper terms separated by hard line breaks)
   std::vector<ShapedParagraph> _paragraphs;
-  SkTextBlobBuilder _builder;
+
   // Painting
   sk_sp<SkPicture> _picture;
 };

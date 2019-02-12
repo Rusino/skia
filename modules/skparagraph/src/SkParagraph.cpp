@@ -51,14 +51,12 @@ void SkParagraph::SetText(const std::u16string& utf16text) {
   icu::UnicodeString unicode((UChar*)utf16text.data(), utf16text.size());
   std::string str;
   unicode.toUTF8String(str);
-  _utf8 = str.data();
-  _utf8Bytes = str.size();
+  _utf8 = SkSpan<const char>(str.data(), str.size());
 }
 
 void SkParagraph::SetText(const std::string& utf8text) {
 
-  _utf8 = utf8text.data();
-  _utf8Bytes = utf8text.size();
+  _utf8 = SkSpan<const char>(utf8text.data(), utf8text.size());
 }
 
 void SkParagraph::SetRuns(std::vector<StyledText> styles) {
@@ -98,7 +96,7 @@ bool SkParagraph::Layout(double width) {
   }
 
   for (auto& paragraph : _paragraphs) {
-    paragraph.format();
+    paragraph.format(width);
 
     _alphabeticBaseline = 0;
     _ideographicBaseline = 0;
@@ -145,7 +143,7 @@ void SkParagraph::BreakTextIntoParagraphs() {
   }
 
   UText utf8UText = UTEXT_INITIALIZER;
-  utext_openUTF8(&utf8UText, _utf8, _utf8Bytes, &status);
+  utext_openUTF8(&utf8UText, _utf8.begin(), _utf8.size(), &status);
   std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> autoClose(&utf8UText);
   if (U_FAILURE(status)) {
     SkDebugf("Could not create utf8UText: %s", u_errorName(status));
@@ -158,8 +156,8 @@ void SkParagraph::BreakTextIntoParagraphs() {
     return;
   }
 
-  int32_t firstChar = _utf8Bytes;
-  int32_t lastChar = _utf8Bytes;
+  int32_t firstChar = _utf8.size();
+  int32_t lastChar = _utf8.size();
 
   size_t firstStyle = _styles.size() - 1;
   while (lastChar > 0) {
@@ -179,7 +177,7 @@ void SkParagraph::BreakTextIntoParagraphs() {
     // TODO: since Flutter is using a space character to measure things;
     // TODO: need to fix it later
     while (lastChar > firstChar) {
-      int32_t character = *(_utf8 + lastChar - 1);
+      int32_t character = *(_utf8.begin() + lastChar - 1);
       if (!u_isWhitespace(character)) {
         break;
       }
@@ -187,12 +185,12 @@ void SkParagraph::BreakTextIntoParagraphs() {
     }
 
     // Find the first style that is related to the line
-    while (firstStyle > 0 && _styles[firstStyle].start > _utf8 + firstChar) {
+    while (firstStyle > 0 && _styles[firstStyle].text.begin() > _utf8.begin() + firstChar) {
       --firstStyle;
     }
 
     size_t lastStyle = firstStyle;
-    while (lastStyle != _styles.size() && _styles[lastStyle].start < _utf8 + lastChar) {
+    while (lastStyle != _styles.size() && _styles[lastStyle].text.begin() < _utf8.begin() + lastChar) {
       ++lastStyle;
     }
 
@@ -201,14 +199,14 @@ void SkParagraph::BreakTextIntoParagraphs() {
     styles.reserve(lastStyle - firstStyle);
     for (auto s = firstStyle; s < lastStyle; ++s) {
       auto& style = _styles[s];
-      styles.emplace_back(
-          _utf8 + SkTMax((int32_t)(style.start - _utf8), firstChar),
-          _utf8 + SkTMin((int32_t)(style.end - _utf8), lastChar),
-          style.textStyle);
+
+      auto start = SkTMax((int32_t)(style.text.begin() - _utf8.begin()), firstChar);
+      auto end = SkTMin((int32_t)(style.text.end() - _utf8.begin()), lastChar);
+      styles.emplace_back(SkSpan<const char>(_utf8.begin() + start, end - start), style.textStyle);
     }
 
     // Add one more string to the list;
-    _paragraphs.emplace(_paragraphs.begin(), &_builder, _style, std::move(styles));
+    _paragraphs.emplace(_paragraphs.begin(), _style, std::move(styles));
 
     // Move on
     lastChar = firstChar;
@@ -232,7 +230,7 @@ std::vector<SkTextBox> SkParagraph::GetRectsForRange(
     RectWidthStyle rect_width_style) {
   std::vector<SkTextBox> result;
   for (auto& paragraph : _paragraphs) {
-    paragraph.GetRectsForRange(_utf8 + start, _utf8 + end, result);
+    paragraph.GetRectsForRange(_utf8.begin() + start, _utf8.begin() + end, result);
   }
 
   return result;

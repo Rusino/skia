@@ -79,8 +79,7 @@ protected:
         paint.setColor(fg);
 
         for (int i = 9; i < 24; i += 2) {
-            //SkTextBlobBuilderRunHandler builder;
-            SkPrinterRunHandler builder;
+            SkTextBlobBuilderRunHandler builder(gText);
             SkFont font(nullptr, SkIntToScalar(i));
             font.setEdging(SkFont::Edging::kSubpixelAntiAlias);
 

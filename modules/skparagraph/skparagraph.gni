@@ -15,15 +15,19 @@ skparagraph_public = [
             "$_include/SkTextShadow.h",
             "$_include/SkTextStyle.h",
             "$_include/SkDartTypes.h",
-            "$_include/SkShaped.h",
          ]
 
 skparagraph_sources = [
+            "$_src/ShapedLine.h",
+            "$_src/ShapedParagraph.h",
+            "$_src/ShapedRun.h",
+
             "$_src/SkFontCollection.cpp",
             "$_src/SkParagraph.cpp",
             "$_src/SkParagraphBuilder.cpp",
             "$_src/SkParagraphStyle.cpp",
             "$_src/SkTextShadow.cpp",
             "$_src/SkTextStyle.cpp",
-            "$_src/SkShaped.cpp",
+            "$_src/ShapedParagraph.cpp",
+            "$_src/ShapedRun.cpp",
           ]

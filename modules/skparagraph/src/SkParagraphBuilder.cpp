@@ -19,6 +19,7 @@
 #include "SkParagraphBuilder.h"
 #include "SkParagraphStyle.h"
 #include "SkPaint.h"
+#include "SkSpan.h"
 
 SkParagraphBuilder::SkParagraphBuilder(
     SkParagraphStyle style,
@@ -117,7 +118,7 @@ std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
   paragraph->SetText(_text);
   std::vector<StyledText> styles;
   std::transform(_runs.cbegin(), _runs.cend(), std::back_inserter(styles), [this](const Run& value) {
-    return StyledText((const char*)&_text[0] + value.start, (const char*)&_text[0] + value.end, value.textStyle);
+    return StyledText( SkSpan<const char>(_text.data() + value.start, value.end - value.start), value.textStyle);
   });
   paragraph->SetRuns(std::move(styles));
   paragraph->SetParagraphStyle(_style);

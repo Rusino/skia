@@ -11,6 +11,7 @@
 #include <memory>
 
 #include "SkPoint.h"
+#include "SkSpan.h"
 #include "SkTextBlob.h"
 #include "SkTypeface.h"
 
@@ -59,14 +60,15 @@ public:
         struct Buffer {
             SkGlyphID* glyphs;    // required
             SkPoint*   positions; // required
-            char*      utf8text;  // optional
             uint32_t*  clusters;  // optional
         };
 
         // Callback per glyph run.
         virtual Buffer newRunBuffer(const RunInfo&, const SkFont&, int glyphCount,
-                                    int utf8textCount) = 0;
+                                    SkSpan<const char> utf8) = 0;
 
+        // Called after run information is filled out.
+        virtual void commitRun() = 0;
         // Callback per line.
         virtual void commitLine() = 0;
     };
@@ -102,26 +104,19 @@ private:
  */
 class SkTextBlobBuilderRunHandler final : public SkShaper::RunHandler {
 public:
+    SkTextBlobBuilderRunHandler(const char* utf8Text) : fUtf8Text(utf8Text) {}
     sk_sp<SkTextBlob> makeBlob();
 
-    SkShaper::RunHandler::Buffer newRunBuffer(const RunInfo&, const SkFont&, int, int) override;
-
+    SkShaper::RunHandler::Buffer newRunBuffer(const RunInfo&, const SkFont&, int, SkSpan<const char>) override;
+    void commitRun() override;
     void commitLine() override {}
 
 private:
     SkTextBlobBuilder fBuilder;
-};
-
-class SkPrinterRunHandler final : public SkShaper::RunHandler {
- public:
-
-  sk_sp<SkTextBlob> makeBlob();
-  SkShaper::RunHandler::Buffer newRunBuffer(const RunInfo&, const SkFont&, int, int) override;
-
-  void commitLine() override {}
-
- private:
-  SkTextBlobBuilder fBuilder;
+    char const * const fUtf8Text;
+    uint32_t* fClusters;
+    int fClusterOffset;
+    int fGlyphCount;
 };
 
 #endif  // SkShaper_DEFINED

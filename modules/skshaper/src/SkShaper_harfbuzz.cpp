@@ -15,6 +15,7 @@
 #include "SkRefCnt.h"
 #include "SkScalar.h"
 #include "SkShaper.h"
+#include "SkSpan.h"
 #include "SkStream.h"
 #include "SkString.h"
 #include "SkTArray.h"
@@ -442,19 +443,18 @@ struct ShapedGlyph {
   bool fUnsafeToBreak;
 };
 struct ShapedRun {
-  ShapedRun(const char* utf8Start, const char* utf8End, int numGlyphs, const SkFont& font,
-            UBiDiLevel level, std::unique_ptr<ShapedGlyph[]> glyphs)
-      : fUtf8Start(utf8Start), fUtf8End(utf8End), fNumGlyphs(numGlyphs), fFont(font)
-      , fLevel(level), fGlyphs(std::move(glyphs))
-  {}
+    ShapedRun(SkSpan<const char> utf8, const SkFont& font, UBiDiLevel level,
+              std::unique_ptr<ShapedGlyph[]> glyphs, int numGlyphs)
+        : fUtf8(utf8), fFont(font), fLevel(level)
+        , fGlyphs(std::move(glyphs)), fNumGlyphs(numGlyphs)
+    {}
 
-  const char* fUtf8Start;
-  const char* fUtf8End;
-  int fNumGlyphs;
-  SkFont fFont;
-  UBiDiLevel fLevel;
-  std::unique_ptr<ShapedGlyph[]> fGlyphs;
-  SkVector fAdvance = { 0, 0 };
+    SkSpan<const char> fUtf8;
+    SkFont fFont;
+    UBiDiLevel fLevel;
+    std::unique_ptr<ShapedGlyph[]> fGlyphs;
+    int fNumGlyphs;
+    SkVector fAdvance = { 0, 0 };
 };
 struct ShapedLine {
   SkTArray<ShapedRun> runs;
@@ -468,27 +468,24 @@ static constexpr bool is_LTR(UBiDiLevel level) {
 static void append(SkShaper::RunHandler* handler, const SkShaper::RunHandler::RunInfo& runInfo,
                    const ShapedRun& run, int start, int end,
                    SkPoint* p) {
-  unsigned len = end - start;
+    const unsigned len = end - start;
 
-  const auto buffer = handler->newRunBuffer(runInfo, run.fFont, len, run.fUtf8End - run.fUtf8Start);
-  SkASSERT(buffer.glyphs);
-  SkASSERT(buffer.positions);
+    const auto buffer = handler->newRunBuffer(runInfo, run.fFont, len, run.fUtf8);
+    SkASSERT(buffer.glyphs);
+    SkASSERT(buffer.positions);
 
-  if (buffer.utf8text) {
-    memcpy(buffer.utf8text, run.fUtf8Start, run.fUtf8End - run.fUtf8Start);
-  }
-
-  for (unsigned i = 0; i < len; i++) {
-    // Glyphs are in logical order, but output ltr since PDF readers seem to expect that.
-    const ShapedGlyph& glyph = run.fGlyphs[is_LTR(run.fLevel) ? start + i : end - 1 - i];
-    buffer.glyphs[i] = glyph.fID;
-    buffer.positions[i] = SkPoint::Make(p->fX + glyph.fOffset.fX, p->fY - glyph.fOffset.fY);
-    if (buffer.clusters) {
-      buffer.clusters[i] = glyph.fCluster;
+    for (unsigned i = 0; i < len; i++) {
+        // Glyphs are in logical order, but output ltr since PDF readers seem to expect that.
+        const ShapedGlyph& glyph = run.fGlyphs[is_LTR(run.fLevel) ? start + i : end - 1 - i];
+        buffer.glyphs[i] = glyph.fID;
+        buffer.positions[i] = SkPoint::Make(p->fX + glyph.fOffset.fX, p->fY - glyph.fOffset.fY);
+        if (buffer.clusters) {
+            buffer.clusters[i] = glyph.fCluster;
+        }
+        p->fX += glyph.fAdvance.fX;
+        p->fY += glyph.fAdvance.fY;
     }
-    p->fX += glyph.fAdvance.fX;
-    p->fY += glyph.fAdvance.fY;
-  }
+    handler->commitRun();
 }
 
 static void emit(const ShapedLine& line, SkShaper::RunHandler* handler,
@@ -746,7 +743,7 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
     utf8Start = utf8End;
     utf8End = runSegmenter.endOfCurrentRun();
 
-    ShapedRun model(nullptr, nullptr, 0, SkFont(), 0, nullptr);
+    ShapedRun model(SkSpan<const char>(), SkFont(), 0, nullptr, 0);
     bool modelNeedsRegenerated = true;
     int modelOffset = 0;
 
@@ -804,7 +801,7 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
         }
       }
 
-      ShapedRun best(nullptr, nullptr, 0, SkFont(), 0, nullptr);
+      ShapedRun best(SkSpan<const char>(), SkFont(), 0, nullptr, 0);
       best.fAdvance = { SK_ScalarNegativeInfinity, SK_ScalarNegativeInfinity };
       SkScalar widthLeft = width - line.fAdvance.fX;
 
@@ -816,15 +813,14 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
 
         // TODO: adjust breakIteratorCurrent by ignorable whitespace
         ShapedRun candidate = modelText[breakIteratorCurrent + modelTextOffset].glyphLen
-                              ? ShapedRun(utf8Start, utf8Start + breakIteratorCurrent,
-                                          modelText[breakIteratorCurrent + modelTextOffset].glyphLen - modelOffset,
-                                          *font->currentFont(),
-                                          bidi->currentLevel(),
-                                          std::unique_ptr<ShapedGlyph[]>())
+                              ? ShapedRun(SkSpan<const char>(utf8Start, breakIteratorCurrent),
+                                          *font->currentFont(), bidi->currentLevel(),
+                                          std::unique_ptr<ShapedGlyph[]>(),
+                                          modelText[breakIteratorCurrent + modelTextOffset].glyphLen - modelOffset)
                               : shape(utf8, utf8Bytes,
                                       utf8Start, utf8Start + breakIteratorCurrent,
                                       bidi, language, script, font);
-        if (!candidate.fUtf8Start) {
+        if (!candidate.fUtf8.data()) {
           //report error
           return point;
         }
@@ -833,10 +829,10 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
         }
         auto score = [widthLeft](const ShapedRun& run) -> SkScalar {
           if (run.fAdvance.fX < widthLeft) {
-            if (run.fUtf8Start == nullptr) {
+            if (run.fUtf8.data() == nullptr) {
               return SK_ScalarNegativeInfinity;
             } else {
-              return run.fUtf8End - run.fUtf8Start;
+              return run.fUtf8.size();
             }
           } else {
             return widthLeft - run.fAdvance.fX;
@@ -858,12 +854,12 @@ SkPoint SkShaper::Impl::shapeCorrect(RunHandler* handler,
           memcpy(best.fGlyphs.get(), model.fGlyphs.get() + modelOffset,
                  best.fNumGlyphs * sizeof(ShapedGlyph));
           modelOffset += best.fNumGlyphs;
-          modelTextOffset += best.fUtf8End - best.fUtf8Start;
+          modelTextOffset += best.fUtf8.size();
           modelTextAdvanceOffset += best.fAdvance;
         } else {
           modelNeedsRegenerated = true;
         }
-        utf8Start = best.fUtf8End;
+        utf8Start = best.fUtf8.end();
         line.fAdvance += best.fAdvance;
         line.runs.emplace_back(std::move(best));
 
@@ -1114,7 +1110,7 @@ ShapedRun SkShaper::Impl::shape(const char* utf8,
                                 const ScriptRunIterator* script,
                                 const FontRunIterator* font) const
 {
-  ShapedRun run(nullptr, nullptr, 0, SkFont(), 0, nullptr);
+    ShapedRun run(SkSpan<const char>(), SkFont(), 0, nullptr, 0);
 
   hb_buffer_t* buffer = fBuffer.get();
   SkAutoTCallVProc<hb_buffer_t, hb_buffer_clear_contents> autoClearBuffer(buffer);
@@ -1138,74 +1134,74 @@ ShapedRun SkShaper::Impl::shape(const char* utf8,
   // Add postcontext.
   hb_buffer_add_utf8(buffer, utf8Current, utf8 + utf8Bytes - utf8Current, 0, 0);
 
-  size_t utf8runLength = utf8End - utf8Start;
-  if (!SkTFitsIn<int>(utf8runLength)) {
-    SkDebugf("Shaping error: utf8 too long");
-    return run;
-  }
-  hb_direction_t direction = is_LTR(bidi->currentLevel()) ? HB_DIRECTION_LTR:HB_DIRECTION_RTL;
-  hb_buffer_set_direction(buffer, direction);
-  hb_buffer_set_script(buffer, script->currentScript());
-  hb_buffer_set_language(buffer, language->currentLanguage());
-  hb_buffer_guess_segment_properties(buffer);
+    size_t utf8runLength = utf8End - utf8Start;
+    if (!SkTFitsIn<int>(utf8runLength)) {
+      SkDebugf("Shaping error: utf8 too long");
+      return run;
+    }
+    hb_direction_t direction = is_LTR(bidi->currentLevel()) ? HB_DIRECTION_LTR:HB_DIRECTION_RTL;
+    hb_buffer_set_direction(buffer, direction);
+    hb_buffer_set_script(buffer, script->currentScript());
+    hb_buffer_set_language(buffer, language->currentLanguage());
+    hb_buffer_guess_segment_properties(buffer);
 
-  HBFont hbFont = create_hb_font(font->currentFont()->getTypeface());
-  if (!hbFont) {
-    return run;
-  }
-  hb_font_t* currentHBFont = hbFont.get();
-  if (!currentHBFont) {
-    return run;
-  }
+    HBFont hbFont = create_hb_font(font->currentFont()->getTypeface());
+    if (!hbFont) {
+      return run;
+    }
+    hb_font_t* currentHBFont = hbFont.get();
+    if (!currentHBFont) {
+      return run;
+    }
 
-  hb_shape(currentHBFont, buffer, nullptr, 0);
-  unsigned len = hb_buffer_get_length(buffer);
-  if (len == 0) {
-    // TODO: this isn't an error, make it look different
-    return run;
-  }
+    hb_shape(currentHBFont, buffer, nullptr, 0);
+    unsigned len = hb_buffer_get_length(buffer);
+    if (len == 0) {
+        // TODO: this isn't an error, make it look different
+        return run;
+    }
 
-  if (direction == HB_DIRECTION_RTL) {
-    // Put the clusters back in logical order.
-    // Note that the advances remain ltr.
-    hb_buffer_reverse(buffer);
-  }
-  hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer, nullptr);
-  hb_glyph_position_t* pos = hb_buffer_get_glyph_positions(buffer, nullptr);
+    if (direction == HB_DIRECTION_RTL) {
+        // Put the clusters back in logical order.
+        // Note that the advances remain ltr.
+        hb_buffer_reverse(buffer);
+    }
+    hb_glyph_info_t* info = hb_buffer_get_glyph_infos(buffer, nullptr);
+    hb_glyph_position_t* pos = hb_buffer_get_glyph_positions(buffer, nullptr);
 
-  if (!SkTFitsIn<int>(len)) {
-    SkDebugf("Shaping error: too many glyphs");
-    return run;
-  }
+    if (!SkTFitsIn<int>(len)) {
+        SkDebugf("Shaping error: too many glyphs");
+        return run;
+    }
 
-  run = ShapedRun(utf8Start, utf8End, len, *font->currentFont(),
-                  bidi->currentLevel(),
-                  std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]));
-  int scaleX, scaleY;
-  hb_font_get_scale(currentHBFont, &scaleX, &scaleY);
-  double textSizeY = run.fFont.getSize() / scaleY;
-  double textSizeX = run.fFont.getSize() / scaleX * run.fFont.getScaleX();
-  SkVector runAdvance = { 0, 0 };
-  for (unsigned i = 0; i < len; i++) {
-    ShapedGlyph& glyph = run.fGlyphs[i];
-    glyph.fID = info[i].codepoint;
-    glyph.fCluster = info[i].cluster;
-    glyph.fOffset.fX = pos[i].x_offset * textSizeX;
-    glyph.fOffset.fY = pos[i].y_offset * textSizeY;
-    glyph.fAdvance.fX = pos[i].x_advance * textSizeX;
-    glyph.fAdvance.fY = pos[i].y_advance * textSizeY;
+    run = ShapedRun(SkSpan<const char>(utf8Start, utf8runLength),
+                    *font->currentFont(), bidi->currentLevel(),
+                    std::unique_ptr<ShapedGlyph[]>(new ShapedGlyph[len]), len);
+    int scaleX, scaleY;
+    hb_font_get_scale(currentHBFont, &scaleX, &scaleY);
+    double textSizeY = run.fFont.getSize() / scaleY;
+    double textSizeX = run.fFont.getSize() / scaleX * run.fFont.getScaleX();
+    SkVector runAdvance = { 0, 0 };
+    for (unsigned i = 0; i < len; i++) {
+        ShapedGlyph& glyph = run.fGlyphs[i];
+        glyph.fID = info[i].codepoint;
+        glyph.fCluster = info[i].cluster;
+        glyph.fOffset.fX = pos[i].x_offset * textSizeX;
+        glyph.fOffset.fY = pos[i].y_offset * textSizeY;
+        glyph.fAdvance.fX = pos[i].x_advance * textSizeX;
+        glyph.fAdvance.fY = pos[i].y_advance * textSizeY;
 
-    SkRect bounds;
-    SkScalar advance;
-    SkPaint p;
-    run.fFont.getWidthsBounds(&glyph.fID, 1, &advance, &bounds, &p);
-    glyph.fHasVisual = !bounds.isEmpty(); //!font->currentTypeface()->glyphBoundsAreZero(glyph.fID);
-    glyph.fUnsafeToBreak = info[i].mask & HB_GLYPH_FLAG_UNSAFE_TO_BREAK;
-    glyph.fMustLineBreakBefore = false;
+        SkRect bounds;
+        SkScalar advance;
+        SkPaint p;
+        run.fFont.getWidthsBounds(&glyph.fID, 1, &advance, &bounds, &p);
+        glyph.fHasVisual = !bounds.isEmpty(); //!font->currentTypeface()->glyphBoundsAreZero(glyph.fID);
+        glyph.fUnsafeToBreak = info[i].mask & HB_GLYPH_FLAG_UNSAFE_TO_BREAK;
+        glyph.fMustLineBreakBefore = false;
 
-    runAdvance += glyph.fAdvance;
-  }
-  run.fAdvance = runAdvance;
+        runAdvance += glyph.fAdvance;
+    }
+    run.fAdvance = runAdvance;
 
   return run;
 }
