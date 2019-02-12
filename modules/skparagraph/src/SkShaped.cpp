@@ -143,17 +143,25 @@ void ShapedParagraph::format() {
   }
 }
 
+// TODO: currently we pick the first style of the run and go with it regardless
 void ShapedParagraph::paint(SkCanvas* textCanvas, SkPoint& point) {
 
-  std::vector<StyledText>::iterator iter = _styles.begin();
+  std::vector<StyledText>::iterator firstStyle = _styles.begin();
   for (auto& line : _lines) {
-    for (auto& word : line.words) {
+    for (auto word : line.words) {
 
-      while (iter != _styles.end() && iter->end < word.end) {
-        ++iter;
+      // Find the first style that affects the run
+      while (firstStyle != _styles.end() && firstStyle->end < word.start) {
+        ++firstStyle;
       }
+      word.textStyle = firstStyle == _styles.end() ? _style.getTextStyle() : firstStyle->textStyle;
 
-      SkTextStyle style = iter == _styles.end() ? _style.getTextStyle() : iter->textStyle;
+      // Draw all backgrounds and shadows for all the styles that affect the run
+      SkPoint start = SkPoint::Make(point.x() + word.shift, point.y());
+      PaintBackground(textCanvas, word, start);
+      PaintShadow(textCanvas, word, start);
+
+      SkTextStyle style = firstStyle == _styles.end() ? _style.getTextStyle() : firstStyle->textStyle;
       SkPaint paint;
       if (style.hasForeground()) {
         paint = style.getForeground();
@@ -162,11 +170,6 @@ void ShapedParagraph::paint(SkCanvas* textCanvas, SkPoint& point) {
         paint.setColor(style.getColor());
       }
       paint.setAntiAlias(true);
-
-      SkPoint start = SkPoint::Make(point.x() + word.shift, point.y());
-      PaintBackground(textCanvas, word, start);
-      PaintShadow(textCanvas, word, start);
-
       textCanvas->drawTextBlob(word.blob, start.x(), start.y(), paint);
 
       PaintDecorations(textCanvas, word, start, word.rect.width());

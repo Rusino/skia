@@ -174,7 +174,7 @@ class ShapedParagraph final : public SkShaper::RunHandler {
 
   void commitLine() override
   {
-    SkScalar height = _maxDescend- _maxLeading - _maxAscend;
+    SkScalar height = _maxDescend -_maxLeading - _maxAscend;
     _advance.fX = 0;
     for (auto& word : _words) {
       const auto wordSize = word.size();
