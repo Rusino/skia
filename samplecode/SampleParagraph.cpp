@@ -6,7 +6,7 @@
  */
 
 #include <vector>
-#include "SkParagraphBuilder.h"
+#include "flutter/SkParagraphBuilder.h"
 #include "Sample.h"
 #include <string>
 #include <locale>
@@ -25,7 +25,7 @@
 #include "SkRandom.h"
 #include "SkRegion.h"
 #include "SkShader.h"
-#include "SkParagraph.h"
+#include "flutter/SkParagraph.h"
 #include "SkStream.h"
 #include "SkTextBlob.h"
 #include "SkTime.h"

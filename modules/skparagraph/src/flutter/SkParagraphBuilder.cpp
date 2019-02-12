@@ -16,7 +16,7 @@
 #include <list>
 #include <algorithm>
 
-#include "SkParagraphBuilder.h"
+#include "flutter/SkParagraphBuilder.h"
 #include "SkParagraphStyle.h"
 #include "SkPaint.h"
 #include "SkSpan.h"
@@ -24,35 +24,39 @@
 SkParagraphBuilder::SkParagraphBuilder(
     SkParagraphStyle style,
     sk_sp<SkFontCollection> font_collection)
-    : _fontCollection(std::move(font_collection)) {
+    : _fontCollection(std::move(font_collection))
+{
   SetParagraphStyle(style);
 }
 
 SkParagraphBuilder::~SkParagraphBuilder() = default;
 
-void SkParagraphBuilder::SetParagraphStyle(const SkParagraphStyle& style) {
+void SkParagraphBuilder::SetParagraphStyle(const SkParagraphStyle& style)
+{
   _style = style;
   auto& textStyle = _style.getTextStyle();
   _fontCollection->findTypeface(textStyle);
   _styles.push(textStyle);
-  _runs.emplace_back(_text.size(), _text.size(), textStyle);
+  _blocks.emplace_back(_text.size(), _text.size(), textStyle);
 }
 
-void SkParagraphBuilder::PushStyle(const SkTextStyle& style) {
+void SkParagraphBuilder::PushStyle(const SkTextStyle& style)
+{
   EndRunIfNeeded();
 
   _styles.push(style);
-  if (!_runs.empty() && _runs.back().end == _text.size() && _runs.back().textStyle == style) {
+  if (!_blocks.empty() && _blocks.back().end == _text.size() && _blocks.back().textStyle == style) {
     // Just continue with the same style
   } else {
     // Resolve the new style and go with it
     auto& textStyle = _styles.top();
     _fontCollection->findTypeface(textStyle);
-    _runs.emplace_back(_text.size(), _text.size(), textStyle);
+    _blocks.emplace_back(_text.size(), _text.size(), textStyle);
   }
 }
 
-void SkParagraphBuilder::Pop() {
+void SkParagraphBuilder::Pop()
+{
 
   EndRunIfNeeded();
   if (_styles.size() > 1) {
@@ -63,10 +67,11 @@ void SkParagraphBuilder::Pop() {
   }
 
   auto top = _styles.top();
-  _runs.emplace_back(_text.size(), _text.size(), top);
+  _blocks.emplace_back(_text.size(), _text.size(), top);
 }
 
-SkTextStyle SkParagraphBuilder::PeekStyle() {
+SkTextStyle SkParagraphBuilder::PeekStyle()
+{
 
   EndRunIfNeeded();
   if (!_styles.empty()) {
@@ -77,14 +82,16 @@ SkTextStyle SkParagraphBuilder::PeekStyle() {
   }
 }
 
-void SkParagraphBuilder::AddText(const std::u16string& text) {
+void SkParagraphBuilder::AddText(const std::u16string& text)
+{
 
   icu::UnicodeString unicode;
   unicode.setTo((UChar*)text.data());
   unicode.toUTF8String(_text);
 }
 
-void SkParagraphBuilder::AddText(const std::string& text) {
+void SkParagraphBuilder::AddText(const std::string& text)
+{
 
   icu::UnicodeString unicode;
   unicode.setTo(text.data());
@@ -97,32 +104,23 @@ void SkParagraphBuilder::AddText(const char* text) {
   unicode.toUTF8String(_text);
 }
 
-void SkParagraphBuilder::EndRunIfNeeded() {
-  if (_runs.empty()) {
+void SkParagraphBuilder::EndRunIfNeeded()
+{
+  if (_blocks.empty()) {
     return;
   }
 
-  auto& last = _runs.back();
+  auto& last = _blocks.back();
   if (last.start == _text.size()) {
-    _runs.pop_back();
+    _blocks.pop_back();
   } else {
     last.end = _text.size();
   }
 }
 
-std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
+std::unique_ptr<SkParagraph> SkParagraphBuilder::Build()
+{
   EndRunIfNeeded();
-
-  std::unique_ptr<SkParagraph> paragraph = std::make_unique<SkParagraph>();
-
-  paragraph->SetText(_text);
-  std::vector<StyledText> styles;
-  std::transform(_runs.cbegin(), _runs.cend(), std::back_inserter(styles), [this](const Run& value) {
-    return StyledText( SkSpan<const char>(_text.data() + value.start, value.end - value.start), value.textStyle);
-  });
-  paragraph->SetRuns(std::move(styles));
-  paragraph->SetParagraphStyle(_style);
-
-  return paragraph;
+  return std::make_unique<SkParagraph>(_text, _style, _blocks);
 }
 

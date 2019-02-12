@@ -181,7 +181,7 @@ void ShapedRun::ComputeDecorationPaint(SkPaint& paint, SkPath& path, SkScalar wi
            1.5f * scaleFactor};
       size_t count = sizeof(intervals) / sizeof(intervals[0]);
       paint.setPathEffect(SkPathEffect::MakeCompose(
-          SkDashPathEffect::Make(intervals, count, 0.0f),
+          SkDashPathEffect::Make(intervals, (int32_t)count, 0.0f),
           SkDiscretePathEffect::Make(0, 0)));
       break;
     }
@@ -194,15 +194,15 @@ void ShapedRun::ComputeDecorationPaint(SkPaint& paint, SkPath& path, SkScalar wi
            2.0f * scaleFactor};
       size_t count = sizeof(intervals) / sizeof(intervals[0]);
       paint.setPathEffect(SkPathEffect::MakeCompose(
-          SkDashPathEffect::Make(intervals, count, 0.0f),
+          SkDashPathEffect::Make(intervals, (int32_t)count, 0.0f),
           SkDiscretePathEffect::Make(0, 0)));
       break;
     }
     case SkTextDecorationStyle::kWavy: {
 
       int wave_count = 0;
-      double x_start = 0;
-      double wavelength = 2 * scaleFactor;
+      SkScalar x_start = 0;
+      SkScalar wavelength = 2 * scaleFactor;
 
       path.moveTo(0, 0);
       while (x_start + wavelength * 2 < width) {

@@ -5,8 +5,9 @@
  * found in the LICENSE file.
  */
 
+#include <algorithm>
 #include <unicode/brkiter.h>
-#include "SkParagraph.h"
+#include "flutter/SkParagraph.h"
 #include "SkPictureRecorder.h"
 
 void printText(const std::string& label, const UChar* text, size_t start, size_t end) {
@@ -16,8 +17,33 @@ void printText(const std::string& label, const UChar* text, size_t start, size_t
   SkDebugf("%s: %d:%d'%s'\n", label.c_str(), start, end, str.c_str());
 }
 
-SkParagraph::SkParagraph()
-    : _picture(nullptr) {}
+SkParagraph::SkParagraph(const std::string& text,
+                         SkParagraphStyle style,
+                         std::vector<Block> blocks)
+    : _style(style)
+    , _utf8(text.data(), text.size())
+    , _picture(nullptr)
+{
+  std::transform(blocks.cbegin(), blocks.cend(), std::back_inserter(_styles), [this](const Block& value) {
+    return StyledText( SkSpan<const char>(_utf8.begin() + value.start, value.end - value.start), value.textStyle);
+  });
+}
+
+SkParagraph::SkParagraph(const std::u16string& utf16text,
+                         SkParagraphStyle style,
+                         std::vector<Block> blocks)
+    : _style(style)
+    , _picture(nullptr)
+{
+  icu::UnicodeString unicode((UChar*)utf16text.data(), utf16text.size());
+  std::string str;
+  unicode.toUTF8String(str);
+  _utf8 = SkSpan<const char>(str.data(), str.size());
+
+  std::transform(blocks.cbegin(), blocks.cend(), std::back_inserter(_styles), [this](const Block& value) {
+    return StyledText( SkSpan<const char>(_utf8.begin() + value.start, value.end - value.start), value.textStyle);
+  });
+}
 
 SkParagraph::~SkParagraph() = default;
 
@@ -46,28 +72,7 @@ double SkParagraph::GetIdeographicBaseline() {
   return SkScalarToDouble(_ideographicBaseline);
 }
 
-void SkParagraph::SetText(const std::u16string& utf16text) {
-
-  icu::UnicodeString unicode((UChar*)utf16text.data(), utf16text.size());
-  std::string str;
-  unicode.toUTF8String(str);
-  _utf8 = SkSpan<const char>(str.data(), str.size());
-}
-
-void SkParagraph::SetText(const std::string& utf8text) {
-
-  _utf8 = SkSpan<const char>(utf8text.data(), utf8text.size());
-}
-
-void SkParagraph::SetRuns(std::vector<StyledText> styles) {
-  _styles = std::move(styles);
-}
-
-void SkParagraph::SetParagraphStyle(SkParagraphStyle style) {
-  _style = style;
-}
-
-bool SkParagraph::Layout(double width) {
+bool SkParagraph::Layout(double doubleWidth) {
 
   // Break the text into lines (with each one broken into blocks by style)
   BreakTextIntoParagraphs();
@@ -81,11 +86,16 @@ bool SkParagraph::Layout(double width) {
   _minIntrinsicWidth = 0;
   _linesNumber = 0;
 
+  auto width = SkDoubleToScalar(doubleWidth);
+
   // Take care of line limitation across all the paragraphs
   size_t maxLines = _style.getMaxLines();
   for (auto& paragraph : _paragraphs) {
-    SkDebugf("Layout requirements: #%d %f * %d\n", _linesNumber, width, maxLines);
+
+    // Shape
     paragraph.layout(width, maxLines);
+
+    // Make sure we haven't exceeded the limits
     _linesNumber += paragraph.lineNumber();
     if (!_style.unlimited_lines()) {
       maxLines -= paragraph.lineNumber();
@@ -93,11 +103,11 @@ bool SkParagraph::Layout(double width) {
     if (maxLines <= 0) {
       break;
     }
-  }
 
-  for (auto& paragraph : _paragraphs) {
+    // Format
     paragraph.format(width);
 
+    // Get the stats
     _alphabeticBaseline = 0;
     _ideographicBaseline = 0;
     _height += paragraph.height();
@@ -156,17 +166,17 @@ void SkParagraph::BreakTextIntoParagraphs() {
     return;
   }
 
-  int32_t firstChar = _utf8.size();
-  int32_t lastChar = _utf8.size();
+  auto firstChar = (int32_t)_utf8.size();
+  auto lastChar = (int32_t)_utf8.size();
 
   size_t firstStyle = _styles.size() - 1;
   while (lastChar > 0) {
-    int32_t status = ubrk_preceding(breakIterator, firstChar);
-    if (status == icu::BreakIterator::DONE) {
+    int32_t ubrkStatus = ubrk_preceding(breakIterator, firstChar);
+    if (ubrkStatus == icu::BreakIterator::DONE) {
       // Take care of the first line
       firstChar = 0;
     } else {
-      firstChar = status;
+      firstChar = ubrkStatus;
       if (ubrk_getRuleStatus(breakIterator) != UBRK_LINE_HARD) {
         continue;
       }

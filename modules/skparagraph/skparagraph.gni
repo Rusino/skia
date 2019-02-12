@@ -8,13 +8,13 @@ _src = get_path_info("src", "abspath")
 _include = get_path_info("include", "abspath")
 
 skparagraph_public = [
-            "$_include/SkFontCollection.h",
-            "$_include/SkParagraph.h",
-            "$_include/SkParagraphBuilder.h",
-            "$_include/SkParagraphStyle.h",
-            "$_include/SkTextShadow.h",
-            "$_include/SkTextStyle.h",
-            "$_include/SkDartTypes.h",
+            "$_include/flutter/SkFontCollection.h",
+            "$_include/flutter/SkParagraph.h",
+            "$_include/flutter/SkParagraphBuilder.h",
+            "$_include/flutter/SkParagraphStyle.h",
+            "$_include/flutter/SkTextShadow.h",
+            "$_include/flutter/SkTextStyle.h",
+            "$_include/flutter/SkDartTypes.h",
          ]
 
 skparagraph_sources = [
@@ -22,12 +22,12 @@ skparagraph_sources = [
             "$_src/ShapedParagraph.h",
             "$_src/ShapedRun.h",
 
-            "$_src/SkFontCollection.cpp",
-            "$_src/SkParagraph.cpp",
-            "$_src/SkParagraphBuilder.cpp",
-            "$_src/SkParagraphStyle.cpp",
-            "$_src/SkTextShadow.cpp",
-            "$_src/SkTextStyle.cpp",
+            "$_src/flutter/SkFontCollection.cpp",
+            "$_src/flutter/SkParagraph.cpp",
+            "$_src/flutter/SkParagraphBuilder.cpp",
+            "$_src/flutter/SkParagraphStyle.cpp",
+            "$_src/flutter/SkTextShadow.cpp",
+            "$_src/flutter/SkTextStyle.cpp",
             "$_src/ShapedParagraph.cpp",
             "$_src/ShapedRun.cpp",
           ]

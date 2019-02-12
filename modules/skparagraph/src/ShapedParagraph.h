@@ -25,7 +25,6 @@
 // Comes from the paragraph
 struct StyledText {
 
-  StyledText() { }
   StyledText( SkSpan<const char> text, SkTextStyle textStyle)
       : text(text), textStyle(textStyle) { }
 
@@ -38,12 +37,29 @@ struct StyledText {
   SkTextStyle textStyle;
 };
 
-class ShapedParagraph final : public SkShaper::RunHandler {
+class ShapedParagraph final : SkShaper::RunHandler {
  public:
 
-  ~ShapedParagraph() { }
-
   ShapedParagraph(SkParagraphStyle style, std::vector<StyledText> styles);
+
+  void layout(SkScalar maxWidth, size_t maxLines);
+
+  void format(SkScalar maxWidth);
+
+  void paint(SkCanvas* textCanvas, SkPoint& point);
+
+  SkScalar alphabeticBaseline() { return _alphabeticBaseline; }
+  SkScalar height() { return _height; }
+  SkScalar width() { return _width; }
+  SkScalar ideographicBaseline() { return _ideographicBaseline; }
+  SkScalar maxIntrinsicWidth() { return _maxIntrinsicWidth; }
+  SkScalar minIntrinsicWidth() { return _minIntrinsicWidth; }
+
+  void GetRectsForRange(const char* start, const char* end, std::vector<SkTextBox>& result);
+
+  size_t lineNumber() const { return _lines.size(); }
+
+ private:
 
   // SkShaper::RunHandler interface
   SkShaper::RunHandler::Buffer newRunBuffer(const RunInfo& info, const SkFont& font, int glyphCount, SkSpan<const char> utf8) override
@@ -82,26 +98,9 @@ class ShapedParagraph final : public SkShaper::RunHandler {
     _lines.emplace_back();
   }
 
-  void layout(SkScalar maxWidth, size_t maxLines);
-
+  // For debugging
   void printBlocks(size_t linenum);
 
-  void format(SkScalar maxWidth);
-
-  void paint(SkCanvas* textCanvas, SkPoint& point);
-
-  SkScalar alphabeticBaseline() { return _alphabeticBaseline; }
-  SkScalar height() { return _height; }
-  SkScalar width() { return _width; }
-  SkScalar ideographicBaseline() { return _ideographicBaseline; }
-  SkScalar maxIntrinsicWidth() { return _maxIntrinsicWidth; }
-  SkScalar minIntrinsicWidth() { return _minIntrinsicWidth; }
-
-  void GetRectsForRange(const char* start, const char* end, std::vector<SkTextBox>& result);
-
-  size_t lineNumber() const { return _lines.size(); }
-
- private:
   // Constrains
   size_t _maxLines;
 
@@ -110,7 +109,6 @@ class ShapedParagraph final : public SkShaper::RunHandler {
   std::vector<StyledText> _styles;
 
   // Output to Flutter
-  size_t _linesNumber;
   SkScalar _alphabeticBaseline;
   SkScalar _ideographicBaseline;
   SkScalar _height;
@@ -121,5 +119,4 @@ class ShapedParagraph final : public SkShaper::RunHandler {
   // Internal structures
   bool     _exceededLimits;     // Lines number exceed the limit and there is an ellipse
   SkTArray<Line> _lines;        // All lines that the shaper produced
-  // TODO: Shadows
 };

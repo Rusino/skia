@@ -19,9 +19,9 @@
 #include <string>
 #include <vector>
 
-#include "SkDartTypes.h"
+#include "flutter/SkDartTypes.h"
 #include "SkFontStyle.h"
-#include "SkTextShadow.h"
+#include "flutter/SkTextShadow.h"
 #include "SkColor.h"
 #include "SkPaint.h"
 #include "SkFont.h"

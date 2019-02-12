@@ -10,12 +10,27 @@
 #include <vector>
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
-#include "../src/ShapedParagraph.h"
+#include "../../src/ShapedParagraph.h"
+
+struct Block {
+  Block(size_t start, size_t end, SkTextStyle style)
+      : start(start), end(end), textStyle(style) { }
+  size_t start;
+  size_t end;
+  SkTextStyle textStyle;
+};
 
 class SkCanvas;
 class SkParagraph {
  public:
-  SkParagraph();
+  SkParagraph(const std::u16string& utf16text,
+              SkParagraphStyle style,
+              std::vector<Block> blocks);
+
+  SkParagraph(const std::string& utf8text,
+              SkParagraphStyle style,
+              std::vector<Block> blocks);
+
   ~SkParagraph();
 
   double GetMaxWidth();
@@ -47,12 +62,6 @@ class SkParagraph {
   SkPositionWithAffinity GetGlyphPositionAtCoordinate(double dx, double dy) const;
 
   SkRange<size_t> GetWordBoundary(unsigned offset);
-
-  void SetText(const std::u16string& utf16text);
-  void SetText(const std::string& utf8text);
-
-  void SetRuns(std::vector<StyledText> styles);
-  void SetParagraphStyle(SkParagraphStyle style);
 
  private:
 

@@ -69,21 +69,13 @@ class SkParagraphBuilder {
 
  private:
 
-  struct Run {
-    Run(size_t start, size_t end, SkTextStyle style)
-    : start(start), end(end), textStyle(style) { }
-    size_t start;
-    size_t end;
-    SkTextStyle textStyle;
-  };
-
   friend class ParagraphTester;
 
   void EndRunIfNeeded();
 
   std::string _text;
   std::stack<SkTextStyle> _styles;
-  std::vector<Run> _runs;
+  std::vector<Block> _blocks;
   sk_sp<SkFontCollection> _fontCollection;
   SkParagraphStyle _style;
 };

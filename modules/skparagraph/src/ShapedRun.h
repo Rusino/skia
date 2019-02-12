@@ -33,18 +33,6 @@ class ShapedRun {
 
   SkShaper::RunHandler::Buffer newRunBuffer();
 
-  void PaintShadow(SkCanvas* canvas, SkPoint offset);
-
-  void PaintBackground(SkCanvas* canvas, SkPoint offset);
-
-  SkScalar ComputeDecorationThickness(SkTextStyle textStyle);
-
-  SkScalar ComputeDecorationPosition(SkScalar thickness);
-
-  void ComputeDecorationPaint(SkPaint& paint, SkPath& path, SkScalar width);
-
-  void PaintDecorations(SkCanvas* canvas, SkPoint offset, SkScalar width);
-
   void Paint(SkCanvas* canvas, SkTextStyle style, SkPoint& point);
 
   size_t size() const {
@@ -65,6 +53,16 @@ class ShapedRun {
   void expand(SkScalar s) { fRect.fRight += s; }
 
  private:
+
+  void PaintShadow(SkCanvas* canvas, SkPoint offset);
+
+  void PaintBackground(SkCanvas* canvas, SkPoint offset);
+
+  SkScalar ComputeDecorationThickness(SkTextStyle textStyle);
+  SkScalar ComputeDecorationPosition(SkScalar thickness);
+  void ComputeDecorationPaint(SkPaint& paint, SkPath& path, SkScalar width);
+  void PaintDecorations(SkCanvas* canvas, SkPoint offset, SkScalar width);
+
   SkFont fFont;
   SkShaper::RunHandler::RunInfo   fInfo;
   SkSTArray<128, SkGlyphID, true> fGlyphs;

@@ -12,14 +12,16 @@
 class Line {
 
  public:
-  Line() {
+  Line()
+  {
     fAdvance = SkVector::Make(0, 0);
     maxAscend = 0;
     maxDescend = 0;
     maxLeading = 0;
   }
 
-  void update() {
+  void update()
+  {
     auto& word = fRuns.back();
 
     fAdvance.fX += word.advance().fX;
@@ -29,7 +31,8 @@ class Line {
     maxLeading = SkMaxScalar(maxLeading, word.leading());
   }
 
-  void finish() {
+  void finish()
+  {
     fAdvance.fY += (maxDescend -maxLeading - maxAscend);
   }
 
@@ -40,11 +43,12 @@ class Line {
   {
     return fRuns.emplace_back(font, info, glyphCount, text);
   }
-  ShapedRun& lastWord() { return fRuns.back(); }
 
-  SkTArray<ShapedRun>& words() { return fRuns; }
+  inline ShapedRun& lastWord() { return fRuns.back(); }
 
-  SkVector& advance() { return fAdvance; }
+  inline SkTArray<ShapedRun>& words() { return fRuns; }
+
+  inline SkVector& advance() { return fAdvance; }
 
  private:
   SkTArray<ShapedRun> fRuns;

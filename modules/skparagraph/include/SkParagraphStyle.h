@@ -19,14 +19,12 @@
 #include <climits>
 #include <string>
 
-#include "SkDartTypes.h"
+#include "flutter/SkDartTypes.h"
 #include "SkFontStyle.h"
 #include "SkTextStyle.h"
 
 // TODO: Introduce line break strategy later
-class SkParagraphStyle {
- public:
-
+struct SkParagraphStyle {
   SkParagraphStyle();
 
   bool operator==(const SkParagraphStyle& rhs) const {

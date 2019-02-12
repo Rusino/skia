@@ -18,7 +18,6 @@ ShapedParagraph::ShapedParagraph(SkParagraphStyle style, std::vector<StyledText>
   _width = 0;
   _maxIntrinsicWidth = 0;
   _minIntrinsicWidth = 0;
-  _linesNumber = 0;
   _exceededLimits = false;
 
   _lines.emplace_back();
@@ -28,13 +27,13 @@ void ShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
 
   class MultipleFontRunIterator final : public FontRunIterator {
    public:
-    MultipleFontRunIterator(const char* utf8,
-                            size_t utf8Bytes,
+    MultipleFontRunIterator(SkSpan<const char> utf8,
                             std::vector<StyledText>::iterator begin,
                             std::vector<StyledText>::iterator end,
                             SkTextStyle defaultStyle)
-        : fCurrent(utf8)
-        , fEnd(fCurrent + utf8Bytes)
+        : fText(utf8)
+        , fCurrent(utf8.begin())
+        , fEnd(utf8.end())
         , fCurrentStyle(SkTextStyle())
         , fDefaultStyle(defaultStyle)
         , fIterator(begin)
@@ -83,6 +82,7 @@ void ShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
     }
 
    private:
+    SkSpan<const char> fText;
     const char* fCurrent;
     const char* fEnd;
     SkFont fFont;
@@ -95,14 +95,13 @@ void ShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
   };
 
   _maxLines = maxLines;
-  _linesNumber = 0;
 
   if (!_styles.empty()) {
     auto start = _styles.begin()->text.begin();
     auto end = _styles.empty() ? start - 1 : std::prev(_styles.end())->text.end();
-
     if (start < end) {
-      MultipleFontRunIterator font(start, end - start,
+      SkSpan<const char> run(start, end - start);
+      MultipleFontRunIterator font(run,
                                    _styles.begin(),
                                    _styles.end(),
                                    _style.getTextStyle());
@@ -120,7 +119,6 @@ void ShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
     _width = 0;
     _maxIntrinsicWidth = 0;
     _minIntrinsicWidth = 0;
-    _linesNumber = 1;
     return;
   }
 
