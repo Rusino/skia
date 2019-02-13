@@ -11,10 +11,10 @@ skparagraph_public = [
             "$_include/SkParagraphStyle.h",
             "$_include/SkTextStyle.h",
             "$_include/SkTextShadow.h",
-            "$_include/flutter/SkFontCollection.h",
-            "$_include/flutter/SkParagraph.h",
-            "$_include/flutter/SkParagraphBuilder.h",
-            "$_include/flutter/SkDartTypes.h",
+            "$_include/SkFontCollection.h",
+            "$_include/SkParagraph.h",
+            "$_include/SkParagraphBuilder.h",
+            "$_include/SkDartTypes.h",
          ]
 
 skparagraph_sources = [
@@ -22,10 +22,10 @@ skparagraph_sources = [
             "$_src/SkShapedParagraph.h",
             "$_src/SkShapedRun.h",
 
-            "$_src/flutter/SkFontCollection.cpp",
-            "$_src/flutter/SkParagraph.cpp",
-            "$_src/flutter/SkParagraphBuilder.cpp",
-            "$_src/flutter/SkTextShadow.cpp",
+            "$_src/SkFontCollection.cpp",
+            "$_src/SkParagraph.cpp",
+            "$_src/SkParagraphBuilder.cpp",
+            "$_src/SkTextShadow.cpp",
             "$_src/SkParagraphStyle.cpp",
             "$_src/SkTextStyle.cpp",
             "$_src/SkShapedParagraph.cpp",
