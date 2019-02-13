@@ -10,7 +10,7 @@
 #include <vector>
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
-#include "../../src/SkShapedParagraph.h"
+#include "SkShapedParagraph.h"
 
 struct Block {
     Block(size_t start, size_t end, SkTextStyle style)

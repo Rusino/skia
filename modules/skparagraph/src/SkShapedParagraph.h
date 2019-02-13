@@ -47,7 +47,7 @@ class SkShapedParagraph final : SkShaper::RunHandler {
 
     void format(SkScalar maxWidth);
 
-    void paint(SkCanvas* textCanvas, SkPoint& point);
+    void paint(SkCanvas* textCanvas);
 
     SkScalar alphabeticBaseline() { return fAlphabeticBaseline; }
     SkScalar height() { return fHeight; }

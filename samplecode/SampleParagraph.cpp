@@ -510,7 +510,7 @@ class ParagraphView : public Sample {
     canvas->translate(0, height);
     drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kWavy);
     */
-
+    /*
       SkScalar width = this->width() / 3;
       drawTest(canvas, width, this->height(), SK_ColorBLACK, SK_ColorWHITE);
       canvas->translate(width, 0);
@@ -519,7 +519,7 @@ class ParagraphView : public Sample {
       drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorWHITE);
       canvas->translate(0, this->height()/2);
       drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
-
+    */
     std::vector<std::string> cupertino = { "google_logogoogle_gsuper_g_logo" };
     std::vector<std::string>  text = {
         "My neighbor came over to say,\n"
@@ -548,7 +548,7 @@ class ParagraphView : public Sample {
     };
     std::vector<std::string> very_long = { "A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text" };
     //drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-    //drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
+    drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
     /*
     SkScalar height = this->height() / 4;
     std::string line = "Hesitation is always easy rarely useful.";

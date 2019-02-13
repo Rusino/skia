@@ -16,7 +16,7 @@
 #include <list>
 #include <algorithm>
 
-#include "flutter/SkParagraphBuilder.h"
+#include "SkParagraphBuilder.h"
 #include "SkParagraphStyle.h"
 #include "SkPaint.h"
 #include "SkSpan.h"

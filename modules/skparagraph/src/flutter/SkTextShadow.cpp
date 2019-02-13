@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "flutter/SkTextShadow.h"
+#include "SkTextShadow.h"
 #include "SkColor.h"
 
 SkTextShadow::SkTextShadow() {}

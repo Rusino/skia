@@ -19,12 +19,23 @@
 #include <string>
 #include <vector>
 
-#include "flutter/SkDartTypes.h"
 #include "SkFontStyle.h"
-#include "flutter/SkTextShadow.h"
+#include "SkTextShadow.h"
 #include "SkColor.h"
 #include "SkPaint.h"
 #include "SkFont.h"
+
+
+// Multiple decorations can be applied at once. Ex: Underline and overline is
+// (0x1 | 0x2)
+enum SkTextDecoration {
+    kNone = 0x0,
+    kUnderline = 0x1,
+    kOverline = 0x2,
+    kLineThrough = 0x4,
+};
+
+enum SkTextDecorationStyle { kSolid, kDouble, kDotted, kDashed, kWavy };
 
 class SkTextStyle {
 

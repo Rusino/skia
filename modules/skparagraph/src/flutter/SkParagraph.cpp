@@ -7,7 +7,7 @@
 
 #include <algorithm>
 #include <unicode/brkiter.h>
-#include "flutter/SkParagraph.h"
+#include "SkParagraph.h"
 #include "SkPictureRecorder.h"
 
 SkParagraph::SkParagraph(const std::string& text,
@@ -109,13 +109,10 @@ void SkParagraph::recordPicture() {
 
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
-    // Point will be moved on each paragraph
-    SkPoint point = SkPoint::Make(0, 0);
     for (auto& paragraph : fParagraphs) {
 
-        paragraph.paint(textCanvas, point);
-        point.fX = 0;
-        point.fY += paragraph.height();
+        paragraph.paint(textCanvas);
+        textCanvas->translate(0, paragraph.height());
     }
 
     fPicture = recorder.finishRecordingAsPicture();

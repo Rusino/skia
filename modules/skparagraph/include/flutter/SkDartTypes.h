@@ -90,13 +90,3 @@ struct SkRange {
     }
 };
 
-// Multiple decorations can be applied at once. Ex: Underline and overline is
-// (0x1 | 0x2)
-enum SkTextDecoration {
-    kNone = 0x0,
-    kUnderline = 0x1,
-    kOverline = 0x2,
-    kLineThrough = 0x4,
-};
-
-enum SkTextDecorationStyle { kSolid, kDouble, kDotted, kDashed, kWavy };

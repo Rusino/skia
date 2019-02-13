@@ -10,10 +10,10 @@ _include = get_path_info("include", "abspath")
 skparagraph_public = [
             "$_include/SkParagraphStyle.h",
             "$_include/SkTextStyle.h",
+            "$_include/SkTextShadow.h",
             "$_include/flutter/SkFontCollection.h",
             "$_include/flutter/SkParagraph.h",
             "$_include/flutter/SkParagraphBuilder.h",
-            "$_include/flutter/SkTextShadow.h",
             "$_include/flutter/SkDartTypes.h",
          ]
 

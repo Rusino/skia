@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "flutter/SkFontCollection.h"
+#include "SkFontCollection.h"
 
 #include <list>
 #include <memory>

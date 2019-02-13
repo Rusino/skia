@@ -219,7 +219,7 @@ void SkShapedParagraph::format(SkScalar maxWidth) {
 }
 
 // TODO: currently we pick the first style of the run and go with it regardless
-void SkShapedParagraph::paint(SkCanvas* textCanvas, SkPoint& point) {
+void SkShapedParagraph::paint(SkCanvas* textCanvas) {
 
     auto styleIter = fTextStyles.begin();
     for (auto& line : fLines) {

@@ -19,7 +19,7 @@
 #include <climits>
 #include <string>
 
-#include "flutter/SkDartTypes.h"
+#include "SkDartTypes.h"
 #include "SkFontStyle.h"
 #include "SkTextStyle.h"
 
