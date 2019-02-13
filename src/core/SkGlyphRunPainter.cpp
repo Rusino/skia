@@ -708,7 +708,7 @@ void GrTextBlob::generateFromGlyphRunList(GrStrikeCache* glyphCache,
             SkExclusiveStrikePtr fallbackCache = SkStrikeCache::FindOrCreateStrikeExclusive(
                     fallbackFont, fallbackPaint, fProps, fScalerContextFlags, glyphCacheMatrix);
             sk_sp<GrTextStrike> strike = fGrStrikeCache->getStrike(fallbackCache->getDescriptor());
-            fRun->setupFont(fallbackPaint, fallbackFont, fallbackCache->getDescriptor());
+            fRun->setupFont(fallbackCache->strikeSpec());
 
             SkASSERT(strike != nullptr);
             subRun->setStrike(strike);
@@ -770,10 +770,10 @@ void GrTextBlob::generateFromGlyphRunList(GrStrikeCache* glyphCache,
                     hasWCoord);
 
             {
-                SkExclusiveStrikePtr cache =SkStrikeCache::FindOrCreateStrikeExclusive(
+                SkExclusiveStrikePtr cache = SkStrikeCache::FindOrCreateStrikeExclusive(
                         distanceFieldFont, distanceFieldPaint, props, flags, SkMatrix::I());
                 sk_sp<GrTextStrike> currStrike = glyphCache->getStrike(cache->getDescriptor());
-                run->setupFont(distanceFieldPaint, distanceFieldFont, cache->getDescriptor());
+                run->setupFont(cache->strikeSpec());
 
                 auto perEmpty = [](const SkGlyph&, SkPoint) {};
 
@@ -846,10 +846,10 @@ void GrTextBlob::generateFromGlyphRunList(GrStrikeCache* glyphCache,
             auto processEmpties = [](SkSpan<const SkGlyph*>glyphs) {};
 
             auto processMasks =
-                [run, glyphCache, &runFont, &runPaint]
+                [run, glyphCache]
                 (SkSpan<const SkGlyphRunListPainter::GlyphAndPos> masks,
                         SkStrikeInterface* strike) {
-                    run->setupFont(runPaint, runFont, strike->getDescriptor());
+                    run->setupFont(strike->strikeSpec());
                     sk_sp<GrTextStrike> currStrike = glyphCache->getStrike(strike->getDescriptor());
                     for (const auto& mask : masks) {
                         SkPoint pt{SkScalarFloorToScalar(mask.position.fX),
@@ -882,8 +882,9 @@ void GrTextBlob::generateFromGlyphRunList(GrStrikeCache* glyphCache,
 #if GR_TEST_UTILS
 
 #include "GrRenderTargetContext.h"
+#include "GrRecordingContextPriv.h"
 
-std::unique_ptr<GrDrawOp> GrTextContext::createOp_TestingOnly(GrContext* context,
+std::unique_ptr<GrDrawOp> GrTextContext::createOp_TestingOnly(GrRecordingContext* context,
                                                               GrTextContext* textContext,
                                                               GrRenderTargetContext* rtc,
                                                               const SkPaint& skPaint,
@@ -892,7 +893,12 @@ std::unique_ptr<GrDrawOp> GrTextContext::createOp_TestingOnly(GrContext* context
                                                               const char* text,
                                                               int x,
                                                               int y) {
-    auto glyphCache = context->priv().getGlyphCache();
+    auto direct = context->priv().asDirectContext();
+    if (!direct) {
+        return nullptr;
+    }
+
+    auto glyphCache = direct->priv().getGlyphCache();
 
     static SkSurfaceProps surfaceProps(SkSurfaceProps::kLegacyFontHost_InitType);
 
@@ -908,7 +914,7 @@ std::unique_ptr<GrDrawOp> GrTextContext::createOp_TestingOnly(GrContext* context
     auto glyphRunList = builder.useGlyphRunList();
     sk_sp<GrTextBlob> blob;
     if (!glyphRunList.empty()) {
-        blob = context->priv().getTextBlobCache()->makeBlob(glyphRunList, color);
+        blob = direct->priv().getTextBlobCache()->makeBlob(glyphRunList, color);
         // Use the text and textLen below, because we don't want to mess with the paint.
         SkScalerContextFlags scalerContextFlags =
                 ComputeScalerContextFlags(rtc->colorSpaceInfo());

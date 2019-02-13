@@ -291,6 +291,7 @@ class SingleFontRunIterator : public FontRunIterator {
   {
     fFallbackFont.setTypeface(nullptr);
   }
+  
   void consume() override {
     SkASSERT(fCurrent < fEnd);
     SkUnichar u = utf8_next(&fCurrent, fEnd);
