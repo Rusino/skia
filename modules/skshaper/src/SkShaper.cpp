@@ -27,7 +27,7 @@ SkShaper::RunHandler::Buffer SkTextBlobBuilderRunHandler::newRunBuffer(const Run
              runBuffer.clusters };
 }
 
-void SkTextBlobBuilderRunHandler::commitRun() {
+void SkTextBlobBuilderRunHandler::commitRun(SkScalar) {
     for (int i = 0; i < fGlyphCount; ++i) {
         fClusters[i] -= fClusterOffset;
     }

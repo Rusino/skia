@@ -17,6 +17,23 @@
 
 class SkFont;
 
+class RunIterator {
+ public:
+  virtual ~RunIterator() {}
+  virtual void consume() = 0;
+  // Pointer one past the last (utf8) element in the current run.
+  virtual const char* endOfCurrentRun() const = 0;
+  virtual bool atEnd() const = 0;
+  bool operator<(const RunIterator& that) const {
+    return this->endOfCurrentRun() < that.endOfCurrentRun();
+  }
+};
+
+class FontRunIterator : public RunIterator {
+ public:
+  virtual const SkFont* currentFont() const = 0;
+};
+
 /**
    Shapes text using HarfBuzz and places the shaped text into a
    client-managed buffer.
@@ -26,6 +43,7 @@ class SkFont;
 class SkShaper {
 public:
     SkShaper(sk_sp<SkTypeface> face);
+    SkShaper();
     ~SkShaper();
 
     class RunHandler {
@@ -50,13 +68,22 @@ public:
                                     SkSpan<const char> utf8) = 0;
 
         // Called after run information is filled out.
-        virtual void commitRun() = 0;
+        virtual void commitRun(SkScalar) = 0;
         // Callback per line.
         virtual void commitLine() = 0;
     };
 
     bool good() const;
-    SkPoint shape(RunHandler* handler,
+
+  SkPoint shape(RunHandler* handler,
+                FontRunIterator* font,
+                const char* utf8text,
+                size_t textBytes,
+                bool leftToRight, // TODO: take from the font iterator
+                SkPoint point,
+                SkScalar width) const;
+
+  SkPoint shape(RunHandler* handler,
                   const SkFont& srcFont,
                   const char* utf8text,
                   size_t textBytes,
@@ -81,7 +108,7 @@ public:
     sk_sp<SkTextBlob> makeBlob();
 
     SkShaper::RunHandler::Buffer newRunBuffer(const RunInfo&, const SkFont&, int, SkSpan<const char>) override;
-    void commitRun() override;
+    void commitRun(SkScalar) override;
     void commitLine() override {}
 
 private:

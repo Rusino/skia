@@ -84,7 +84,7 @@ protected:
             font.setEdging(SkFont::Edging::kSubpixelAntiAlias);
 
             SkPoint end = shaper.shape(&builder, font, gText, strlen(gText), true,
-                                       { margin, margin }, w - margin);
+                                       { margin, margin }, w - margin * 2);
             canvas->drawTextBlob(builder.makeBlob(), 0, 0, paint);
 
             canvas->translate(0, end.y());
