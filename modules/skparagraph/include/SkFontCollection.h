@@ -18,7 +18,7 @@
 #include <memory>
 #include <set>
 #include <string>
-#include "SkTHash.h"
+#include "../../include/private/SkTHash.h" // TODO: Figure out how to deal with it in Flutter engine
 #include "SkFontMgr.h"
 #include "SkRefCnt.h"
 #include "SkTextStyle.h"

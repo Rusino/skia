@@ -16,7 +16,6 @@
 
 #pragma once
 
-#include <climits>
 #include <string>
 
 #include "SkDartTypes.h"
