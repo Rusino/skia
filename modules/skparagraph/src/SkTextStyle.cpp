@@ -22,8 +22,9 @@
 #define DEFAULT_FONT_FAMILY "Arial"
 
 SkTextStyle::SkTextStyle()
-    : fFontStyle(), fFontFamily(DEFAULT_FONT_FAMILY) {
+    : fFontStyle() {
 
+    fFontFamily = DEFAULT_FONT_FAMILY;
     fColor = SK_ColorWHITE;
     fDecoration = SkTextDecoration::kNone;
     // Does not make sense to draw a transparent object, so we use it as a default
@@ -42,47 +43,57 @@ SkTextStyle::SkTextStyle()
 
 // TODO: use font provider to resolve the font
 sk_sp<SkTypeface> SkTextStyle::getTypeface() const {
-    /*
-    if (_typeface == nullptr) {
-      SkDebugf("MakeDefault!!!!!\n");
-      _typeface = SkTypeface::MakeDefault();
-    }
-     */
-    return fTypeface; // SkTypeface::MakeFromName(_fontFamily.data(), SkFontStyle());
+
+    return fTypeface;
 }
 
 bool SkTextStyle::equals(const SkTextStyle& other) const {
-    if (fColor != other.fColor)
-        return false;
-    if (fDecoration != other.fDecoration)
-        return false;
-    if (fDecorationColor != other.fDecorationColor)
-        return false;
-    if (fDecorationStyle != other.fDecorationStyle)
-        return false;
-    if (fDecorationThicknessMultiplier != other.fDecorationThicknessMultiplier)
-        return false;
-    if (!(fFontStyle == other.fFontStyle))
-        return false;
-    if (fFontFamily != other.fFontFamily)
-        return false;
-    if (fLetterSpacing != other.fLetterSpacing)
-        return false;
-    if (fWordSpacing != other.fWordSpacing)
-        return false;
-    if (fFontHeight != other.fFontHeight)
-        return false;
-    if (fLocale != other.fLocale)
-        return false;
-    if (fForeground != other.fForeground)
-        return false;
-    if (fTextShadows.size() != other.fTextShadows.size())
-        return false;
 
-    for (size_t shadow_index = 0; shadow_index < fTextShadows.size();
-         ++shadow_index) {
-        if (fTextShadows[shadow_index] != other.fTextShadows[shadow_index])
+    if (fColor != other.fColor) {
+        return false;
+    }
+    if (fDecoration != other.fDecoration) {
+        return false;
+    }
+    if (fDecorationColor != other.fDecorationColor) {
+        return false;
+    }
+    if (fDecorationStyle != other.fDecorationStyle) {
+        return false;
+    }
+    if (fDecorationThicknessMultiplier
+        != other.fDecorationThicknessMultiplier) {
             return false;
+    }
+    if (!(fFontStyle == other.fFontStyle)) {
+        return false;
+    }
+    if (fFontFamily != other.fFontFamily) {
+        return false;
+    }
+    if (fLetterSpacing != other.fLetterSpacing) {
+        return false;
+    }
+    if (fWordSpacing != other.fWordSpacing) {
+        return false;
+    }
+    if (fFontHeight != other.fFontHeight) {
+        return false;
+    }
+    if (fLocale != other.fLocale) {
+        return false;
+    }
+    if (fForeground != other.fForeground) {
+        return false;
+    }
+    if (fTextShadows.size() != other.fTextShadows.size()) {
+        return false;
+    }
+
+    for (int32_t i = 0; i < (int32_t)fTextShadows.size(); ++i) {
+        if (fTextShadows[i] != other.fTextShadows[i]) {
+            return false;
+        }
     }
 
     return true;

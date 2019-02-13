@@ -28,6 +28,7 @@ struct SkParagraphStyle {
     SkParagraphStyle();
 
     bool operator==(const SkParagraphStyle& rhs) const {
+
         return this->fLineHeight == rhs.fLineHeight &&
             this->fEllipsis == rhs.fEllipsis &&
             this->fTextDirection == rhs.fTextDirection &&
@@ -41,10 +42,12 @@ struct SkParagraphStyle {
     std::string getEllipsis() const { return fEllipsis; }
 
     void setTextStyle(SkTextStyle textStyle) {
+
         fDefaultTextStyle = textStyle;
     }
     void setTextAlign(SkTextAlign align) { fTextAlign = align; }
     void setTextDirection(SkTextDirection direction) {
+
         fTextDirection = direction;
     }
     void setMaxLines(size_t maxLines) { fLinesLimit = maxLines; }

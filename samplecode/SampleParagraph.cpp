@@ -236,28 +236,28 @@ class ParagraphView : public Sample {
     //builder.AddText("// Create a raised button.\n");
     //builder.Pop();
 
-    builder.PushStyle(style(name));
-    builder.AddText("RaisedButton");
-    builder.Pop();
-    builder.AddText("(\n");
-    builder.AddText("  child: ");
-    builder.PushStyle(style(constant));
-    builder.AddText("const");
-    builder.Pop();
-    builder.AddText(" ");
-    builder.PushStyle(style(name));
-    builder.AddText("Text");
-    builder.Pop();
-    builder.AddText("(");
-    builder.PushStyle(style(literal));
-    builder.AddText("'BUTTON TITLE'");
-    builder.Pop();
-    builder.AddText("),\n");
+    builder.pushStyle(style(name));
+    builder.addText("RaisedButton");
+    builder.pop();
+    builder.addText("(\n");
+    builder.addText("  child: ");
+    builder.pushStyle(style(constant));
+    builder.addText("const");
+    builder.pop();
+    builder.addText(" ");
+    builder.pushStyle(style(name));
+    builder.addText("Text");
+    builder.pop();
+    builder.addText("(");
+    builder.pushStyle(style(literal));
+    builder.addText("'BUTTON TITLE'");
+    builder.pop();
+    builder.addText("),\n");
 
     auto paragraph = builder.Build();
-    paragraph->Layout(w - 20);
+    paragraph->layout(w - 20);
 
-    paragraph->Paint(canvas, 20, 20);
+      paragraph->paint(canvas, 20, 20);
   }
 
   SkTextStyle style(SkPaint paint) {
@@ -291,7 +291,7 @@ class ParagraphView : public Sample {
     for (auto i = 1; i < 5; ++i) {
       paraStyle.getTextStyle().setFontSize(24 * i);
       SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
-      builder.AddText("Paragraph:");
+      builder.addText("Paragraph:");
       for (auto para : gParagraph) {
         SkTextStyle style;
         style.setBackgroundColor(bg);
@@ -321,7 +321,7 @@ class ParagraphView : public Sample {
           style.setDecorationStyle(std::get<7>(para));
           style.setDecorationColor(std::get<5>(para));
         }
-        builder.PushStyle(style);
+        builder.pushStyle(style);
         std::string name = " " +
             std::get<0>(para) +
             (std::get<1>(para) ? ", bold" : "") +
@@ -332,16 +332,16 @@ class ParagraphView : public Sample {
             (std::get<6>(para) ? ", shadow" : "") +
             (test ? ", decorations " + deco : "") +
             ";";
-        builder.AddText(name);
-        builder.Pop();
+        builder.addText(name);
+        builder.pop();
       }
 
       auto paragraph = builder.Build();
-      paragraph->Layout(w - margin);
+      paragraph->layout(w - margin);
 
-      paragraph->Paint(canvas, margin, margin);
+        paragraph->paint(canvas, margin, margin);
 
-      canvas->translate(0, paragraph->GetHeight());
+      canvas->translate(0, paragraph->getHeight());
     }
   }
 
@@ -396,16 +396,16 @@ class ParagraphView : public Sample {
       style.setDecorationStyle(decorationStyle);
       style.setDecorationColor(SK_ColorBLACK);
     }
-    builder.PushStyle(style);
-    builder.AddText(gText);
-    builder.Pop();
+    builder.pushStyle(style);
+    builder.addText(gText);
+    builder.pop();
 
     auto paragraph = builder.Build();
-    paragraph->Layout(w - margin);
+    paragraph->layout(w - margin);
 
-    paragraph->Paint(canvas, margin, margin);
+      paragraph->paint(canvas, margin, margin);
 
-    canvas->translate(0, paragraph->GetHeight() + margin);
+    canvas->translate(0, paragraph->getHeight() + margin);
   }
 
   void drawText(SkCanvas* canvas, SkScalar w, SkScalar h,
@@ -439,7 +439,7 @@ class ParagraphView : public Sample {
 
     paraStyle.setEllipsis(ellipsis);
     paraStyle.getTextStyle().setFontSize(20);
-    fontCollection->SetTestFontManager(testFontProvider);
+    fontCollection->setTestFontManager(testFontProvider);
     SkParagraphBuilder builder(paraStyle, fontCollection);
 
     SkPaint foreground;
@@ -448,17 +448,17 @@ class ParagraphView : public Sample {
     style.setBackgroundColor(bg);
 
     for (auto& part : text) {
-      builder.PushStyle(style);
-      builder.AddText(part);
-      builder.Pop();
+      builder.pushStyle(style);
+      builder.addText(part);
+      builder.pop();
     }
 
     auto paragraph = builder.Build();
-    paragraph->Layout(240);
+    paragraph->layout(240);
 
-    paragraph->Paint(canvas, margin, margin);
+      paragraph->paint(canvas, margin, margin);
 
-    canvas->translate(0, paragraph->GetHeight() + margin);
+    canvas->translate(0, paragraph->getHeight() + margin);
   }
 
   void drawLine(SkCanvas* canvas, SkScalar w, SkScalar h,
@@ -485,14 +485,14 @@ class ParagraphView : public Sample {
     paraStyle.setTextAlign(align);
 
     SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
-    builder.AddText(text);
+    builder.addText(text);
 
     auto paragraph = builder.Build();
-    paragraph->Layout(w - margin * 2);
+    paragraph->layout(w - margin * 2);
 
-    paragraph->Paint(canvas, margin, margin);
+      paragraph->paint(canvas, margin, margin);
 
-    canvas->translate(0, paragraph->GetHeight() + margin);
+    canvas->translate(0, paragraph->getHeight() + margin);
 
   }
 

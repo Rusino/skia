@@ -14,65 +14,69 @@
 
 struct Block {
     Block(size_t start, size_t end, SkTextStyle style)
-        : start(start), end(end), textStyle(style) {}
-    size_t start;
-    size_t end;
-    SkTextStyle textStyle;
+        : fStart(start), fEnd(end), fStyle(style) {}
+    size_t fStart;
+    size_t fEnd;
+    SkTextStyle fStyle;
 };
 
 class SkCanvas;
+
 class SkParagraph {
   public:
-    SkParagraph(const std::u16string& utf16text,
-                SkParagraphStyle style,
-                std::vector<Block> blocks);
+    SkParagraph(
+        const std::u16string& utf16text,
+        SkParagraphStyle style,
+        std::vector<Block> blocks);
 
-    SkParagraph(const std::string& utf8text,
-                SkParagraphStyle style,
-                std::vector<Block> blocks);
+    SkParagraph(
+        const std::string& utf8text,
+        SkParagraphStyle style,
+        std::vector<Block> blocks);
 
     ~SkParagraph();
 
-    double GetMaxWidth();
+    double getMaxWidth() { return SkScalarToDouble(fWidth); }
 
-    double GetHeight();
+    double getHeight() { return SkScalarToDouble(fHeight); }
 
-    double GetMinIntrinsicWidth();
+    double getMinIntrinsicWidth() { return SkScalarToDouble(fMinIntrinsicWidth); }
 
-    double GetMaxIntrinsicWidth();
+    double getMaxIntrinsicWidth() { return SkScalarToDouble(fMaxIntrinsicWidth); }
 
-    double GetAlphabeticBaseline();
+    double getAlphabeticBaseline() { return SkScalarToDouble(fAlphabeticBaseline); }
 
-    double GetIdeographicBaseline();
+    double getIdeographicBaseline() { return SkScalarToDouble(fIdeographicBaseline); }
 
-    bool DidExceedMaxLines() {
-        return !fParagraphStyle.unlimited_lines() && fLinesNumber > fParagraphStyle.getMaxLines();
+    bool didExceedMaxLines() {
+
+        return !fParagraphStyle.unlimited_lines()
+            && fLinesNumber > fParagraphStyle.getMaxLines();
     }
 
-    bool Layout(double width);
+    bool layout(double width);
 
-    void Paint(SkCanvas* canvas, double x, double y) const;
+    void paint(SkCanvas* canvas, double x, double y) const;
 
-    std::vector<SkTextBox> GetRectsForRange(
+    std::vector<SkTextBox> getRectsForRange(
         unsigned start,
         unsigned end,
         RectHeightStyle rectHeightStyle,
         RectWidthStyle rectWidthStyle);
 
-    SkPositionWithAffinity
-    GetGlyphPositionAtCoordinate(double dx, double dy) const;
+    SkPositionWithAffinity getGlyphPositionAtCoordinate(double dx, double dy) const;
 
-    SkRange<size_t> GetWordBoundary(unsigned offset);
+    SkRange<size_t> getWordBoundary(unsigned offset);
 
   private:
 
     friend class ParagraphTester;
 
     // Record a picture drawing all small text blobs
-    void RecordPicture();
+    void recordPicture();
 
     // Break the text by explicit line breaks
-    void BreakTextIntoParagraphs();
+    void breakTextIntoParagraphs();
 
     // Things for Flutter
     SkScalar fAlphabeticBaseline;
@@ -86,7 +90,7 @@ class SkParagraph {
     // Input
     SkParagraphStyle fParagraphStyle;
     std::vector<StyledText> fTextStyles;
-    SkSpan<const char> _fUtf8;
+    SkSpan<const char> fUtf8;
 
     // Shaping (list of paragraphs in Shaper terms separated by hard line breaks)
     std::vector<SkShapedParagraph> fParagraphs;

@@ -9,8 +9,9 @@
 #include "SkFontMetrics.h"
 
 SkShapedParagraph::SkShapedParagraph(SkParagraphStyle style,
-                                 std::vector<StyledText> styles)
+    std::vector<StyledText> styles)
     : fParagraphStyle(style), fTextStyles(std::move(styles)) {
+
     fAlphabeticBaseline = 0;
     fIdeographicBaseline = 0;
     fHeight = 0;
@@ -27,12 +28,13 @@ void SkShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
     class MultipleFontRunIterator final : public FontRunIterator {
       public:
         MultipleFontRunIterator(SkSpan<const char> utf8,
-                                std::vector<StyledText>::iterator begin,
-                                std::vector<StyledText>::iterator end,
-                                SkTextStyle defaultStyle)
-            : fText(utf8), fCurrent(utf8.begin()), fEnd(utf8.end()),
-              fCurrentStyle(SkTextStyle()), fDefaultStyle(defaultStyle),
-              fIterator(begin), fNext(begin), fLast(end) {
+            std::vector<StyledText>::iterator begin,
+            std::vector<StyledText>::iterator end,
+            SkTextStyle defaultStyle)
+            : fText(utf8), fCurrent(utf8.begin()), fEnd(utf8.end()), fCurrentStyle(
+            SkTextStyle()), fDefaultStyle(defaultStyle), fIterator(begin), fNext(
+            begin), fLast(end) {
+
             fCurrentTypeface = SkTypeface::MakeDefault();
             MoveToNext();
         }
@@ -55,13 +57,16 @@ void SkShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
             MoveToNext();
         }
         const char* endOfCurrentRun() const override {
+
             return fCurrent;
         }
         bool atEnd() const override {
+
             return fCurrent == fEnd;
         }
 
         const SkFont* currentFont() const override {
+
             return &fFont;
         }
 
@@ -89,12 +94,13 @@ void SkShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
         sk_sp<SkTypeface> fCurrentTypeface;
     };
 
-    _maxLines = maxLines;
+    fMaxLines = maxLines;
 
     if (!fTextStyles.empty()) {
         auto start = fTextStyles.begin()->fText.begin();
         auto end =
-            fTextStyles.empty() ? start - 1 : std::prev(fTextStyles.end())->fText.end();
+            fTextStyles.empty() ? start - 1
+                                : std::prev(fTextStyles.end())->fText.end();
         if (start < end) {
             SkSpan<const char> run(start, end - start);
             MultipleFontRunIterator font(run,
@@ -136,6 +142,7 @@ void SkShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
 }
 
 void SkShapedParagraph::printBlocks(size_t linenum) {
+
     SkDebugf("Paragraph #%d\n", linenum);
     if (!fTextStyles.empty()) {
         SkDebugf("Lost blocks\n");
@@ -169,8 +176,7 @@ void SkShapedParagraph::format(SkScalar maxWidth) {
         }
 
         switch (fParagraphStyle.effective_align()) {
-            case SkTextAlign::left:
-                break;
+            case SkTextAlign::left:break;
             case SkTextAlign::right:
                 for (auto& word : line.words()) {
                     word.shift(delta);
@@ -207,8 +213,7 @@ void SkShapedParagraph::format(SkScalar maxWidth) {
                 }
                 break;
             }
-            default:
-                break;
+            default:break;
         }
     }
 }
@@ -216,36 +221,35 @@ void SkShapedParagraph::format(SkScalar maxWidth) {
 // TODO: currently we pick the first style of the run and go with it regardless
 void SkShapedParagraph::paint(SkCanvas* textCanvas, SkPoint& point) {
 
-    std::vector<StyledText>::iterator firstStyle = fTextStyles.begin();
+    auto styleIter = fTextStyles.begin();
     for (auto& line : fLines) {
         for (auto word : line.words()) {
 
             // Find the first style that affects the run
-            while (firstStyle != fTextStyles.end()
-                && firstStyle->fText.begin() < word.text().begin()) {
-                ++firstStyle;
+            while (styleIter != fTextStyles.end()
+                && styleIter->fText.begin() < word.text().begin()) {
+                ++styleIter;
             }
 
             word.Paint(textCanvas,
-                       firstStyle == fTextStyles.end() ? fParagraphStyle.getTextStyle()
-                                                   : firstStyle->fStyle,
-                       point);
+                       styleIter == fTextStyles.end()
+                       ? fParagraphStyle.getTextStyle()
+                       : styleIter->fStyle);
         }
-        //point.fY += line.advance().fY;
-        point.fX = 0;
     }
 }
 
-void SkShapedParagraph::GetRectsForRange(const char* start,
-                                       const char* end,
-                                       std::vector<SkTextBox>& result) {
+void SkShapedParagraph::GetRectsForRange(
+    const char* start,
+    const char* end,
+    std::vector<SkTextBox>& result) {
+
     for (auto& line : fLines) {
         for (auto& word : line.words()) {
             if (word.text().end() <= start || word.text().begin() >= end) {
                 continue;
             }
-            result.emplace_back(word.rect(),
-                                SkTextDirection::ltr); // TODO: the right direction
+            result.emplace_back(word.rect(), fParagraphStyle.getTextDirection());
         }
     }
 }

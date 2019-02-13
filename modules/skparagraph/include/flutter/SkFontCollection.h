@@ -18,10 +18,10 @@
 #include <memory>
 #include <set>
 #include <string>
-#include "../private/SkTHash.h"
+#include "SkTHash.h"
 #include "SkFontMgr.h"
 #include "SkRefCnt.h"
-#include "../SkTextStyle.h"
+#include "SkTextStyle.h"
 #include "SkFontMgr.h"
 
 class SkFontCollection : public SkRefCnt {
@@ -30,29 +30,29 @@ class SkFontCollection : public SkRefCnt {
 
     ~SkFontCollection();
 
-    size_t GetFontManagersCount() const;
+    size_t getFontManagersCount() const;
 
-    void SetAssetFontManager(sk_sp<SkFontMgr> fontManager);
-    void SetDynamicFontManager(sk_sp<SkFontMgr> fontManager);
-    void SetTestFontManager(sk_sp<SkFontMgr> fontManager);
+    void setAssetFontManager(sk_sp<SkFontMgr> fontManager);
+    void setDynamicFontManager(sk_sp<SkFontMgr> fontManager);
+    void setTestFontManager(sk_sp<SkFontMgr> fontManager);
 
     SkTypeface* findTypeface(SkTextStyle& textStyle);
 
-    void DisableFontFallback();
+    void disableFontFallback();
 
   private:
 
     sk_sp<SkTypeface>
     findByFamilyName(const std::string& familyName, SkFontStyle fontStyle);
 
-    std::vector<sk_sp<SkFontMgr>> GetFontManagerOrder() const;
+    std::vector<sk_sp<SkFontMgr>> getFontManagerOrder() const;
 
     friend class ParagraphTester;
 
     struct FamilyKey {
         FamilyKey(const std::string& family,
-                  const std::string& loc,
-                  SkFontStyle style)
+            const std::string& loc,
+            SkFontStyle style)
             : font_family(family), locale(loc), font_style(style) {}
 
         FamilyKey() {}

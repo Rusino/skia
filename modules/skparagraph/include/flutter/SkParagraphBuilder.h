@@ -29,14 +29,13 @@
 
 class SkParagraphBuilder {
   public:
-    SkParagraphBuilder(SkParagraphStyle style,
-                       sk_sp<SkFontCollection> fontCollection);
+    SkParagraphBuilder(SkParagraphStyle style, sk_sp<SkFontCollection> fontCollection);
 
     ~SkParagraphBuilder();
 
     // Push a style to the stack. The corresponding text added with AddText will
     // use the top-most style.
-    void PushStyle(const SkTextStyle& style);
+    void pushStyle(const SkTextStyle& style);
 
     // Remove a style from the stack. Useful to apply different styles to chunks
     // of text such as bolding.
@@ -49,21 +48,21 @@ class SkParagraphBuilder {
     //
     //   builder.Pop();
     //   builder.AddText(" Back to normal again.");
-    void Pop();
+    void pop();
 
-    SkTextStyle PeekStyle();
+    SkTextStyle peekStyle();
 
     // Adds text to the builder. Forms the proper runs to use the upper-most style
     // on the style_stack_;
-    void AddText(const std::u16string& text);
+    void addText(const std::u16string& text);
 
     // Converts to u16string before adding.
-    void AddText(const std::string& text);
+    void addText(const std::string& text);
 
     // Converts to u16string before adding.
-    void AddText(const char* text);
+    void addText(const char* text);
 
-    void SetParagraphStyle(const SkParagraphStyle& style);
+    void setParagraphStyle(const SkParagraphStyle& style);
 
     // Constructs a SkParagraph object that can be used to layout and paint the text to a SkCanvas.
     std::unique_ptr<SkParagraph> Build();
@@ -72,7 +71,7 @@ class SkParagraphBuilder {
 
     friend class ParagraphTester;
 
-    void EndRunIfNeeded();
+    void endRunIfNeeded();
 
     std::string fUtf8;
     std::stack<SkTextStyle> fTextStyles;

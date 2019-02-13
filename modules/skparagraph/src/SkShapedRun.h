@@ -34,7 +34,7 @@ class SkShapedRun
 
     SkShaper::RunHandler::Buffer newRunBuffer();
 
-    void Paint(SkCanvas* canvas, SkTextStyle style, SkPoint& point);
+    void Paint(SkCanvas* canvas, SkTextStyle style);
 
     size_t size() const
     {
@@ -51,19 +51,19 @@ class SkShapedRun
     inline SkRect rect() { return fRect; }
     inline sk_sp<SkTextBlob> blob() { return fBlob; }
 
-    void shift(SkScalar s) { fShift += s; }
-    void expand(SkScalar s) { fRect.fRight += s; }
+    inline void shift(SkScalar s) { fShift += s; }
+    inline void expand(SkScalar s) { fRect.fRight += s; }
 
   private:
 
-    void PaintShadow(SkCanvas* canvas, SkPoint offset);
+    void paintShadow(SkCanvas* canvas);
+    void paintBackground(SkCanvas* canvas);
+    void paintDecorations(SkCanvas* canvas);
 
-    void PaintBackground(SkCanvas* canvas, SkPoint offset);
-
-    SkScalar ComputeDecorationThickness(SkTextStyle textStyle);
-    SkScalar ComputeDecorationPosition(SkScalar thickness);
-    void ComputeDecorationPaint(SkPaint& paint, SkPath& path, SkScalar width);
-    void PaintDecorations(SkCanvas* canvas, SkPoint offset, SkScalar width);
+    // TODO: This is a poor mimicing of Minikin decorations; needs some work
+    SkScalar computeDecorationThickness(SkTextStyle textStyle);
+    SkScalar computeDecorationPosition(SkScalar thickness);
+    void computeDecorationPaint(SkPaint& paint, SkPath& path);
 
     SkFont fFont;
     SkShaper::RunHandler::RunInfo fInfo;
@@ -71,7 +71,7 @@ class SkShapedRun
     SkSTArray<128, SkPoint, true> fPositions;
 
     SkSpan<const char> fText;
-    SkTextStyle fStyle;
+    SkTextStyle fStyle; // TODO: Either we keep the style here or recompute it at painting
     sk_sp<SkTextBlob> fBlob;
     SkRect fRect;
     SkScalar fShift;

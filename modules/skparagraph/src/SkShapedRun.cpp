@@ -7,17 +7,24 @@
 
 #include "SkShapedRun.h"
 
-SkShapedRun::SkShapedRun(const SkFont& font,
-                     const SkShaper::RunHandler::RunInfo& info,
-                     int glyphCount,
-                     SkSpan<const char> text)
-    : fFont(font), fInfo(info), fGlyphs(glyphCount), fPositions(glyphCount),
-      fText(text), fShift(0) {
+SkShapedRun::SkShapedRun(
+    const SkFont& font,
+    const SkShaper::RunHandler::RunInfo& info,
+    int glyphCount,
+    SkSpan<const char> text)
+    : fFont(font)
+    , fInfo(info)
+    , fGlyphs(glyphCount)
+    , fPositions(glyphCount)
+    , fText(text)
+    , fShift(0) {
+
     fGlyphs.push_back_n(glyphCount);
     fPositions.push_back_n(glyphCount);
 }
 
 void SkShapedRun::finish(SkVector advance, SkScalar width) {
+
     SkTextBlobBuilder builder;
     const auto wordSize = fGlyphs.size();
     const auto& blobBuffer = builder.allocRunPos(fFont, SkToInt(wordSize));
@@ -45,6 +52,7 @@ void SkShapedRun::finish(SkVector advance, SkScalar width) {
 }
 
 SkShaper::RunHandler::Buffer SkShapedRun::newRunBuffer() {
+
     return {
         fGlyphs.data(),
         fPositions.data(),
@@ -52,7 +60,8 @@ SkShaper::RunHandler::Buffer SkShapedRun::newRunBuffer() {
     };
 }
 
-void SkShapedRun::PaintShadow(SkCanvas* canvas, SkPoint offset) {
+void SkShapedRun::paintShadow(SkCanvas* canvas) {
+
     if (fStyle.getShadowNumber() == 0) {
         return;
     }
@@ -70,21 +79,24 @@ void SkShapedRun::PaintShadow(SkCanvas* canvas, SkPoint offset) {
                                                        false));
         }
         canvas->drawTextBlob(fBlob,
-                             offset.x() + shadow.fOffset.x(),
-                             offset.y() + shadow.fOffset.y(),
+                             fShift + shadow.fOffset.x(),
+                             shadow.fOffset.y(),
                              paint);
     }
 }
 
-void SkShapedRun::PaintBackground(SkCanvas* canvas, SkPoint offset) {
+void SkShapedRun::paintBackground(SkCanvas* canvas) {
+
     if (!fStyle.hasBackground()) {
         return;
     }
-    fRect.offset(offset.fY, offset.fY);
+
+    fRect.offset(fShift, 0);
     canvas->drawRect(fRect, fStyle.getBackground());
 }
 
-SkScalar SkShapedRun::ComputeDecorationThickness(SkTextStyle textStyle) {
+SkScalar SkShapedRun::computeDecorationThickness(SkTextStyle textStyle) {
+
     SkScalar thickness = 1.0f;
 
     SkFontMetrics metrics;
@@ -96,15 +108,13 @@ SkScalar SkShapedRun::ComputeDecorationThickness(SkTextStyle textStyle) {
                 thickness = 1.f;
             }
             break;
-        case SkTextDecoration::kOverline:
-            break;
+        case SkTextDecoration::kOverline:break;
         case SkTextDecoration::kLineThrough:
             if (!metrics.hasStrikeoutThickness(&thickness)) {
                 thickness = 1.f;
             }
             break;
-        default:
-            SkASSERT(false);
+        default:SkASSERT(false);
     }
 
     thickness = SkMaxScalar(thickness, textStyle.getFontSize() / 14.f);
@@ -112,7 +122,8 @@ SkScalar SkShapedRun::ComputeDecorationThickness(SkTextStyle textStyle) {
     return thickness * textStyle.getDecorationThicknessMultiplier();
 }
 
-SkScalar SkShapedRun::ComputeDecorationPosition(SkScalar thickness) {
+SkScalar SkShapedRun::computeDecorationPosition(SkScalar thickness) {
+
     SkFontMetrics metrics;
     fStyle.getFontMetrics(metrics);
 
@@ -136,8 +147,7 @@ SkScalar SkShapedRun::ComputeDecorationPosition(SkScalar thickness) {
             }
 
             break;
-        case SkTextDecoration::kOverline:
-            return 0;
+        case SkTextDecoration::kOverline:return 0;
             break;
         case SkTextDecoration::kLineThrough: {
             SkScalar delta = fRect.height()
@@ -146,8 +156,7 @@ SkScalar SkShapedRun::ComputeDecorationPosition(SkScalar thickness) {
                 SkTMax(0.0f, delta) + (metrics.fDescent - metrics.fAscent) / 2;
             break;
         }
-        default:
-            position = 0;
+        default:position = 0;
             SkASSERT(false);
             break;
     }
@@ -155,9 +164,8 @@ SkScalar SkShapedRun::ComputeDecorationPosition(SkScalar thickness) {
     return position;
 }
 
-void SkShapedRun::ComputeDecorationPaint(SkPaint& paint,
-                                       SkPath& path,
-                                       SkScalar width) {
+void SkShapedRun::computeDecorationPaint(SkPaint& paint, SkPath& path) {
+
     paint.setStyle(SkPaint::kStroke_Style);
     if (fStyle.getDecorationColor() == SK_ColorTRANSPARENT) {
         paint.setColor(fStyle.getColor());
@@ -169,11 +177,9 @@ void SkShapedRun::ComputeDecorationPaint(SkPaint& paint,
     SkScalar scaleFactor = fStyle.getFontSize() / 14.f;
 
     switch (fStyle.getDecorationStyle()) {
-        case SkTextDecorationStyle::kSolid:
-            break;
+        case SkTextDecorationStyle::kSolid:break;
 
-        case SkTextDecorationStyle::kDouble:
-            break;
+        case SkTextDecorationStyle::kDouble:break;
 
             // Note: the intervals are scaled by the thickness of the line, so it is
             // possible to change spacing by changing the decoration_thickness
@@ -208,6 +214,7 @@ void SkShapedRun::ComputeDecorationPaint(SkPaint& paint,
             SkScalar wavelength = 2 * scaleFactor;
 
             path.moveTo(0, 0);
+            auto width = fRect.width();
             while (x_start + wavelength * 2 < width) {
                 path.rQuadTo(wavelength,
                              wave_count % 2 != 0 ? wavelength : -wavelength,
@@ -221,30 +228,30 @@ void SkShapedRun::ComputeDecorationPaint(SkPaint& paint,
     }
 }
 
-void
-SkShapedRun::PaintDecorations(SkCanvas* canvas, SkPoint offset, SkScalar width) {
+void SkShapedRun::paintDecorations(SkCanvas* canvas) {
+
     if (fStyle.getDecoration() == SkTextDecoration::kNone) {
         return;
     }
 
     // Decoration thickness
-    SkScalar thickness = ComputeDecorationThickness(fStyle);
+    SkScalar thickness = computeDecorationThickness(fStyle);
 
     // Decoration position
-    SkScalar position = ComputeDecorationPosition(thickness);
+    SkScalar position = computeDecorationPosition(thickness);
 
     // Decoration paint (for now) and/or path
     SkPaint paint;
     SkPath path;
-    ComputeDecorationPaint(paint, path, width);
+    this->computeDecorationPaint(paint, path);
     paint.setStrokeWidth(thickness);
 
     // Draw the decoration
-    SkScalar x = offset.x() + fRect.left() + fShift;
-    SkScalar y = offset.y() + fRect.top() + position;
+    auto width = fRect.width();
+    SkScalar x = fRect.left() + fShift;
+    SkScalar y = fRect.top() + position;
     switch (fStyle.getDecorationStyle()) {
-        case SkTextDecorationStyle::kWavy:
-            path.offset(x, y);
+        case SkTextDecorationStyle::kWavy:path.offset(x, y);
             canvas->drawPath(path, paint);
             break;
         case SkTextDecorationStyle::kDouble: {
@@ -256,18 +263,21 @@ SkShapedRun::PaintDecorations(SkCanvas* canvas, SkPoint offset, SkScalar width) 
         case SkTextDecorationStyle::kDashed:
         case SkTextDecorationStyle::kDotted:
         case SkTextDecorationStyle::kSolid:
-            canvas->drawLine(x, y, x + width, y, paint);
+            canvas->drawLine(x,
+                             y,
+                             x + width,
+                             y,
+                             paint);
             break;
-        default:
-            break;
+        default:break;
     }
 }
 
-void SkShapedRun::Paint(SkCanvas* canvas, SkTextStyle style, SkPoint& point) {
-    SkPoint start = SkPoint::Make(point.x() + fShift, point.y());
+void SkShapedRun::Paint(SkCanvas* canvas, SkTextStyle style) {
+
     fStyle = style;
-    PaintBackground(canvas, start);
-    PaintShadow(canvas, start);
+    this->paintBackground(canvas);
+    this->paintShadow(canvas);
 
     SkPaint paint;
     if (style.hasForeground()) {
@@ -277,7 +287,7 @@ void SkShapedRun::Paint(SkCanvas* canvas, SkTextStyle style, SkPoint& point) {
         paint.setColor(style.getColor());
     }
     paint.setAntiAlias(true);
-    canvas->drawTextBlob(fBlob, start.x(), start.y(), paint);
+    canvas->drawTextBlob(fBlob, fShift, 0, paint);
 
-    PaintDecorations(canvas, start, fRect.width());
+    this->paintDecorations(canvas);
 }

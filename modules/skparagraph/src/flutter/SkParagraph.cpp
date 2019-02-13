@@ -10,80 +10,47 @@
 #include "flutter/SkParagraph.h"
 #include "SkPictureRecorder.h"
 
-void printText(const std::string& label,
-               const UChar* text,
-               size_t start,
-               size_t end) {
-    icu::UnicodeString utf16 = icu::UnicodeString(text + start, end - start);
-    std::string str;
-    utf16.toUTF8String(str);
-    SkDebugf("%s: %d:%d'%s'\n", label.c_str(), start, end, str.c_str());
-}
-
 SkParagraph::SkParagraph(const std::string& text,
-                         SkParagraphStyle style,
-                         std::vector<Block> blocks)
-    : fParagraphStyle(style), _fUtf8(text.data(), text.size()), fPicture(nullptr) {
+    SkParagraphStyle style,
+    std::vector<Block> blocks)
+    : fParagraphStyle(style), fUtf8(text.data(), text.size()), fPicture(nullptr) {
+
     std::transform(blocks.cbegin(),
                    blocks.cend(),
                    std::back_inserter(fTextStyles),
                    [this](const Block& value) {
-                       return StyledText(SkSpan<const char>(
-                           _fUtf8.begin() + value.start,
-                           value.end - value.start), value.textStyle);
+                     return StyledText(SkSpan<const char>(
+                         fUtf8.begin() + value.fStart,
+                         value.fEnd - value.fStart), value.fStyle);
                    });
 }
 
 SkParagraph::SkParagraph(const std::u16string& utf16text,
-                         SkParagraphStyle style,
-                         std::vector<Block> blocks)
+    SkParagraphStyle style,
+    std::vector<Block> blocks)
     : fParagraphStyle(style), fPicture(nullptr) {
+
     icu::UnicodeString unicode((UChar*) utf16text.data(), utf16text.size());
     std::string str;
     unicode.toUTF8String(str);
-    _fUtf8 = SkSpan<const char>(str.data(), str.size());
+    fUtf8 = SkSpan<const char>(str.data(), str.size());
 
     std::transform(blocks.cbegin(),
                    blocks.cend(),
                    std::back_inserter(fTextStyles),
                    [this](const Block& value) {
-                       return StyledText(SkSpan<const char>(
-                           _fUtf8.begin() + value.start,
-                           value.end - value.start), value.textStyle);
+                     return StyledText(SkSpan<const char>(
+                         fUtf8.begin() + value.fStart,
+                         value.fEnd - value.fStart), value.fStyle);
                    });
 }
 
 SkParagraph::~SkParagraph() = default;
 
-double SkParagraph::GetMaxWidth() {
-    return SkScalarToDouble(fWidth);
-}
-
-double SkParagraph::GetHeight() {
-    return SkScalarToDouble(fHeight);
-}
-
-double SkParagraph::GetMinIntrinsicWidth() {
-    return SkScalarToDouble(fWidth/*_minIntrinsicWidth*/);
-}
-
-double SkParagraph::GetMaxIntrinsicWidth() {
-    return SkScalarToDouble(fWidth /*_maxIntrinsicWidth*/);
-}
-
-double SkParagraph::GetAlphabeticBaseline() {
-    return SkScalarToDouble(fAlphabeticBaseline);
-}
-
-double SkParagraph::GetIdeographicBaseline() {
-    // TODO: implement
-    return SkScalarToDouble(fIdeographicBaseline);
-}
-
-bool SkParagraph::Layout(double doubleWidth) {
+bool SkParagraph::layout(double doubleWidth) {
 
     // Break the text into lines (with each one broken into blocks by style)
-    BreakTextIntoParagraphs();
+    this->breakTextIntoParagraphs();
 
     // Collect Flutter values
     fAlphabeticBaseline = 0;
@@ -126,19 +93,19 @@ bool SkParagraph::Layout(double doubleWidth) {
             SkMaxScalar(fMinIntrinsicWidth, paragraph.minIntrinsicWidth());
     }
 
-    RecordPicture();
+    this->recordPicture();
 
     return true;
 }
 
-void SkParagraph::Paint(SkCanvas* canvas, double x, double y) const {
+void SkParagraph::paint(SkCanvas* canvas, double x, double y) const {
 
-    SkMatrix
-        matrix = SkMatrix::MakeTrans(SkDoubleToScalar(x), SkDoubleToScalar(y));
+    SkMatrix matrix =
+        SkMatrix::MakeTrans(SkDoubleToScalar(x), SkDoubleToScalar(y));
     canvas->drawPicture(fPicture, &matrix, nullptr);
 }
 
-void SkParagraph::RecordPicture() {
+void SkParagraph::recordPicture() {
 
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
@@ -154,7 +121,7 @@ void SkParagraph::RecordPicture() {
     fPicture = recorder.finishRecordingAsPicture();
 }
 
-void SkParagraph::BreakTextIntoParagraphs() {
+void SkParagraph::breakTextIntoParagraphs() {
 
     fParagraphs.clear();
 
@@ -167,7 +134,7 @@ void SkParagraph::BreakTextIntoParagraphs() {
     }
 
     UText utf8UText = UTEXT_INITIALIZER;
-    utext_openUTF8(&utf8UText, _fUtf8.begin(), _fUtf8.size(), &status);
+    utext_openUTF8(&utf8UText, fUtf8.begin(), fUtf8.size(), &status);
     std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>>
         autoClose(&utf8UText);
     if (U_FAILURE(status)) {
@@ -182,8 +149,8 @@ void SkParagraph::BreakTextIntoParagraphs() {
         return;
     }
 
-    auto firstChar = (int32_t) _fUtf8.size();
-    auto lastChar = (int32_t) _fUtf8.size();
+    auto firstChar = (int32_t) fUtf8.size();
+    auto lastChar = (int32_t) fUtf8.size();
 
     size_t firstStyle = fTextStyles.size() - 1;
     while (lastChar > 0) {
@@ -203,7 +170,7 @@ void SkParagraph::BreakTextIntoParagraphs() {
         // TODO: since Flutter is using a space character to measure things;
         // TODO: need to fix it later
         while (lastChar > firstChar) {
-            int32_t character = *(_fUtf8.begin() + lastChar - 1);
+            int32_t character = *(fUtf8.begin() + lastChar - 1);
             if (!u_isWhitespace(character)) {
                 break;
             }
@@ -212,13 +179,15 @@ void SkParagraph::BreakTextIntoParagraphs() {
 
         // Find the first style that is related to the line
         while (firstStyle > 0
-            && fTextStyles[firstStyle].fText.begin() > _fUtf8.begin() + firstChar) {
+            && fTextStyles[firstStyle].fText.begin()
+                > fUtf8.begin() + firstChar) {
             --firstStyle;
         }
 
         size_t lastStyle = firstStyle;
         while (lastStyle != fTextStyles.size()
-            && fTextStyles[lastStyle].fText.begin() < _fUtf8.begin() + lastChar) {
+            && fTextStyles[lastStyle].fText.begin()
+                < fUtf8.begin() + lastChar) {
             ++lastStyle;
         }
 
@@ -228,11 +197,11 @@ void SkParagraph::BreakTextIntoParagraphs() {
         for (auto s = firstStyle; s < lastStyle; ++s) {
             auto& style = fTextStyles[s];
 
-            auto start = SkTMax((int32_t) (style.fText.begin() - _fUtf8.begin()),
+            auto start = SkTMax((int32_t) (style.fText.begin() - fUtf8.begin()),
                                 firstChar);
             auto end =
-                SkTMin((int32_t) (style.fText.end() - _fUtf8.begin()), lastChar);
-            styles.emplace_back(SkSpan<const char>(_fUtf8.begin() + start,
+                SkTMin((int32_t) (style.fText.end() - fUtf8.begin()), lastChar);
+            styles.emplace_back(SkSpan<const char>(fUtf8.begin() + start,
                                                    end - start),
                                 style.fStyle);
         }
@@ -255,15 +224,16 @@ void SkParagraph::BreakTextIntoParagraphs() {
 }
 
 // TODO: implement properly (currently it only works as an indicator that something changed in the text)
-std::vector<SkTextBox> SkParagraph::GetRectsForRange(
+std::vector<SkTextBox> SkParagraph::getRectsForRange(
     unsigned start,
     unsigned end,
     RectHeightStyle rectHeightStyle,
     RectWidthStyle rectWidthStyle) {
+
     std::vector<SkTextBox> result;
     for (auto& paragraph : fParagraphs) {
-        paragraph.GetRectsForRange(_fUtf8.begin() + start,
-                                   _fUtf8.begin() + end,
+        paragraph.GetRectsForRange(fUtf8.begin() + start,
+                                   fUtf8.begin() + end,
                                    result);
     }
 
@@ -271,15 +241,13 @@ std::vector<SkTextBox> SkParagraph::GetRectsForRange(
 }
 
 SkPositionWithAffinity
-SkParagraph::GetGlyphPositionAtCoordinate(double dx, double dy) const {
+SkParagraph::getGlyphPositionAtCoordinate(double dx, double dy) const {
     // TODO: implement
-    //SkASSERT(false);
     return SkPositionWithAffinity(0, Affinity::UPSTREAM);
 }
 
-SkRange<size_t> SkParagraph::GetWordBoundary(unsigned offset) {
+SkRange<size_t> SkParagraph::getWordBoundary(unsigned offset) {
     // TODO: implement
-    SkASSERT(false);
     SkRange<size_t> result;
     return result;
 }

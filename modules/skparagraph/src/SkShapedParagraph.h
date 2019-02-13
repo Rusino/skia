@@ -12,13 +12,13 @@
 #include "SkColor.h"
 #include "SkCanvas.h"
 #include "SkFontMetrics.h"
+#include "SkDashPathEffect.h"
+#include "SkDiscretePathEffect.h"
+#include "SkParagraphStyle.h"
 #include "SkShaper.h"
 #include "SkSpan.h"
 #include "SkTextStyle.h"
-#include "SkParagraphStyle.h"
 #include "SkTextBlobPriv.h"
-#include "SkDashPathEffect.h"
-#include "SkDiscretePathEffect.h"
 #include "SkShapedRun.h"
 #include "SkShapedLine.h"
 
@@ -29,6 +29,7 @@ struct StyledText {
         : fText(text), fStyle(style) {}
 
     bool operator==(const StyledText& rhs) const {
+
         return fText.begin() == rhs.fText.begin() &&
             fText.end() == rhs.fText.end() && // TODO: Can we have == on SkSpan?
             fStyle == rhs.fStyle;
@@ -55,24 +56,30 @@ class SkShapedParagraph final : SkShaper::RunHandler {
     SkScalar maxIntrinsicWidth() { return fMaxIntrinsicWidth; }
     SkScalar minIntrinsicWidth() { return fMinIntrinsicWidth; }
 
-    void GetRectsForRange(const char* start,
-                          const char* end,
-                          std::vector<SkTextBox>& result);
+    void GetRectsForRange(
+        const char* start,
+        const char* end,
+        std::vector<SkTextBox>& result);
 
     size_t lineNumber() const { return fLines.size(); }
 
   private:
 
+    typedef SkShaper::RunHandler INHERITED;
+
     // SkShaper::RunHandler interface
-    SkShaper::RunHandler::Buffer newRunBuffer(const RunInfo& info,
-                                              const SkFont& font,
-                                              int glyphCount,
-                                              SkSpan<const char> utf8) override {
+    SkShaper::RunHandler::Buffer newRunBuffer(
+        const RunInfo& info,
+        const SkFont& font,
+        int glyphCount,
+        SkSpan<const char> utf8) override {
+
         auto& word = fLines.back().addWord(font, info, glyphCount, utf8);
         return word.newRunBuffer();
     }
 
     void commitRun(SkScalar width) override {
+
         auto& line = fLines.back();   // Last line
         auto& word = line.lastWord(); // Last word
 
@@ -104,7 +111,7 @@ class SkShapedParagraph final : SkShaper::RunHandler {
     void printBlocks(size_t linenum);
 
     // Constrains
-    size_t _maxLines;
+    size_t fMaxLines;
 
     // Input
     SkParagraphStyle fParagraphStyle;

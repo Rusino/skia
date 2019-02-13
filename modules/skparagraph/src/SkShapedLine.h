@@ -9,23 +9,22 @@
 
 #include "SkShapedRun.h"
 
-class SkShapedLine
-{
+class SkShapedLine {
   public:
-    SkShapedLine()
-    {
+    SkShapedLine() {
+
         fAdvance = SkVector::Make(0, 0);
     }
 
-    void update()
-    {
+    void update() {
+
         auto& word = fRuns.back();
 
         fAdvance.fX += word.advance().fX;
     }
 
-    void finish()
-    {
+    void finish() {
+
         if (!fRuns.empty()) {
             auto& run = fRuns.front();
             fAdvance.fY = (run.descent() + run.leading() - run.ascent());
@@ -33,10 +32,10 @@ class SkShapedLine
     }
 
     SkShapedRun& addWord(const SkFont& font,
-                       const SkShaper::RunHandler::RunInfo& info,
-                       int glyphCount,
-                       SkSpan<const char> text)
-    {
+        const SkShaper::RunHandler::RunInfo& info,
+        int glyphCount,
+        SkSpan<const char> text) {
+
         return fRuns.emplace_back(font, info, glyphCount, text);
     }
 

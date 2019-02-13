@@ -25,9 +25,9 @@ skparagraph_sources = [
             "$_src/flutter/SkFontCollection.cpp",
             "$_src/flutter/SkParagraph.cpp",
             "$_src/flutter/SkParagraphBuilder.cpp",
-            "$_src/flutter/SkParagraphStyle.cpp",
             "$_src/flutter/SkTextShadow.cpp",
-            "$_src/flutter/SkTextStyle.cpp",
+            "$_src/SkParagraphStyle.cpp",
+            "$_src/SkTextStyle.cpp",
             "$_src/SkShapedParagraph.cpp",
             "$_src/SkShapedRun.cpp",
           ]
