@@ -32,18 +32,18 @@
 bool SkFontCollection::FamilyKey::operator==(
     const SkFontCollection::FamilyKey& other) const {
 
-    return font_family == other.font_family &&
-        locale == other.locale &&
-        font_style == other.font_style;
+    return fFontFamily == other.fFontFamily &&
+        fLocale == other.fLocale &&
+        fFontStyle == other.fFontStyle;
 }
 
 size_t SkFontCollection::FamilyKey::Hasher::operator()(
     const SkFontCollection::FamilyKey& key) const {
 
-    return std::hash<std::string>()(key.font_family) ^
-        std::hash<std::string>()(key.locale) ^
-        std::hash<uint32_t>()(key.font_style.weight()) ^
-        std::hash<uint32_t>()(key.font_style.slant());
+    return std::hash<std::string>()(key.fFontFamily) ^
+        std::hash<std::string>()(key.fLocale) ^
+        std::hash<uint32_t>()(key.fFontStyle.weight()) ^
+        std::hash<uint32_t>()(key.fFontStyle.slant());
 }
 
 SkFontCollection::SkFontCollection()

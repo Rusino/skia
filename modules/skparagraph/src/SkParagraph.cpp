@@ -15,6 +15,8 @@ SkParagraph::SkParagraph(const std::string& text,
     std::vector<Block> blocks)
     : fParagraphStyle(style), fUtf8(text.data(), text.size()), fPicture(nullptr) {
 
+    fOldDoubleWidth = 0;
+
     std::transform(blocks.cbegin(),
                    blocks.cend(),
                    std::back_inserter(fTextStyles),
@@ -48,6 +50,10 @@ SkParagraph::SkParagraph(const std::u16string& utf16text,
 SkParagraph::~SkParagraph() = default;
 
 bool SkParagraph::layout(double doubleWidth) {
+
+    if (doubleWidth == fOldDoubleWidth) {
+        SkDebugf("************************* Layout with the same width: %f\n", SkDoubleToScalar(fOldDoubleWidth));
+    }
 
     // Break the text into lines (with each one broken into blocks by style)
     this->breakTextIntoParagraphs();

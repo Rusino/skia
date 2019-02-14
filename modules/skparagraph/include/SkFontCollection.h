@@ -53,13 +53,13 @@ class SkFontCollection : public SkRefCnt {
         FamilyKey(const std::string& family,
             const std::string& loc,
             SkFontStyle style)
-            : font_family(family), locale(loc), font_style(style) {}
+            : fFontFamily(family), fLocale(loc), fFontStyle(style) {}
 
         FamilyKey() {}
 
-        std::string font_family;
-        std::string locale;
-        SkFontStyle font_style;
+        std::string fFontFamily;
+        std::string fLocale;
+        SkFontStyle fFontStyle;
 
         bool operator==(const FamilyKey& other) const;
 

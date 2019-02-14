@@ -72,6 +72,8 @@ class SkParagraph {
 
     friend class ParagraphTester;
 
+    double fOldDoubleWidth;
+
     // Record a picture drawing all small text blobs
     void recordPicture();
 
