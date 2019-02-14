@@ -210,6 +210,7 @@ private:
     size_t   fIncrDecRowBytes;
 
     std::unique_ptr<SkSwizzler> fSwizzler;
+    int                         fScaledHeight;
     SkPMColor                   fColorTable[256];
     bool                        fColorTableFilled;
 
@@ -330,6 +331,7 @@ SkWuffsCodec::SkWuffsCodec(SkEncodedInfo&&                                      
       fIncrDecDst(nullptr),
       fIncrDecRowBytes(0),
       fSwizzler(nullptr),
+      fScaledHeight(0),
       fColorTableFilled(false),
       fNumFullyReceivedFrames(0),
       fFramesComplete(false),
@@ -392,6 +394,7 @@ SkCodec::Result SkWuffsCodec::onStartIncrementalDecode(const SkImageInfo&      d
 
     fSpySampler.reset();
     fSwizzler = nullptr;
+    fScaledHeight = 0;
     fColorTableFilled = false;
 
     const char* status = this->decodeFrameConfig();
@@ -464,7 +467,6 @@ SkCodec::Result SkWuffsCodec::onIncrementalDecode(int* rowsDecoded) {
     // In Wuffs, a paletted image is always 1 byte per pixel.
     static constexpr size_t src_bpp = 1;
     wuffs_base__table_u8 pixels = fPixelBuffer.plane(0);
-    int scaledHeight = dstInfo().height();
     wuffs_base__rect_ie_u32 frame_rect = fFrameConfig.bounds();
     wuffs_base__rect_ie_u32 dirty_rect = fDecoder->frame_dirty_rect();
     if (!fSwizzler) {
@@ -474,14 +476,17 @@ SkCodec::Result SkWuffsCodec::onIncrementalDecode(int* rowsDecoded) {
                                      this->options(), &bounds);
         fSwizzler->setSampleX(fSpySampler.sampleX());
         fSwizzler->setSampleY(fSpySampler.sampleY());
-        scaledHeight = get_scaled_dimension(dstInfo().height(), fSpySampler.sampleY());
+        fScaledHeight = get_scaled_dimension(dstInfo().height(), fSpySampler.sampleY());
 
         // If the frame rect does not fill the output, ensure that those pixels are not
         // left uninitialized.
         if (independent && (bounds != this->bounds() || dirty_rect.is_empty())) {
-            auto fillInfo = dstInfo().makeWH(fSwizzler->fillWidth(), scaledHeight);
+            auto fillInfo = dstInfo().makeWH(fSwizzler->fillWidth(), fScaledHeight);
             SkSampler::Fill(fillInfo, fIncrDecDst, fIncrDecRowBytes, options().fZeroInitialized);
         }
+    }
+    if (fScaledHeight == 0) {
+        return SkCodec::kInternalError;
     }
 
     // The semantics of *rowsDecoded is: say you have a 10 pixel high image
@@ -499,10 +504,10 @@ SkCodec::Result SkWuffsCodec::onIncrementalDecode(int* rowsDecoded) {
     // do anything.
     //
     // Similarly, if the output is scaled, we zero-initialized all
-    // |scaledHeight| rows (the scaled image height), so we inform the caller
+    // |fScaledHeight| rows (the scaled image height), so we inform the caller
     // that it doesn't need to do anything.
     if (rowsDecoded) {
-        *rowsDecoded = scaledHeight;
+        *rowsDecoded = fScaledHeight;
     }
 
     // If the frame's dirty rect is empty, no need to swizzle.
@@ -530,7 +535,7 @@ SkCodec::Result SkWuffsCodec::onIncrementalDecode(int* rowsDecoded) {
                     continue;
                 }
                 dstY /= sampleY;
-                if (dstY >= scaledHeight) {
+                if (dstY >= fScaledHeight) {
                     break;
                 }
             }
