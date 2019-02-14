@@ -548,20 +548,18 @@ class ParagraphView : public Sample {
     };
     std::vector<std::string> very_long = { "A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text" };
     //drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-    drawText(canvas, this->width(), this->height(), text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
-    /*
-    SkScalar height = this->height() / 4;
+
+    SkScalar width = this->width() / 4;
+    SkScalar height = this->height();
     std::string line = "Hesitation is always easy rarely useful.";
     std::string str(gText);
-    drawLine(canvas, this->width(), height, str, SkTextAlign::left);
-    canvas->translate(0, height);
-    drawLine(canvas, this->width(), height, str, SkTextAlign::right);
-    canvas->translate(0, height);
-    drawLine(canvas, this->width(), height, str, SkTextAlign::center);
-    canvas->translate(0, height);
-    drawLine(canvas, this->width(), height, str, SkTextAlign::justify);
-    */
-    //drawCode(canvas, width(), height());
+    drawLine(canvas, width, height, str, SkTextAlign::center);
+    canvas->translate(width, 0);
+    drawText(canvas, width, height, text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
+    canvas->translate(width, 0);
+    drawCode(canvas, width, height);
+    canvas->translate(width, 0);
+    drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
   }
 
  private:

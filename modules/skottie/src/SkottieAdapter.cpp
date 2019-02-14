@@ -343,7 +343,7 @@ sk_sp<SkTextBlob> TextAdapter::makeBlob() const {
             };
         }
 
-        void commitRun(SkScalar) override { }
+        void commitRun() override { }
 
         void commitLine() override {
             SkScalar line_spacing = 0;

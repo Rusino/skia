@@ -76,9 +76,10 @@ void SkShapedParagraph::layout(SkScalar maxWidth, size_t maxLines) {
             if (fIterator == fLast) {
                 return;
             }
-            // This is a semi-solution allows flutter to run correctly:
-            // we break runs on every style change even if the font is still the same
-            ++fNext;
+            auto nextTypeface = fNext->fStyle.getTypeface();
+            while (fNext != fLast && fNext->fStyle.getTypeface() == nextTypeface) {
+                ++fNext;
+            }
         }
 
       private:
@@ -221,20 +222,23 @@ void SkShapedParagraph::format(SkScalar maxWidth) {
 // TODO: currently we pick the first style of the run and go with it regardless
 void SkShapedParagraph::paint(SkCanvas* textCanvas) {
 
-    auto styleIter = fTextStyles.begin();
+    auto styleBegin = fTextStyles.begin();
     for (auto& line : fLines) {
         for (auto word : line.words()) {
 
             // Find the first style that affects the run
-            while (styleIter != fTextStyles.end()
-                && styleIter->fText.begin() < word.text().begin()) {
-                ++styleIter;
+            while (styleBegin != fTextStyles.end()
+                && styleBegin->fText.begin() < word.text().begin()) {
+                ++styleBegin;
             }
 
-            word.Paint(textCanvas,
-                       styleIter == fTextStyles.end()
-                       ? fParagraphStyle.getTextStyle()
-                       : styleIter->fStyle);
+            auto styleEnd = styleBegin;
+            while (styleEnd != fTextStyles.end()
+                && styleEnd->fText.begin() < word.text().end()) {
+                ++styleEnd;
+            }
+
+            word.Paint(textCanvas, styleBegin, styleEnd);
         }
     }
 }

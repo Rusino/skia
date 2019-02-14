@@ -22,22 +22,6 @@
 #include "SkShapedRun.h"
 #include "SkShapedLine.h"
 
-// Comes from the paragraph
-struct StyledText {
-
-    StyledText(SkSpan<const char> text, SkTextStyle style)
-        : fText(text), fStyle(style) {}
-
-    bool operator==(const StyledText& rhs) const {
-
-        return fText.begin() == rhs.fText.begin() &&
-            fText.end() == rhs.fText.end() && // TODO: Can we have == on SkSpan?
-            fStyle == rhs.fStyle;
-    }
-    SkSpan<const char> fText;
-    SkTextStyle fStyle;
-};
-
 class SkShapedParagraph final : SkShaper::RunHandler {
   public:
 
@@ -78,13 +62,13 @@ class SkShapedParagraph final : SkShaper::RunHandler {
         return word.newRunBuffer();
     }
 
-    void commitRun(SkScalar width) override {
+    void commitRun() override {
 
         auto& line = fLines.back();   // Last line
         auto& word = line.lastWord(); // Last word
 
         // Finish the word
-        word.finish(line.advance(), width);
+        word.finish(line.advance(), word.advance().fX);
 
         // Update the line stats
         line.update();

@@ -475,7 +475,6 @@ static void append(SkShaper::RunHandler* handler, const SkShaper::RunHandler::Ru
     SkASSERT(buffer.glyphs);
     SkASSERT(buffer.positions);
 
-    SkScalar glyphStart = p->fX;
     for (unsigned i = 0; i < len; i++) {
         // Glyphs are in logical order, but output ltr since PDF readers seem to expect that.
         const ShapedGlyph& glyph = run.fGlyphs[is_LTR(run.fLevel) ? start + i : end - 1 - i];
@@ -487,7 +486,7 @@ static void append(SkShaper::RunHandler* handler, const SkShaper::RunHandler::Ru
         p->fX += glyph.fAdvance.fX;
         p->fY += glyph.fAdvance.fY;
     }
-    handler->commitRun(p->fX - glyphStart);
+    handler->commitRun();
 }
 
 static void emit(const ShapedLine& line, SkShaper::RunHandler* handler,

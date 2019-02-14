@@ -68,7 +68,7 @@ public:
                                     SkSpan<const char> utf8) = 0;
 
         // Called after run information is filled out.
-        virtual void commitRun(SkScalar) = 0;
+        virtual void commitRun() = 0;
         // Callback per line.
         virtual void commitLine() = 0;
     };
@@ -108,7 +108,7 @@ public:
     sk_sp<SkTextBlob> makeBlob();
 
     SkShaper::RunHandler::Buffer newRunBuffer(const RunInfo&, const SkFont&, int, SkSpan<const char>) override;
-    void commitRun(SkScalar) override;
+    void commitRun() override;
     void commitLine() override {}
 
 private:

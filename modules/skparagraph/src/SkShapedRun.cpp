@@ -16,17 +16,20 @@ SkShapedRun::SkShapedRun(
     , fInfo(info)
     , fGlyphs(glyphCount)
     , fPositions(glyphCount)
+    , fClusters(glyphCount)
     , fText(text)
     , fShift(0) {
 
     fGlyphs.push_back_n(glyphCount);
     fPositions.push_back_n(glyphCount);
+    fClusters.push_back_n(glyphCount);
 }
 
 void SkShapedRun::finish(SkVector advance, SkScalar width) {
 
-    SkTextBlobBuilder builder;
     const auto wordSize = fGlyphs.size();
+    /*
+    SkTextBlobBuilder builder;
     const auto& blobBuffer = builder.allocRunPos(fFont, SkToInt(wordSize));
 
     sk_careful_memcpy(blobBuffer.glyphs,
@@ -37,9 +40,8 @@ void SkShapedRun::finish(SkVector advance, SkScalar width) {
         blobBuffer.points()[i] = fPositions[SkToInt(i)];
     }
 
-    fInfo.fAdvance.fX = width;
     fBlob = builder.make();
-
+    */
     SkVector runAdvance = advance;
     if (wordSize > 0) {
         runAdvance = fPositions[0];
@@ -56,8 +58,48 @@ SkShaper::RunHandler::Buffer SkShapedRun::newRunBuffer() {
     return {
         fGlyphs.data(),
         fPositions.data(),
-        nullptr
+        fClusters.data()
     };
+}
+
+std::unique_ptr<SkShapedRun> SkShapedRun::applyStyle(SkSpan<const char> limit, const SkTextStyle& style) {
+
+    SkRect rect = fRect;
+    // Start from the simple case: the entire run is covered by one style
+    auto gStart = size_t(0);
+    auto gEnd = fGlyphs.size();
+
+    if (text().begin() < limit.begin() || text().end() > limit.end()) {
+        // Cut the part of the run and apply the style to the part
+        auto cStart = SkTMax(text().begin(), limit.begin()) - text().begin();
+        auto cEnd = SkTMin(text().end(), limit.end()) - text().begin();
+
+        while (gStart < gEnd && fClusters[gStart] < cStart) {
+            ++gStart;
+        }
+
+        while (gEnd > gStart && fClusters[gEnd - 1] > cEnd) {
+            --gEnd;
+        }
+        // Recalculate the rect
+        rect.fLeft = gStart == gEnd ? fRect.fRight : fPositions[gStart].fX;
+        if (gEnd != fGlyphs.size()) {
+            rect.fRight = fPositions[gEnd].fX;
+        }
+    }
+
+    SkTextBlobBuilder builder;
+    const auto& blobBuffer = builder.allocRunPos(fFont, SkToInt(gEnd - gStart));
+
+    sk_careful_memcpy(blobBuffer.glyphs,
+                      fGlyphs.data() + gStart,
+                      (gEnd - gStart) * sizeof(SkGlyphID));
+
+    for (size_t i = gStart; i < gEnd; ++i) {
+        blobBuffer.points()[i - gStart] = fPositions[SkToInt(i)];
+    }
+
+    return std::make_unique<SkShapedRun>(builder.make(), rect, fShift, style);
 }
 
 void SkShapedRun::paintShadow(SkCanvas* canvas) {
@@ -234,19 +276,19 @@ void SkShapedRun::paintDecorations(SkCanvas* canvas) {
         return;
     }
 
-    // Decoration thickness
+// Decoration thickness
     SkScalar thickness = computeDecorationThickness(fStyle);
 
-    // Decoration position
+// Decoration position
     SkScalar position = computeDecorationPosition(thickness);
 
-    // Decoration paint (for now) and/or path
+// Decoration paint (for now) and/or path
     SkPaint paint;
     SkPath path;
     this->computeDecorationPaint(paint, path);
     paint.setStrokeWidth(thickness);
 
-    // Draw the decoration
+// Draw the decoration
     auto width = fRect.width();
     SkScalar x = fRect.left() + fShift;
     SkScalar y = fRect.top() + position;
@@ -273,21 +315,29 @@ void SkShapedRun::paintDecorations(SkCanvas* canvas) {
     }
 }
 
-void SkShapedRun::Paint(SkCanvas* canvas, SkTextStyle style) {
+void SkShapedRun::Paint(
+    SkCanvas* canvas,
+    std::vector<StyledText>::iterator begin,
+    std::vector<StyledText>::iterator end) {
 
-    fStyle = style;
-    this->paintBackground(canvas);
-    this->paintShadow(canvas);
+    for (auto& iter = begin; iter != end; ++iter) {
 
-    SkPaint paint;
-    if (style.hasForeground()) {
-        paint = style.getForeground();
-    } else {
-        paint.reset();
-        paint.setColor(style.getColor());
+        auto style = iter->fStyle;
+        auto part = this->applyStyle(iter->fText, iter->fStyle);
+
+        part->paintBackground(canvas);
+        part->paintShadow(canvas);
+
+        SkPaint paint;
+        if (style.hasForeground()) {
+            paint = style.getForeground();
+        } else {
+            paint.reset();
+            paint.setColor(style.getColor());
+        }
+        paint.setAntiAlias(true);
+        canvas->drawTextBlob(part->fBlob, part->fShift, 0, paint);
+
+        part->paintDecorations(canvas);
     }
-    paint.setAntiAlias(true);
-    canvas->drawTextBlob(fBlob, fShift, 0, paint);
-
-    this->paintDecorations(canvas);
 }

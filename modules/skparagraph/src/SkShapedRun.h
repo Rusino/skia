@@ -30,11 +30,23 @@ class SkShapedRun
               int glyphCount,
               SkSpan<const char> text);
 
+    SkShapedRun(sk_sp<SkTextBlob> blob, SkRect rect, SkScalar shift, const SkTextStyle& style) {
+        fBlob = blob;
+        fRect = rect;
+        fShift = shift;
+        fStyle = style;
+    }
+
     void finish(SkVector advance, SkScalar width);
+
+    std::unique_ptr<SkShapedRun> applyStyle(SkSpan<const char> limit, const SkTextStyle& style);
 
     SkShaper::RunHandler::Buffer newRunBuffer();
 
-    void Paint(SkCanvas* canvas, SkTextStyle style);
+    void Paint(
+        SkCanvas* canvas,
+        std::vector<StyledText>::iterator begin,
+        std::vector<StyledText>::iterator end);
 
     size_t size() const
     {
@@ -69,6 +81,7 @@ class SkShapedRun
     SkShaper::RunHandler::RunInfo fInfo;
     SkSTArray<128, SkGlyphID, true> fGlyphs;
     SkSTArray<128, SkPoint, true> fPositions;
+    SkSTArray<128, uint32_t, true> fClusters;
 
     SkSpan<const char> fText;
     SkTextStyle fStyle; // TODO: Either we keep the style here or recompute it at painting
