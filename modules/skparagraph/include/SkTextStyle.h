@@ -24,7 +24,7 @@
 #include "SkColor.h"
 #include "SkPaint.h"
 #include "SkFont.h"
-#include "SkSpan.h"
+#include "../../../src/core/SkSpan.h"
 
 // Multiple decorations can be applied at once. Ex: Underline and overline is
 // (0x1 | 0x2)

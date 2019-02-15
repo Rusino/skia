@@ -71,8 +71,8 @@ std::unique_ptr<SkShapedRun> SkShapedRun::applyStyle(SkSpan<const char> limit, c
 
     if (text().begin() < limit.begin() || text().end() > limit.end()) {
         // Cut the part of the run and apply the style to the part
-        auto cStart = SkTMax(text().begin(), limit.begin()) - text().begin();
-        auto cEnd = SkTMin(text().end(), limit.end()) - text().begin();
+        uint32_t cStart = SkTMax(text().begin(), limit.begin()) - text().begin();
+        uint32_t cEnd = SkTMin(text().end(), limit.end()) - text().begin();
 
         while (gStart < gEnd && fClusters[gStart] < cStart) {
             ++gStart;

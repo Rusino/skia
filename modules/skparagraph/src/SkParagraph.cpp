@@ -15,8 +15,6 @@ SkParagraph::SkParagraph(const std::string& text,
     std::vector<Block> blocks)
     : fParagraphStyle(style), fUtf8(text.data(), text.size()), fPicture(nullptr) {
 
-    fOldDoubleWidth = 0;
-
     std::transform(blocks.cbegin(),
                    blocks.cend(),
                    std::back_inserter(fTextStyles),
@@ -49,14 +47,23 @@ SkParagraph::SkParagraph(const std::u16string& utf16text,
 
 SkParagraph::~SkParagraph() = default;
 
+// TODO: optimize for intrinsic widths
 bool SkParagraph::layout(double doubleWidth) {
 
-    if (doubleWidth == fOldDoubleWidth) {
-        SkDebugf("************************* Layout with the same width: %f\n", SkDoubleToScalar(fOldDoubleWidth));
+    auto width = SkDoubleToScalar(doubleWidth);
+    if (width == std::ceil(fMaxLineWidth)) {
+        SkDebugf("******* Optimization: no reshaping with %f\n", width);
+        // It's been broken by lines and shaped already and is not going to change
+        for (auto& paragraph : fParagraphs) {
+            paragraph.format(width);
+        }
+        return true;
     }
 
-    // Break the text into lines (with each one broken into blocks by style)
-    this->breakTextIntoParagraphs();
+    if (fParagraphs.empty()) {
+        // Break the text into lines (with each one broken into blocks by style)
+        this->breakTextIntoParagraphs();
+    }
 
     // Collect Flutter values
     fAlphabeticBaseline = 0;
@@ -66,8 +73,7 @@ bool SkParagraph::layout(double doubleWidth) {
     fMaxIntrinsicWidth = 0;
     fMinIntrinsicWidth = 0;
     fLinesNumber = 0;
-
-    auto width = SkDoubleToScalar(doubleWidth);
+    fMaxLineWidth = 0;
 
     // Take care of line limitation across all the paragraphs
     size_t maxLines = fParagraphStyle.getMaxLines();
@@ -85,12 +91,14 @@ bool SkParagraph::layout(double doubleWidth) {
             break;
         }
 
+        fMaxLineWidth = SkMaxScalar(fMaxLineWidth, paragraph.width());
+
         // Format
         paragraph.format(width);
 
         // Get the stats
-        fAlphabeticBaseline = 0;
-        fIdeographicBaseline = 0;
+        fAlphabeticBaseline = paragraph.alphabeticBaseline();
+        fIdeographicBaseline = paragraph.ideographicBaseline();
         fHeight += paragraph.height();
         fWidth = SkMaxScalar(fWidth, paragraph.width());
         fMaxIntrinsicWidth =
@@ -99,12 +107,17 @@ bool SkParagraph::layout(double doubleWidth) {
             SkMaxScalar(fMinIntrinsicWidth, paragraph.minIntrinsicWidth());
     }
 
-    this->recordPicture();
+    fPicture = nullptr;
 
     return true;
 }
 
-void SkParagraph::paint(SkCanvas* canvas, double x, double y) const {
+void SkParagraph::paint(SkCanvas* canvas, double x, double y) {
+
+    if (nullptr == fPicture) {
+        // Postpone painting until we actually have to paint
+        this->recordPicture();
+    }
 
     SkMatrix matrix =
         SkMatrix::MakeTrans(SkDoubleToScalar(x), SkDoubleToScalar(y));

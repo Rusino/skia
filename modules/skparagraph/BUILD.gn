@@ -13,7 +13,7 @@ config("public_config") {
   if (skia_enable_skparagraph) {
     include_dirs = [ "include",
               "include/flutter",
-              "src",
+              "../../src/code",
               "../../include/private" ]
   }
 }

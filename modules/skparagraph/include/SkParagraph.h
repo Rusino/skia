@@ -56,7 +56,7 @@ class SkParagraph {
 
     bool layout(double width);
 
-    void paint(SkCanvas* canvas, double x, double y) const;
+    void paint(SkCanvas* canvas, double x, double y);
 
     std::vector<SkTextBox> getRectsForRange(
         unsigned start,
@@ -72,8 +72,6 @@ class SkParagraph {
 
     friend class ParagraphTester;
 
-    double fOldDoubleWidth;
-
     // Record a picture drawing all small text blobs
     void recordPicture();
 
@@ -88,6 +86,7 @@ class SkParagraph {
     SkScalar fMaxIntrinsicWidth;
     SkScalar fMinIntrinsicWidth;
     size_t fLinesNumber;
+    SkScalar fMaxLineWidth;
 
     // Input
     SkParagraphStyle fParagraphStyle;
