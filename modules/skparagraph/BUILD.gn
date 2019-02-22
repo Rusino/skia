@@ -11,9 +11,11 @@ import("../../gn/skia.gni")
 
 config("public_config") {
   if (skia_enable_skparagraph) {
-    include_dirs = [ "include",
-              "include/flutter",
-              "../../src/code",
+    include_dirs = [
+              "include",
+              "src",
+              "../shaper/include",
+              "../../src/core",
               "../../include/private" ]
   }
 }

@@ -10,7 +10,8 @@
 #include <vector>
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
-#include "SkShapedParagraph.h"
+//#include "SkShapedParagraph.h"
+#include "SkSection.h"
 
 struct Block {
     Block(size_t start, size_t end, SkTextStyle style)
@@ -76,7 +77,7 @@ class SkParagraph {
     void recordPicture();
 
     // Break the text by explicit line breaks
-    void breakTextIntoParagraphs();
+    void breakTextIntoSections();
 
     // Things for Flutter
     SkScalar fAlphabeticBaseline;
@@ -85,16 +86,16 @@ class SkParagraph {
     SkScalar fWidth;
     SkScalar fMaxIntrinsicWidth;
     SkScalar fMinIntrinsicWidth;
-    size_t fLinesNumber;
     SkScalar fMaxLineWidth;
+    size_t fLinesNumber;
 
     // Input
     SkParagraphStyle fParagraphStyle;
     std::vector<StyledText> fTextStyles;
     SkSpan<const char> fUtf8;
 
-    // Shaping (list of paragraphs in Shaper terms separated by hard line breaks)
-    std::vector<SkShapedParagraph> fParagraphs;
+    // Shaping (list of sections separated by hard line breaks)
+    std::vector<SkSection> fSections;
 
     // Painting
     sk_sp<SkPicture> fPicture;

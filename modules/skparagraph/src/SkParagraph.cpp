@@ -50,19 +50,10 @@ SkParagraph::~SkParagraph() = default;
 // TODO: optimize for intrinsic widths
 bool SkParagraph::layout(double doubleWidth) {
 
-    auto width = SkDoubleToScalar(doubleWidth);
-    if (width == std::ceil(fMaxLineWidth)) {
-        SkDebugf("******* Optimization: no reshaping with %f\n", width);
-        // It's been broken by lines and shaped already and is not going to change
-        for (auto& paragraph : fParagraphs) {
-            paragraph.format(width);
-        }
-        return true;
-    }
-
-    if (fParagraphs.empty()) {
-        // Break the text into lines (with each one broken into blocks by style)
-        this->breakTextIntoParagraphs();
+    if (fSections.empty()) {
+        // Break the text into sections separated by hard line breaks
+        // (with each one broken into blocks by style)
+        this->breakTextIntoSections();
     }
 
     // Collect Flutter values
@@ -75,36 +66,37 @@ bool SkParagraph::layout(double doubleWidth) {
     fLinesNumber = 0;
     fMaxLineWidth = 0;
 
+    auto width = SkDoubleToScalar(doubleWidth);
+
     // Take care of line limitation across all the paragraphs
     size_t maxLines = fParagraphStyle.getMaxLines();
-    for (auto& paragraph : fParagraphs) {
+    for (auto& section : fSections) {
 
         // Shape
-        paragraph.layout(width, maxLines);
+        section.shapeIntoLines(width, maxLines);
 
         // Make sure we haven't exceeded the limits
-        fLinesNumber += paragraph.lineNumber();
+        fLinesNumber += section.lineNumber();
         if (!fParagraphStyle.unlimited_lines()) {
-            maxLines -= paragraph.lineNumber();
+            maxLines -= section.lineNumber();
         }
         if (maxLines <= 0) {
             break;
         }
 
-        fMaxLineWidth = SkMaxScalar(fMaxLineWidth, paragraph.width());
+        fMaxLineWidth = SkMaxScalar(fMaxLineWidth, section.width());
 
-        // Format
-        paragraph.format(width);
+        section.formatLinesByWords(width);
 
         // Get the stats
-        fAlphabeticBaseline = paragraph.alphabeticBaseline();
-        fIdeographicBaseline = paragraph.ideographicBaseline();
-        fHeight += paragraph.height();
-        fWidth = SkMaxScalar(fWidth, paragraph.width());
+        fAlphabeticBaseline = section.alphabeticBaseline();
+        fIdeographicBaseline = section.ideographicBaseline();
+        fHeight += section.height();
+        fWidth = SkMaxScalar(fWidth, section.width());
         fMaxIntrinsicWidth =
-            SkMaxScalar(fMaxIntrinsicWidth, paragraph.maxIntrinsicWidth());
+            SkMaxScalar(fMaxIntrinsicWidth, section.maxIntrinsicWidth());
         fMinIntrinsicWidth =
-            SkMaxScalar(fMinIntrinsicWidth, paragraph.minIntrinsicWidth());
+            SkMaxScalar(fMinIntrinsicWidth, section.minIntrinsicWidth());
     }
 
     fPicture = nullptr;
@@ -128,18 +120,18 @@ void SkParagraph::recordPicture() {
 
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
-    for (auto& paragraph : fParagraphs) {
+    for (auto& section : fSections) {
 
-        paragraph.paint(textCanvas);
-        textCanvas->translate(0, paragraph.height());
+        section.paintEachLineByStyles(textCanvas);
+        textCanvas->translate(0, section.height());
     }
 
     fPicture = recorder.finishRecordingAsPicture();
 }
 
-void SkParagraph::breakTextIntoParagraphs() {
+void SkParagraph::breakTextIntoSections() {
 
-    fParagraphs.clear();
+    fSections.clear();
 
     UErrorCode status = U_ZERO_ERROR;
     UBreakIterator
@@ -167,18 +159,27 @@ void SkParagraph::breakTextIntoParagraphs() {
 
     auto firstChar = (int32_t) fUtf8.size();
     auto lastChar = (int32_t) fUtf8.size();
+    auto lastWordChar = lastChar;
 
     size_t firstStyle = fTextStyles.size() - 1;
+    std::vector<SkSpan<const char>> softLineBreaks;
     while (lastChar > 0) {
         int32_t ubrkStatus = ubrk_preceding(breakIterator, firstChar);
         if (ubrkStatus == icu::BreakIterator::DONE) {
-            // Take care of the first line
+            // Take care of the first line; treat it as a hard line break
             firstChar = 0;
+            ubrkStatus = UBRK_LINE_HARD;
         } else {
             firstChar = ubrkStatus;
-            if (ubrk_getRuleStatus(breakIterator) != UBRK_LINE_HARD) {
-                continue;
-            }
+        }
+
+        // Collect all soft line breaks for future use
+        softLineBreaks.emplace_back(fUtf8.begin() + firstChar, lastWordChar - firstChar);
+        lastWordChar = firstChar;
+
+        if (/*ubrk_getRuleStatus(breakIterator)*/ ubrkStatus != UBRK_LINE_HARD) {
+            // Ignore soft line breaks for the rest
+            continue;
         }
 
         // Remove all insignificant characters at the end of the line (whitespaces)
@@ -215,28 +216,18 @@ void SkParagraph::breakTextIntoParagraphs() {
 
             auto start = SkTMax((int32_t) (style.fText.begin() - fUtf8.begin()),
                                 firstChar);
-            auto end =
-                SkTMin((int32_t) (style.fText.end() - fUtf8.begin()), lastChar);
-            styles.emplace_back(SkSpan<const char>(fUtf8.begin() + start,
-                                                   end - start),
+            auto end = SkTMin((int32_t) (style.fText.end() - fUtf8.begin()), lastChar);
+            styles.emplace_back(SkSpan<const char>(fUtf8.begin() + start, end - start),
                                 style.fStyle);
         }
 
         // Add one more string to the list;
-        fParagraphs.emplace(fParagraphs.begin(), fParagraphStyle, std::move(styles));
+        //fParagraphs.emplace(fParagraphs.begin(), fParagraphStyle, std::move(styles));
+        fSections.emplace(fSections.begin(), fParagraphStyle, std::move(styles), std::move(softLineBreaks));
 
         // Move on
         lastChar = firstChar;
     }
-/*
-  SkDebugf("Paragraphs:\n");
-  // Print all lines
-  size_t linenum = 0;
-  for (auto& line : _paragraphs) {
-    ++linenum;
-    line.printBlocks(linenum);
-  }
-*/
 }
 
 // TODO: implement properly (currently it only works as an indicator that something changed in the text)
@@ -247,10 +238,11 @@ std::vector<SkTextBox> SkParagraph::getRectsForRange(
     RectWidthStyle rectWidthStyle) {
 
     std::vector<SkTextBox> result;
-    for (auto& paragraph : fParagraphs) {
-        paragraph.GetRectsForRange(fUtf8.begin() + start,
-                                   fUtf8.begin() + end,
-                                   result);
+    for (auto& section : fSections) {
+        section.getRectsForRange(
+            fUtf8.begin() + start,
+            fUtf8.begin() + end,
+            result);
     }
 
     return result;
