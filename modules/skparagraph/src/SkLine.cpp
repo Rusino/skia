@@ -10,9 +10,20 @@
 SkLine::SkLine() {
     fShift = 0;
     fAdvance.set(0, 0);
-    fOffset.set(0, 0);
     fWidth = 0;
     fHeight = 0;
+}
+
+SkLine::SkLine(SkVector advance, SkSpan<SkWord> words)
+: SkLine() {
+    fAdvance = advance;
+    fWords = words;
+
+    // Change positions for all the words and build text blobs
+    auto offset = SkVector::Make(fWords[0].offset().fX, 0);
+    for (auto& word : fWords) {
+        word.generate(offset);
+    }
 }
 
 void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
@@ -61,12 +72,12 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
     }
 }
 
-void SkLine::paintByStyles(SkCanvas* canvas) {
+void SkLine::paintByStyles(SkCanvas* canvas, SkPoint point, SkSpan<StyledText> fTextStyles) {
 
     // TODO: For now we paint everything by words but we better combine words by style
     for (auto word : fWords) {
 
-        word.paint(canvas);
+        word.paint(canvas, point, fTextStyles);
     }
 }
 

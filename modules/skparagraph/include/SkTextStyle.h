@@ -102,9 +102,9 @@ class SkTextStyle {
     void addShadow(SkTextShadow shadow) { fTextShadows.emplace_back(shadow); }
     void resetShadows() { fTextShadows.clear(); }
 
-    void getFontMetrics(SkFontMetrics& metrics) const {
+    void getFontMetrics(SkFontMetrics* metrics) const {
         SkFont font(fTypeface, fFontSize);
-        font.getMetrics(&metrics);
+        font.getMetrics(metrics);
     }
 
     SkScalar getFontSize() const { return fFontSize; }

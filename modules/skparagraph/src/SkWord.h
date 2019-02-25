@@ -18,9 +18,10 @@ class SkRun;
 class SkWord {
   public:
 
-    SkWord(SkSpan<const char> text, SkRun& run);
 
-    SkWord(SkSpan<const char> wordSpan, SkRun* begin, SkRun* end);
+    SkWord(SkSpan<const char> text, SkSpan<SkRun> runs);
+
+    void generate(SkVector offset);
 
     inline void shift(SkScalar shift) { fShift += shift; }
     inline void expand(SkScalar step) { fAdvance.fX += step; }
@@ -31,18 +32,30 @@ class SkWord {
     SkRect rect() { return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY); }
 
     // Take in account possible many
-    void paint(SkCanvas* canvas);
+    void paint(SkCanvas* canvas, SkPoint point, SkSpan<StyledText> styles);
 
   private:
+
+    SkVector getAdvance(const SkRun& run, size_t start, size_t end);
+    SkVector getOffset(const SkRun& run, size_t start);
+
+    void paintShadow(SkCanvas* canvas);
+    void paintBackground(SkCanvas* canvas, SkPoint point);
+    void paintDecorations(SkCanvas* canvas);
+    SkScalar computeDecorationThickness(SkTextStyle textStyle);
+    SkScalar computeDecorationPosition(SkScalar thickness);
+    void computeDecorationPaint(SkPaint& paint, SkPath& path);
 
     friend class SkSection;
 
     SkSpan<StyledText> fStyles;
+    SkSpan<const char> fText;
     SkVector fOffset;
     SkVector fAdvance;
-    SkScalar fShift;              // Caused by justify text alignment
-
-    SkSpan<const char> fText;
+    SkScalar fShift;// Caused by justify text alignment
+    SkSpan<SkRun> fRuns;
     sk_sp<SkTextBlob> fBlob;
+    size_t fLeft;
+    size_t fRight;
 
 };

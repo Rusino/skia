@@ -19,8 +19,6 @@
 #include "SkSpan.h"
 #include "SkTextStyle.h"
 #include "SkTextBlobPriv.h"
-#include "SkShapedRun.h"
-#include "SkShapedLine.h"
 
 #include "SkRun.h"
 #include "SkLine.h"
@@ -97,10 +95,13 @@ class MultipleFontRunIterator final : public FontRunIterator {
     sk_sp<SkTypeface> fCurrentTypeface;
 };
 
-class SkSection final : SkShaper::RunHandler {
+class SkSection {
   public:
 
-    SkSection(SkParagraphStyle style, std::vector<StyledText> styles, std::vector<SkSpan<const char>> softBreaks);
+    SkSection(
+        const SkParagraphStyle& style,
+        std::vector<StyledText> styles,
+        std::vector<SkSpan<const char>> softBreaks);
 
     void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
 
@@ -126,61 +127,17 @@ class SkSection final : SkShaper::RunHandler {
 
     typedef SkShaper::RunHandler INHERITED;
 
+    friend class ShapeOneLongWord;
+    friend class ShapeOneLine;
+
     bool shapeTextIntoEndlessLine();
 
     void breakEndlessLineIntoWords();
-
-    void breakEndlessLineIntoLinesByWords(SkScalar width);
+    void breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines);
 
     void shapeWordIntoManyLines(SkScalar width, SkWord& word);
 
-    // SkShaper::RunHandler interface
-    SkShaper::RunHandler::Buffer newRunBuffer(
-        const RunInfo& info,
-        const SkFont& font,
-        int glyphCount,
-        SkSpan<const char> utf8) override {
-
-        SkASSERT(fStatus != ShapingNothing);
-
-        if (fStatus == ShapingOneLine) {
-            auto& run = fRuns.emplace_back(font, info, glyphCount, utf8);
-            return run.newRunBuffer();
-        } else {
-            fRun = SkRun(font, info, glyphCount, utf8);
-            return fRun.newRunBuffer();
-        }
-    }
-
-    void commitRun() override {
-
-        SkASSERT(fStatus != ShapingNothing);
-        if (fStatus == ShapingOneLine) {
-            auto& run = fRuns.back();
-            if (run.size() == 0) {
-                fRuns.pop_back();
-            }
-        } else if (fStatus == ShapingOneWord) {
-            if (fRuns.size() != 0) {
-                fWords.emplace_back(fRun.text(), fRun);
-            }
-        }
-    }
-
-    void commitLine() override {
-        SkASSERT(fStatus != ShapingNothing);
-        if (fStatus == ShapingOneLine) {
-            // We have only one line
-            SkASSERT(false);
-        } else {
-            fLines.emplace_back();
-        }
-    }
-
-    // Constrains
-    size_t fMaxLines;
-
-    // Input
+     // Input
     SkParagraphStyle fParagraphStyle;
     std::vector<StyledText> fTextStyles;
     std::vector<SkSpan<const char>> fSoftLineBreaks;
@@ -198,12 +155,86 @@ class SkSection final : SkShaper::RunHandler {
     SkTArray<SkRun> fRuns;   // Shaped text, one line, broken into runs
     SkTArray<SkWord> fWords; // Shaped text, one line, broken into words
     SkTArray<SkLine> fLines; // Shaped text, broken into lines
-    enum ShapingStatus {
-        ShapingNothing,
-        ShapingOneLine,
-        ShapingOneWord
-    };
+};
 
-    ShapingStatus fStatus;
+
+class ShapeOneLine final : public SkShaper::RunHandler {
+
+  public:
+    explicit ShapeOneLine(SkSection* section)
+    : fSection(section)
+    , fLineNumber(0)
+    , fAdvance(SkVector::Make(0, 0)) { }
+
+  private:
+    // SkShaper::RunHandler interface
+    SkShaper::RunHandler::Buffer newRunBuffer(
+        const RunInfo& info,
+        const SkFont& font,
+        int glyphCount,
+        SkSpan<const char> utf8) override {
+        auto& run = fSection->fRuns.emplace_back(font, info, glyphCount, utf8);
+        return run.newRunBuffer();
+    }
+
+    void commitRun() override {
+
+        auto& run = fSection->fRuns.back();
+        if (run.size() == 0) {
+            fSection->fRuns.pop_back();
+        }
+        fAdvance.fX += run.advance().fX;
+        fAdvance.fY = SkMaxScalar(fAdvance.fY, run.descent() + run.leading() - run.ascent());
+    }
+
+    void commitLine() override {
+        // We have only one line
+        ++fLineNumber;
+        SkASSERT(fLineNumber == 1);
+    }
+
+    SkSection* fSection;
+    size_t fLineNumber;
+    SkVector fAdvance;
+};
+
+class ShapeOneLongWord final : public SkShaper::RunHandler {
+
+  public:
+    explicit ShapeOneLongWord(SkSection* section)
+        : fSection(section)
+        , fFirstWord(&section->fWords.back())
+        , fAdvance(SkVector::Make(0, 0)) {
+    }
+
+  private:
+    // SkShaper::RunHandler interface
+    SkShaper::RunHandler::Buffer newRunBuffer(
+        const RunInfo& info,
+        const SkFont& font,
+        int glyphCount,
+        SkSpan<const char> utf8) override {
+
+        fRun = SkRun(font, info, glyphCount, utf8);
+        return fRun.newRunBuffer();
+    }
+
+    void commitRun() override {
+
+        if (fRun.size() != 0) {
+            fSection->fWords.emplace_back(fRun.text(), SkSpan<SkRun>(&fRun, 1));
+            fAdvance.fX += fRun.advance().fX;
+            fAdvance.fY = SkMaxScalar(fAdvance.fY, fRun.descent() + fRun.leading() - fRun.ascent());
+        }
+    }
+
+    void commitLine() override {
+        fSection->fLines.emplace_back(fAdvance, SkSpan<SkWord>(fFirstWord, &fSection->fWords.back() - fFirstWord));
+        fAdvance = SkVector::Make(0, 0);
+    }
+
+    SkSection* fSection;
+    SkWord* fFirstWord;
     SkRun fRun;
+    SkVector fAdvance;
 };

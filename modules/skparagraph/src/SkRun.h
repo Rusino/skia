@@ -32,17 +32,19 @@ class SkRun
         int glyphCount,
         SkSpan<const char> text);
 
-    void endRunBuffer(SkScalar offset, SkScalar advance) { }
-
     SkShaper::RunHandler::Buffer newRunBuffer();
 
     inline size_t size() const { return fGlyphs.size(); }
-    inline SkVector advance() { return fInfo.fAdvance; }
-    inline SkScalar ascent() { return fInfo.fAscent; }
-    inline SkScalar descent() { return fInfo.fDescent; }
-    inline SkScalar leading() { return fInfo.fLeading; }
+    SkVector advance() const {
+        return SkVector::Make(fInfo.fAdvance.fX,
+                              fInfo.fDescent + fInfo.fLeading - fInfo.fAscent);
+    }
+    inline SkVector offset() const { return fInfo.fOffset; }
+    inline SkScalar ascent() const { return fInfo.fAscent; }
+    inline SkScalar descent() const { return fInfo.fDescent; }
+    inline SkScalar leading() const { return fInfo.fLeading; }
 
-    inline SkSpan<const char> text() { return fText; }
+    inline SkSpan<const char> text() const { return fText; }
 
   private:
 
@@ -53,9 +55,6 @@ class SkRun
     SkSTArray<128, SkGlyphID, true> fGlyphs;
     SkSTArray<128, SkPoint, true> fPositions;
     SkSTArray<128, uint32_t, true> fClusters;
-
-    SkScalar fOffset;
-    SkScalar fAdvance;
 
     SkSpan<const char> fText;
 };

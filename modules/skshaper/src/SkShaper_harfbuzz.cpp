@@ -520,6 +520,7 @@ static void emit(const ShapedLine& line, SkShaper::RunHandler* handler,
     const auto& run = line.runs[logicalIndex];
     const SkShaper::RunHandler::RunInfo info = {
         run.fAdvance,
+        (SkVector)currentPoint,
         maxAscent,
         maxDescent,
         maxLeading,
@@ -1079,6 +1080,7 @@ SkPoint SkShaper::Impl::shapeOk(RunHandler* handler,
         const auto& run = runs[logicalIndex];
         const RunHandler::RunInfo info = {
             run.fAdvance,
+            (SkVector)currentPoint,
             maxAscent,
             maxDescent,
             maxLeading,

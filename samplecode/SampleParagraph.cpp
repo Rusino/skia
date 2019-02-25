@@ -93,13 +93,14 @@ class TestFontStyleSet : public SkFontStyleSet {
 class TestFontProvider : public SkFontMgr {
  public:
   TestFontProvider(sk_sp<SkTypeface> typeface) {
+      _set = new TestFontStyleSet();
     RegisterTypeface(std::move(typeface));
   }
   ~TestFontProvider() override { }
 
   void RegisterTypeface(sk_sp<SkTypeface> typeface) {
-    _set.registerTypeface(std::move(typeface));
-    _set.getStyle(0, nullptr, &_familyName);
+    _set->registerTypeface(std::move(typeface));
+    _set->getStyle(0, nullptr, &_familyName);
   }
 
   void RegisterTypeface(sk_sp<SkTypeface> typeface, std::string family_name_alias) {
@@ -121,19 +122,31 @@ class TestFontProvider : public SkFontMgr {
     return nullptr;
   }
 
-  SkFontStyleSet* onCreateStyleSet(int index) const override { return nullptr; }
+  SkFontStyleSet* onCreateStyleSet(int index) const override {
+      return _set;
+  }
   SkTypeface* onMatchFamilyStyle(const char familyName[],
-                                 const SkFontStyle& style) const override { return nullptr; }
+                                 const SkFontStyle& style) const override {
+      return nullptr;
+  }
   SkTypeface* onMatchFamilyStyleCharacter(const char familyName[],
                                           const SkFontStyle& style,
                                           const char* bcp47[], int bcp47Count,
-                                          SkUnichar character) const override { return nullptr; }
+                                          SkUnichar character) const override {
+      return nullptr;
+  }
   SkTypeface* onMatchFaceStyle(const SkTypeface* tf,
-                               const SkFontStyle& style) const override { return nullptr; }
+                               const SkFontStyle& style) const override {
+      return nullptr;
+  }
 
-  sk_sp<SkTypeface> onMakeFromData(sk_sp<SkData>, int ttcIndex) const override { return nullptr; }
+  sk_sp<SkTypeface> onMakeFromData(sk_sp<SkData>, int ttcIndex) const override {
+      return nullptr;
+  }
   sk_sp<SkTypeface> onMakeFromStreamIndex(std::unique_ptr<SkStreamAsset>,
-                                          int ttcIndex) const override { return nullptr; }
+                                          int ttcIndex) const override {
+      return nullptr;
+  }
   sk_sp<SkTypeface> onMakeFromStreamArgs(std::unique_ptr<SkStreamAsset>,
                                          const SkFontArguments&) const override { return nullptr; }
   sk_sp<SkTypeface> onMakeFromFontData(std::unique_ptr<SkFontData>) const override { return nullptr; }
@@ -143,7 +156,7 @@ class TestFontProvider : public SkFontMgr {
                                          SkFontStyle style) const override { return nullptr; }
 
  private:
-  TestFontStyleSet _set;
+  TestFontStyleSet* _set;
   SkString _familyName;
 };
 }
@@ -546,20 +559,23 @@ class ParagraphView : public Sample {
         "onPressed: null\n",
         ");"
     };
-    std::vector<std::string> very_long = { "A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text" };
-    //drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-
-    SkScalar width = this->width() / 4;
-    SkScalar height = this->height();
     std::string line = "Hesitation is always easy rarely useful.";
     std::string str(gText);
-    drawLine(canvas, width, height, str, SkTextAlign::center);
-    canvas->translate(width, 0);
-    drawText(canvas, width, height, text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
-    canvas->translate(width, 0);
-    drawCode(canvas, width, height);
-    canvas->translate(width, 0);
-    drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
+    std::vector<std::string> very_long = { "A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text" };
+    drawText(canvas, this->width(), this->height(), cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
+      /*
+      SkScalar width = this->width() / 4;
+      SkScalar height = this->height();
+
+
+      drawLine(canvas, width, height, line, SkTextAlign::center);
+      canvas->translate(width, 0);
+      drawText(canvas, width, height, text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 4, u"\u2026");
+      canvas->translate(width, 0);
+      drawCode(canvas, width, height);
+      canvas->translate(width, 0);
+      drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
+       */
   }
 
  private:

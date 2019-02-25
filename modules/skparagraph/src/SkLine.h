@@ -17,17 +17,14 @@ class SkLine {
 
     SkLine();
 
-    SkLine(SkScalar width, SkSpan<SkWord> words)
-    : SkLine() {
-        fWords = words;
-    }
+    SkLine(SkVector advance, SkSpan<SkWord> words);
 
     inline SkVector advance() { return fAdvance; }
-    inline SkVector offset() { return fOffset; }
+    inline SkSpan<SkWord>& words() { return fWords; }
 
     void formatByWords(SkTextAlign align, SkScalar maxWidth);
 
-    void paintByStyles(SkCanvas* canvas);
+    void paintByStyles(SkCanvas* canvas, SkPoint point, SkSpan<StyledText> fTextStyles);
 
     void getRectsForRange(
         SkTextDirection textDirection,
@@ -39,7 +36,6 @@ class SkLine {
 
     SkScalar fShift;    // Shift to left - right - center
     SkVector fAdvance;
-    SkVector fOffset;
     SkScalar fWidth;    // Could be different from advance because of formatting
     SkScalar fHeight;
 

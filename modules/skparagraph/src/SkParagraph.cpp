@@ -30,7 +30,7 @@ SkParagraph::SkParagraph(const std::u16string& utf16text,
     std::vector<Block> blocks)
     : fParagraphStyle(style), fPicture(nullptr) {
 
-    icu::UnicodeString unicode((UChar*) utf16text.data(), utf16text.size());
+    icu::UnicodeString unicode((UChar*) utf16text.data(), SkToS32(utf16text.size()));
     std::string str;
     unicode.toUTF8String(str);
     fUtf8 = SkSpan<const char>(str.data(), str.size());
@@ -131,6 +131,7 @@ void SkParagraph::recordPicture() {
 
 void SkParagraph::breakTextIntoSections() {
 
+    SkDebugf("breakTextIntoSections:\n");
     fSections.clear();
 
     UErrorCode status = U_ZERO_ERROR;
@@ -171,11 +172,11 @@ void SkParagraph::breakTextIntoSections() {
             ubrkStatus = UBRK_LINE_HARD;
         } else {
             firstChar = ubrkStatus;
-        }
 
-        // Collect all soft line breaks for future use
-        softLineBreaks.emplace_back(fUtf8.begin() + firstChar, lastWordChar - firstChar);
-        lastWordChar = firstChar;
+            // Collect all soft line breaks for future use
+            softLineBreaks.emplace(softLineBreaks.begin(), fUtf8.begin() + firstChar, lastWordChar - firstChar);
+            lastWordChar = firstChar;
+        }
 
         if (/*ubrk_getRuleStatus(breakIterator)*/ ubrkStatus != UBRK_LINE_HARD) {
             // Ignore soft line breaks for the rest
@@ -217,13 +218,16 @@ void SkParagraph::breakTextIntoSections() {
             auto start = SkTMax((int32_t) (style.fText.begin() - fUtf8.begin()),
                                 firstChar);
             auto end = SkTMin((int32_t) (style.fText.end() - fUtf8.begin()), lastChar);
-            styles.emplace_back(SkSpan<const char>(fUtf8.begin() + start, end - start),
+            styles.emplace_back(SkSpan<const char>(fUtf8.begin() + start, SkToS32(end - start)),
                                 style.fStyle);
         }
+
+        SkDebugf("Section [%d : %d] %d, %d\n", firstChar, lastChar, styles.size(), softLineBreaks.size());
 
         // Add one more string to the list;
         //fParagraphs.emplace(fParagraphs.begin(), fParagraphStyle, std::move(styles));
         fSections.emplace(fSections.begin(), fParagraphStyle, std::move(styles), std::move(softLineBreaks));
+        softLineBreaks.clear();
 
         // Move on
         lastChar = firstChar;
@@ -251,7 +255,7 @@ std::vector<SkTextBox> SkParagraph::getRectsForRange(
 SkPositionWithAffinity
 SkParagraph::getGlyphPositionAtCoordinate(double dx, double dy) const {
     // TODO: implement
-    return SkPositionWithAffinity(0, Affinity::UPSTREAM);
+    return {0, Affinity::UPSTREAM};
 }
 
 SkRange<size_t> SkParagraph::getWordBoundary(unsigned offset) {

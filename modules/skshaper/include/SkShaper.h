@@ -52,6 +52,7 @@ public:
 
         struct RunInfo {
             SkVector fAdvance;
+            SkVector fOffset;
             SkScalar fAscent,
                      fDescent,
                      fLeading;
