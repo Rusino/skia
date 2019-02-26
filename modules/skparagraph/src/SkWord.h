@@ -18,21 +18,22 @@ class SkRun;
 class SkWord {
   public:
 
-
     SkWord(SkSpan<const char> text, SkSpan<SkRun> runs);
 
     void generate(SkVector offset);
 
     inline void shift(SkScalar shift) { fShift += shift; }
-    inline void expand(SkScalar step) { fAdvance.fX += step; }
+    inline void expand(SkScalar step) { fFullWidth += step; }
+    inline void trim() { fFullWidth = fRightTrimmedWidth; }
     inline SkSpan<const char> text() { return fText; }
-    inline SkVector advance() { return fAdvance; }
+    inline SkVector fullAdvance()  { return SkVector::Make(fFullWidth, fHeight); }
+    inline SkVector trimmedAdvance() { return SkVector::Make(fRightTrimmedWidth, fHeight); }
     inline SkVector offset() { return fOffset; }
 
-    SkRect rect() { return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY); }
+    SkRect rect() { return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fFullWidth, fHeight); }
 
     // Take in account possible many
-    void paint(SkCanvas* canvas, SkPoint point, SkSpan<StyledText> styles);
+    void paint(SkCanvas* canvas, SkScalar offsetX, SkScalar offsetY, SkSpan<StyledText> styles);
 
   private:
 
@@ -51,11 +52,13 @@ class SkWord {
     SkSpan<StyledText> fStyles;
     SkSpan<const char> fText;
     SkVector fOffset;
-    SkVector fAdvance;
+    SkScalar fHeight;
+    SkScalar fFullWidth;
+    SkScalar fRightTrimmedWidth;
     SkScalar fShift;// Caused by justify text alignment
     SkSpan<SkRun> fRuns;
     sk_sp<SkTextBlob> fBlob;
-    size_t fLeft;
-    size_t fRight;
+    size_t gLeft;   // Glyph index on the first run that starts the word
+    size_t gRight;  // Glyph index on the last run that ends the word
 
 };

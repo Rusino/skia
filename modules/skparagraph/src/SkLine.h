@@ -22,9 +22,11 @@ class SkLine {
     inline SkVector advance() { return fAdvance; }
     inline SkSpan<SkWord>& words() { return fWords; }
 
+    void generateWords();
+
     void formatByWords(SkTextAlign align, SkScalar maxWidth);
 
-    void paintByStyles(SkCanvas* canvas, SkPoint point, SkSpan<StyledText> fTextStyles);
+    void paintByStyles(SkCanvas* canvas, SkScalar offset, SkSpan<StyledText> fTextStyles);
 
     void getRectsForRange(
         SkTextDirection textDirection,

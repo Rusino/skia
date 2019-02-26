@@ -14,66 +14,85 @@ SkWord::SkWord(SkSpan<const char> text, SkSpan<SkRun> runs)
 , fRuns(runs)
 , fBlob(nullptr) {
     // begin and end runs intersect with the word
+    auto first = fRuns.begin();
+    auto last = fRuns.end() - 1;
 
     // Clusters
-    auto cStart = SkTMax(fText.begin(), fRuns.begin()->fText.begin()) - fRuns.begin()->fText.begin();
-    auto cEnd = SkTMin(fText.end(), fRuns.end()->fText.end()) - fRuns.end()->fText.begin();
+    auto cStart = SkTMax(fText.begin(), first->fText.begin()) - first->fText.begin();
+    auto cEnd = SkTMin(fText.end(), last->fText.end()) - last->fText.begin();
 
-    // Find the starting glyph position for the first run
-    fLeft = 0;
-    if (fText.begin() > fRuns.begin()->fText.begin()) {
-        while (fLeft < fRuns.begin()->fText.size() && fRuns.begin()->fClusters[fLeft] < cStart) {
-            ++fLeft;
+    // Find the starting glyph position for the first run (in characters)
+    gLeft = 0;
+    if (fText.begin() > first->fText.begin()) {
+        while (gLeft < first->size() && first->fClusters[gLeft] < cStart) {
+            ++gLeft;
         }
     }
 
-
-    // find the ending glyph position for the last run
-    fRight = fRuns.end()->fText.size();
-    if (fText.end() < fRuns.end()->fText.end()) {
-        while (fRight > fLeft && fRuns.end()->fClusters[fRight - 1] >= cEnd) {
-            --fRight;
+    // find the ending glyph position for the last run (in characters)
+    gRight = last->size();
+    if (fText.end() < last->fText.end()) {
+        while (gRight > gLeft && last->fClusters[gRight - 1] >= cEnd) {
+            --gRight;
         }
     }
 
-    fOffset = fRuns.begin()->offset();
-    fAdvance = SkVector::Make(0, 0);
-    auto iter = fRuns.begin();
+    fOffset = first->offset();
+    fHeight = 0;
+    fFullWidth = 0;
+    auto iter = first;
     do {
-        auto gStart = iter == fRuns.begin() ? fLeft : 0;
-        auto gEnd = iter == fRuns.end() ? fRight : iter->size();
+        auto gStart = iter == first ? gLeft : 0;
+        auto gEnd = iter == last ? gRight : iter->size();
         if (gStart >= gEnd) {
-            if (fAdvance.fX == 0) {
+            if (fHeight == 0) {
+              ++iter;
                 continue;
             } else {
                 break;
             }
         }
 
-        if (iter != fRuns.begin() && iter != fRuns.end()) {
-            fAdvance += iter->advance();
+        SkVector advance;
+        if (iter != first && iter != last) {
+          advance = iter->advance();
         } else {
-            if (iter == fRuns.begin()) {
-                fOffset += getOffset(*iter, gStart);
-            }
-            fAdvance += getAdvance(*iter, gStart, gEnd);
+          advance = getAdvance(*iter, gStart, gEnd);
+          if (iter == first) {
+            fOffset += getOffset(*iter, gStart);
+          }
         }
+        fHeight += advance.fY;
+        fFullWidth += advance.fX;
 
         ++iter;
-    } while(iter != fRuns.end());
+    } while (iter <= last);
+
+
+    // TODO: figure out the right way to discover white spaces
+    fRightTrimmedWidth = fFullWidth;
+    auto trimmed = gRight - 1;
+    while (trimmed > 0 && last->fGlyphs[trimmed] == 3) {
+      fRightTrimmedWidth = last->fPositions[trimmed].fX - fOffset.fX;
+      --trimmed;
+    }
+
+    SkDebugf("Word [%d:%d] %f ~ %f\n", this->gLeft, this->gRight, this->fFullWidth, this->fRightTrimmedWidth);
 }
 
 void SkWord::generate(SkVector offset) {
-    fOffset -= offset;
-    SkDebugf("generate word: @%f:%f +%f:%f [%d:%d]\n", fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY, fLeft, fRight);
+    // begin and end runs intersect with the word
+    auto first = fRuns.begin();
+    auto last = fRuns.end() - 1;
 
+    fOffset -= offset;
     SkTextBlobBuilder builder;
     auto iter = fRuns.begin();
     do {
-        auto gStart = iter == fRuns.begin() ? fLeft : 0;
-        auto gEnd = iter == fRuns.end() ? fRight : iter->size();
+        auto gStart = iter == first ? gLeft : 0;
+        auto gEnd = iter == last ? gRight : iter->size();
         if (gStart >= gEnd) {
-            if (fAdvance.fX == 0) {
+            if (fFullWidth == 0) {
                 continue;
             } else {
                 break;
@@ -100,7 +119,7 @@ SkVector SkWord::getAdvance(const SkRun& run, size_t start, size_t end) {
     //                SkVector::Make(run.fPositions[start].fX, 0);
     return SkVector::Make((end == run.size()
                             ? run.advance().fX
-                            : run.fPositions[end - 1].fX) - run.fPositions[start].fX,
+                            : run.fPositions[end].fX) - run.fPositions[start].fX,
                            run.advance().fY);
 }
 
@@ -110,7 +129,9 @@ SkVector SkWord::getOffset(const SkRun& run, size_t start) {
 }
 
 // TODO: Optimize painting by colors (paints)
-void SkWord::paint(SkCanvas* canvas, SkPoint point, SkSpan<StyledText> styles) {
+void SkWord::paint(SkCanvas* canvas, SkScalar offsetX, SkScalar offsetY, SkSpan<StyledText> styles) {
+
+    generate(SkVector::Make(offsetX, 0));
 
     // Do it somewhere else much earlier
     auto start = styles.begin();
@@ -128,7 +149,7 @@ void SkWord::paint(SkCanvas* canvas, SkPoint point, SkSpan<StyledText> styles) {
 
     fStyles = SkSpan<StyledText>(start, end - start);
     // TODO: deal with different styles
-    paintBackground(canvas, point);
+    paintBackground(canvas, SkPoint::Make(0, offsetY));
     paintShadow(canvas);
 
     auto style = this->fStyles.begin()->fStyle;
@@ -140,7 +161,7 @@ void SkWord::paint(SkCanvas* canvas, SkPoint point, SkSpan<StyledText> styles) {
         paint.setColor(style.getColor());
     }
     paint.setAntiAlias(true);
-    canvas->drawTextBlob(fBlob, point.fX + fShift, point.fY, paint);
+    canvas->drawTextBlob(fBlob, fShift, offsetY, paint);
 
     paintDecorations(canvas);
 }
@@ -173,7 +194,7 @@ void SkWord::paintShadow(SkCanvas* canvas) {
 
 void SkWord::paintBackground(SkCanvas* canvas, SkPoint point) {
 
-    SkRect fRect = SkRect::MakeXYWH(point.fX + fOffset.fX, point.fY, fAdvance.fX, fAdvance.fY);
+    SkRect fRect = SkRect::MakeXYWH(point.fX + fOffset.fX, point.fY, fFullWidth, fHeight);
     auto fStyle = this->fStyles.begin()->fStyle;
     if (!fStyle.hasBackground()) {
         return;
@@ -212,7 +233,7 @@ SkScalar SkWord::computeDecorationThickness(SkTextStyle textStyle) {
 
 SkScalar SkWord::computeDecorationPosition(SkScalar thickness) {
 
-    SkRect fRect = SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
+    SkRect fRect = SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fFullWidth, fHeight);
     auto fStyle = this->fStyles.begin()->fStyle;
     SkFontMetrics metrics;
     fStyle.getFontMetrics(&metrics);
@@ -256,7 +277,7 @@ SkScalar SkWord::computeDecorationPosition(SkScalar thickness) {
 
 void SkWord::computeDecorationPaint(SkPaint& paint, SkPath& path) {
 
-    SkRect fRect = SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
+    SkRect fRect = SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fFullWidth, fHeight);
     auto fStyle = this->fStyles.begin()->fStyle;
     paint.setStyle(SkPaint::kStroke_Style);
     if (fStyle.getDecorationColor() == SK_ColorTRANSPARENT) {
@@ -322,7 +343,7 @@ void SkWord::computeDecorationPaint(SkPaint& paint, SkPath& path) {
 
 void SkWord::paintDecorations(SkCanvas* canvas) {
 
-    SkRect fRect = SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
+    SkRect fRect = SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fFullWidth, fHeight);
     auto fStyle = this->fStyles.begin()->fStyle;
     if (fStyle.getDecoration() == SkTextDecoration::kNone) {
         return;

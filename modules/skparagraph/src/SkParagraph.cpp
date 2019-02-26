@@ -72,7 +72,6 @@ bool SkParagraph::layout(double doubleWidth) {
     size_t maxLines = fParagraphStyle.getMaxLines();
     for (auto& section : fSections) {
 
-        // Shape
         section.shapeIntoLines(width, maxLines);
 
         // Make sure we haven't exceeded the limits
@@ -131,106 +130,196 @@ void SkParagraph::recordPicture() {
 
 void SkParagraph::breakTextIntoSections() {
 
+  class BreakIterator {
+
+   public:
+    BreakIterator(SkSpan<const char> text) {
+      UErrorCode status = U_ZERO_ERROR;
+
+      UText utf8UText = UTEXT_INITIALIZER;
+      utext_openUTF8(&utf8UText, text.begin(), text.size(), &status);
+      fAutoClose = std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>>(&utf8UText);
+      if (U_FAILURE(status)) {
+        SkDebugf("Could not create utf8UText: %s", u_errorName(status));
+        return;
+      }
+
+      fLineBreak = ubrk_open(UBRK_LINE, "th", nullptr, 0, &status);
+      if (U_FAILURE(status)) {
+        SkDebugf("Could not create line break iterator: %s", u_errorName(status));
+        SK_ABORT("");
+      }
+
+      fWordBreak = ubrk_open(UBRK_WORD, "th", nullptr, 0, &status);
+      if (U_FAILURE(status)) {
+        SkDebugf("Could not create word break iterator: %s", u_errorName(status));
+        SK_ABORT("");
+      }
+
+      if (U_FAILURE(status)) {
+        SkDebugf("Could not create utf8UText: %s", u_errorName(status));
+        return;
+      }
+
+      ubrk_setUText(fLineBreak, &utf8UText, &status);
+      if (U_FAILURE(status)) {
+        SkDebugf("Could not setText on break iterator: %s",u_errorName(status));
+        return;
+      }
+
+      ubrk_setUText(fWordBreak, &utf8UText, &status);
+      if (U_FAILURE(status)) {
+        SkDebugf("Could not setText on break iterator: %s", u_errorName(status));
+        return;
+      }
+
+      fText = text;
+      fCurrentIndex = 0;
+      fNextLineIndex = -1;
+      fNextWordIndex = -1;
+      fPrevWordIndex = -1;
+      bWordBreak = false;
+      bLineBreak = false;
+    }
+
+    bool next() {
+
+      if (fCurrentIndex == (int32_t)fText.size()) {
+        return false;
+      }
+      // Move iterators forward if necessary
+      if (fNextLineIndex <= fCurrentIndex) {
+        // Ignore soft line breaks
+        fPrevLineIndex = fCurrentIndex;
+        fNextLineIndex = fCurrentIndex;
+        while (true) {
+          fNextLineIndex = ubrk_following(fLineBreak, fNextLineIndex);
+          if (fNextLineIndex == icu::BreakIterator::DONE) {
+            fNextLineIndex = fText.size();
+            break;
+          } else if (ubrk_getRuleStatus(fLineBreak) == UBRK_LINE_HARD) {
+            break;
+          }
+        }
+      }
+
+      if (fNextWordIndex <= fCurrentIndex) {
+        fPrevWordIndex = fCurrentIndex;
+        fNextWordIndex = ubrk_following(fWordBreak, fCurrentIndex);
+        if (fNextWordIndex == icu::BreakIterator::DONE) {
+          fNextWordIndex = fText.size();
+        }
+      }
+
+      fCurrentIndex = SkTMin(fNextWordIndex, fNextLineIndex);
+      bWordBreak = fNextWordIndex <= fNextLineIndex;
+      bLineBreak = fNextLineIndex <= fNextWordIndex;
+
+      return true;
+    }
+
+    SkSpan<const char> getWord() {
+      // Remove all insignificant characters at the end of the line (linebreaks)
+      auto first = fPrevWordIndex;
+      auto last = fNextWordIndex - 1;
+      while (last >= first) {
+        int32_t character = *(fText.begin() +  last);
+        if (u_charType(character) != U_CONTROL_CHAR &&
+            u_charType(character) != U_NON_SPACING_MARK) {
+          break;
+        }
+        --last;
+      }
+      return SkSpan<const char>(fText.begin() + first, last - first + 1);
+    }
+
+    SkSpan<const char> getLine() {
+      // Remove all insignificant characters at the end of the line (whitespaces)
+      auto first = fPrevLineIndex;
+      auto last = fNextLineIndex - 1;
+      while (last >= first) {
+        int32_t character = *(fText.begin() +  last);
+        if (u_charType(character) != U_CONTROL_CHAR &&
+            u_charType(character) != U_NON_SPACING_MARK) {
+          break;
+        }
+        --last;
+      }
+      return SkSpan<const char>(fText.begin() + first, last - first + 1);
+    }
+
+    inline int32_t getRuleStatus() { return fRuleStatus; }
+    inline int32_t getCurrentIndex() { return fCurrentIndex; }
+    inline bool isWordBreak() { return bWordBreak; }
+    inline bool isLineBreak() { return bLineBreak; }
+
+   private:
+    UBreakIterator* fLineBreak;
+    UBreakIterator* fWordBreak;
+    int32_t fCurrentIndex;
+    int32_t fNextLineIndex;
+    int32_t fPrevLineIndex;
+    int32_t fNextWordIndex;
+    int32_t fPrevWordIndex;
+    int32_t fRuleStatus;
+    bool bWordBreak;
+    bool bLineBreak;
+    SkSpan<const char> fText;
+    std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> fAutoClose;
+  };
+
     SkDebugf("breakTextIntoSections:\n");
     fSections.clear();
 
-    UErrorCode status = U_ZERO_ERROR;
-    UBreakIterator
-        * breakIterator(ubrk_open(UBRK_LINE, "th", nullptr, 0, &status));
-    if (U_FAILURE(status)) {
-        SkDebugf("Could not create break iterator: %s", u_errorName(status));
-        SK_ABORT("");
-    }
-
-    UText utf8UText = UTEXT_INITIALIZER;
-    utext_openUTF8(&utf8UText, fUtf8.begin(), fUtf8.size(), &status);
-    std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>>
-        autoClose(&utf8UText);
-    if (U_FAILURE(status)) {
-        SkDebugf("Could not create utf8UText: %s", u_errorName(status));
-        return;
-    }
-
-    ubrk_setUText(breakIterator, &utf8UText, &status);
-    if (U_FAILURE(status)) {
-        SkDebugf("Could not setText on break iterator: %s",
-                 u_errorName(status));
-        return;
-    }
-
-    auto firstChar = (int32_t) fUtf8.size();
-    auto lastChar = (int32_t) fUtf8.size();
-    auto lastWordChar = lastChar;
-
+    BreakIterator breakIterator(fUtf8);
     size_t firstStyle = fTextStyles.size() - 1;
-    std::vector<SkSpan<const char>> softLineBreaks;
-    while (lastChar > 0) {
-        int32_t ubrkStatus = ubrk_preceding(breakIterator, firstChar);
-        if (ubrkStatus == icu::BreakIterator::DONE) {
-            // Take care of the first line; treat it as a hard line break
-            firstChar = 0;
-            ubrkStatus = UBRK_LINE_HARD;
-        } else {
-            firstChar = ubrkStatus;
+    std::vector<SkSpan<const char>> wordBreaks;
 
-            // Collect all soft line breaks for future use
-            softLineBreaks.emplace(softLineBreaks.begin(), fUtf8.begin() + firstChar, lastWordChar - firstChar);
-            lastWordChar = firstChar;
+    while (breakIterator.next()) {
+
+      if (breakIterator.isWordBreak()){
+        // We only need word breaks to collect
+        auto word = breakIterator.getWord();
+        if (!word.empty()) {
+          wordBreaks.emplace_back(breakIterator.getWord());
         }
-
-        if (/*ubrk_getRuleStatus(breakIterator)*/ ubrkStatus != UBRK_LINE_HARD) {
-            // Ignore soft line breaks for the rest
-            continue;
+        if (!breakIterator.isLineBreak()) {
+          continue;
         }
+      }
 
-        // Remove all insignificant characters at the end of the line (whitespaces)
-        // TODO: we keep at least one space in case the line is all spaces for now
-        // TODO: since Flutter is using a space character to measure things;
-        // TODO: need to fix it later
-        while (lastChar > firstChar) {
-            int32_t character = *(fUtf8.begin() + lastChar - 1);
-            if (!u_isWhitespace(character)) {
-                break;
-            }
-            lastChar -= 1;
-        }
+      // Line break situation
+      SkASSERT(breakIterator.isLineBreak());
+      auto line = breakIterator.getLine();
 
-        // Find the first style that is related to the line
-        while (firstStyle > 0
-            && fTextStyles[firstStyle].fText.begin()
-                > fUtf8.begin() + firstChar) {
-            --firstStyle;
-        }
+      // Find the first style that is related to the line;
+      while (firstStyle > 0 && fTextStyles[firstStyle].fText.begin() > line.begin()) {
+          --firstStyle;
+      }
 
-        size_t lastStyle = firstStyle;
-        while (lastStyle != fTextStyles.size()
-            && fTextStyles[lastStyle].fText.begin()
-                < fUtf8.begin() + lastChar) {
-            ++lastStyle;
-        }
+      // Find the last style that is related to the line
+      size_t lastStyle = firstStyle;
+      while (lastStyle != fTextStyles.size() && fTextStyles[lastStyle].fText.begin() < line.end()) {
+          ++lastStyle;
+      }
 
-        // Generate blocks for future use
-        std::vector<StyledText> styles;
-        styles.reserve(lastStyle - firstStyle);
-        for (auto s = firstStyle; s < lastStyle; ++s) {
-            auto& style = fTextStyles[s];
+      // Generate blocks for future use
+      std::vector<StyledText> styles;
+      styles.reserve(lastStyle - firstStyle);
+      for (auto s = firstStyle; s < lastStyle; ++s) {
+          auto& style = fTextStyles[s];
 
-            auto start = SkTMax((int32_t) (style.fText.begin() - fUtf8.begin()),
-                                firstChar);
-            auto end = SkTMin((int32_t) (style.fText.end() - fUtf8.begin()), lastChar);
-            styles.emplace_back(SkSpan<const char>(fUtf8.begin() + start, SkToS32(end - start)),
-                                style.fStyle);
-        }
 
-        SkDebugf("Section [%d : %d] %d, %d\n", firstChar, lastChar, styles.size(), softLineBreaks.size());
+          auto start = SkTMax(style.fText.begin(), line.begin());
+          auto end = SkTMin(style.fText.end(), line.end());
+          styles.emplace_back(SkSpan<const char>(start, SkToS32(end - start)), style.fStyle);
+      }
 
-        // Add one more string to the list;
-        //fParagraphs.emplace(fParagraphs.begin(), fParagraphStyle, std::move(styles));
-        fSections.emplace(fSections.begin(), fParagraphStyle, std::move(styles), std::move(softLineBreaks));
-        softLineBreaks.clear();
+      SkDebugf("Section [%d : %d] %d, %d\n", line.begin() - &fUtf8[0], line.end() - &fUtf8[0], styles.size(), wordBreaks.size());
 
-        // Move on
-        lastChar = firstChar;
+      // Add one more section to the list
+      fSections.emplace_back(line, fParagraphStyle, std::move(styles), std::move(wordBreaks));
+      wordBreaks.clear();
     }
 }
 

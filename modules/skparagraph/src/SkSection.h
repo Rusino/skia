@@ -99,6 +99,7 @@ class SkSection {
   public:
 
     SkSection(
+        SkSpan<const char> text,
         const SkParagraphStyle& style,
         std::vector<StyledText> styles,
         std::vector<SkSpan<const char>> softBreaks);
@@ -127,8 +128,7 @@ class SkSection {
 
     typedef SkShaper::RunHandler INHERITED;
 
-    friend class ShapeOneLongWord;
-    friend class ShapeOneLine;
+    friend class ShapeHandler;
 
     bool shapeTextIntoEndlessLine();
 
@@ -138,10 +138,10 @@ class SkSection {
     void shapeWordIntoManyLines(SkScalar width, SkWord& word);
 
      // Input
+    SkSpan<const char> fText;
     SkParagraphStyle fParagraphStyle;
     std::vector<StyledText> fTextStyles;
     std::vector<SkSpan<const char>> fSoftLineBreaks;
-    SkSpan<const char> fText;
 
     // Output to Flutter
     SkScalar fAlphabeticBaseline;   // TODO: Not implemented yet
@@ -158,12 +158,12 @@ class SkSection {
 };
 
 
-class ShapeOneLine final : public SkShaper::RunHandler {
+class ShapeHandler final : public SkShaper::RunHandler {
 
   public:
-    explicit ShapeOneLine(SkSection* section)
-    : fSection(section)
-    , fLineNumber(0)
+    explicit ShapeHandler(SkSection* section, bool endlessLine)
+    : fEndlessLine(endlessLine)
+    , fSection(section)
     , fAdvance(SkVector::Make(0, 0)) { }
 
   private:
@@ -182,59 +182,26 @@ class ShapeOneLine final : public SkShaper::RunHandler {
         auto& run = fSection->fRuns.back();
         if (run.size() == 0) {
             fSection->fRuns.pop_back();
+            return;
         }
         fAdvance.fX += run.advance().fX;
         fAdvance.fY = SkMaxScalar(fAdvance.fY, run.descent() + run.leading() - run.ascent());
     }
 
     void commitLine() override {
-        // We have only one line
-        ++fLineNumber;
-        SkASSERT(fLineNumber == 1);
-    }
 
-    SkSection* fSection;
-    size_t fLineNumber;
-    SkVector fAdvance;
-};
-
-class ShapeOneLongWord final : public SkShaper::RunHandler {
-
-  public:
-    explicit ShapeOneLongWord(SkSection* section)
-        : fSection(section)
-        , fFirstWord(&section->fWords.back())
-        , fAdvance(SkVector::Make(0, 0)) {
-    }
-
-  private:
-    // SkShaper::RunHandler interface
-    SkShaper::RunHandler::Buffer newRunBuffer(
-        const RunInfo& info,
-        const SkFont& font,
-        int glyphCount,
-        SkSpan<const char> utf8) override {
-
-        fRun = SkRun(font, info, glyphCount, utf8);
-        return fRun.newRunBuffer();
-    }
-
-    void commitRun() override {
-
-        if (fRun.size() != 0) {
-            fSection->fWords.emplace_back(fRun.text(), SkSpan<SkRun>(&fRun, 1));
-            fAdvance.fX += fRun.advance().fX;
-            fAdvance.fY = SkMaxScalar(fAdvance.fY, fRun.descent() + fRun.leading() - fRun.ascent());
+        if (!fEndlessLine) {
+            // One run = one word
+            auto& run = fSection->fRuns.back();
+            auto& word = fSection->fWords.emplace_back(run.text(), SkSpan<SkRun>(&run, 1));
+            fSection->fLines.emplace_back(fAdvance, SkSpan<SkWord>(&word, 1));
+            fAdvance = SkVector::Make(0, 0);
+        } else {
+            // Only one line is possible
         }
     }
 
-    void commitLine() override {
-        fSection->fLines.emplace_back(fAdvance, SkSpan<SkWord>(fFirstWord, &fSection->fWords.back() - fFirstWord));
-        fAdvance = SkVector::Make(0, 0);
-    }
-
+    bool fEndlessLine;
     SkSection* fSection;
-    SkWord* fFirstWord;
-    SkRun fRun;
     SkVector fAdvance;
 };
