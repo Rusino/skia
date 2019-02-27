@@ -494,7 +494,7 @@ class ParagraphView : public Sample {
     }
 
     auto paragraph = builder.Build();
-    paragraph->layout(240);
+    paragraph->layout(w - margin * 2);
 
     paragraph->paint(canvas, margin, margin);
 
@@ -588,10 +588,13 @@ class ParagraphView : public Sample {
     };
     std::string line = "Hesitation is always easy rarely useful.";
     std::string str(gText);
+    std::vector<std::string> long_word = 
+        { "A_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_text"};
+
     std::vector<std::string> very_long =
         {"A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text"};
-    //drawText(canvas, this->width(), this->height(), very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-
+    drawText(canvas, this->width(), this->height(), long_word, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
+/*
     SkScalar width = this->width() / 4;
     SkScalar height = this->height();
     drawText(canvas, width, height, cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
@@ -601,6 +604,7 @@ class ParagraphView : public Sample {
     drawCode(canvas, width, height);
     canvas->translate(width, 0);
     drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
+*/
   }
 
  private:

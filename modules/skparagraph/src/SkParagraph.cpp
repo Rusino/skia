@@ -294,7 +294,7 @@ void SkParagraph::breakTextIntoSections() {
   };
 
   fSections.clear();
-  SkTArray<SkWord> words;
+  std::vector<SkWord> words;
 
   BreakIterator breakIterator(fUtf8);
   while (breakIterator.next()) {
@@ -331,7 +331,7 @@ void SkParagraph::breakTextIntoSections() {
       styles.emplace_back(SkSpan<const char>(start, SkToS32(end - start)), style->fStyle);
     }
     fSections.emplace_back(line, fParagraphStyle, std::move(styles), std::move(words));
-    words.reset();
+    words.clear();
   }
 }
 

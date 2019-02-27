@@ -28,7 +28,7 @@ SkSection::SkSection(
     SkSpan<const char> text,
     const SkParagraphStyle& style,
     SkTArray<StyledText> styles,
-    SkTArray<SkWord> words)
+    std::vector<SkWord> words)
     : fText(text)
     , fParagraphStyle(style)
     , fTextStyles(std::move(styles))
@@ -94,18 +94,23 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
 
   auto lineBegin = &fWords.front();
 
-  for (auto& word : fWords) {
+  // TODO: We cannot iterate through all the words because the list can change if we call SkShaper
+  fWordInsertPosition = fWords.begin();
+  while (fWordInsertPosition != fWords.end()) {
 
+    auto& word = *fWordInsertPosition;
     if (advance.fX + word.trimmedAdvance().fX > width) {
+      // TODO: there is one limitation here - SkShaper starts breaking words from the new line
       if (advance.fX == 0) {
-        // The word is too big! Remove it and ask shaper to break it
-        fWords.pop_back();
-        // Re-shape this word with the given width and use all the breaks from the shaper
+        // The word is too big!
+        // Let SkShaper to break it into many words and insert these words instead of this big word
+        // Then continue breaking as if nothing happened
+        auto newIndex = fWordInsertPosition - fWords.begin();
         shapeWordIntoManyLines(width, word);
-        // The last line may not be full; we are going to break it again
-        auto last = fLines.back();
-        advance = last.advance();
-        fLines.pop_back();
+        // Remove the big word
+        fWords.erase(fWordInsertPosition);
+        fWordInsertPosition = std::next(fWords.begin(), newIndex);
+        continue;
       } else {
         // Add the line and start counting again
         SkDebugf("break %d: %f + %f ? %f\n",
@@ -118,6 +123,8 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
         advance = SkVector::Make(0, 0);
       }
     }
+
+    ++fWordInsertPosition;
 
     // Check if the word only fits without spaces (that would be the last word on the line)
     bool lastWordOnTheLine = &word == &fWords.back();
@@ -135,11 +142,11 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
 
   // Do not forget the rest of the words
   SkDebugf("break %d: %f + %f ? %f\n",
-           fWords.end() - lineBegin,
+           &fWords.back() - lineBegin,
            fWords.back().fullAdvance().fX,
            advance.fX,
            width);
-  fLines.emplace_back(advance, SkSpan<SkWord>(lineBegin, fWords.end() - lineBegin));
+  fLines.emplace_back(advance, SkSpan<SkWord>(lineBegin, &fWords.back() - lineBegin));
   fWidth = SkMaxScalar(fWidth, advance.fX);
   fHeight += advance.fY;
 }
@@ -158,7 +165,7 @@ SkSpan<StyledText> SkSection::selectStyles(SkSpan<const char> text, SkSpan<Style
   return SkSpan<StyledText>(start, end - start);
 }
 
-void SkSection::shapeWordIntoManyLines(SkScalar width, SkWord& word) {
+void SkSection::shapeWordIntoManyLines(SkScalar width, const SkWord& word) {
 
   SkDebugf("shapeWordIntoManyLines\n");
   auto text = word.span();
@@ -166,7 +173,7 @@ void SkSection::shapeWordIntoManyLines(SkScalar width, SkWord& word) {
   MultipleFontRunIterator font(text, styles);
   SkShaper shaper(nullptr);
   ShapeHandler handler(this, false /* one words many lines */);
-  fLines.emplace_back();
+
   shaper.shape(&handler,
                &font,
                text.begin(),

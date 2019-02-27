@@ -102,7 +102,7 @@ class SkSection {
         SkSpan<const char> text,
         const SkParagraphStyle& style,
         SkTArray<StyledText> styles,
-        SkTArray<SkWord> words);
+        std::vector<SkWord> words);
 
     void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
 
@@ -137,7 +137,7 @@ class SkSection {
     void mapRunsToWords();
     void breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines);
 
-    void shapeWordIntoManyLines(SkScalar width, SkWord& word);
+    void shapeWordIntoManyLines(SkScalar width, const SkWord& word);
 
      // Input
     SkSpan<const char> fText;
@@ -153,9 +153,11 @@ class SkSection {
     SkScalar fMinIntrinsicWidth;
 
     // Internal structures
-    SkTArray<SkRun> fRuns;   // Shaped text, one line, broken into runs
-    SkTArray<SkWord> fWords; // Shaped text, one line, broken into words
-    SkTArray<SkLine> fLines; // Shaped text, broken into lines
+    SkTArray<SkRun> fRuns;      // Shaped text, one line, broken into runs
+    std::vector<SkWord> fWords; // Shaped text, one line, broken into words
+    SkTArray<SkLine> fLines;    // Shaped text, broken into lines
+
+    std::vector<SkWord>::iterator fWordInsertPosition;
 };
 
 
@@ -174,12 +176,14 @@ class ShapeHandler final : public SkShaper::RunHandler {
         const SkFont& font,
         int glyphCount,
         SkSpan<const char> utf8) override {
+      // Runs always go to the end of the list even if we insert words in the middle
         auto& run = fSection->fRuns.emplace_back(font, info, glyphCount, utf8);
         return run.newRunBuffer();
     }
 
     void commitRun() override {
 
+      // TODO: recalculate run advance for glyphCount since SkShaped does not do it
         auto& run = fSection->fRuns.back();
         if (run.size() == 0) {
             fSection->fRuns.pop_back();
@@ -193,10 +197,9 @@ class ShapeHandler final : public SkShaper::RunHandler {
 
         if (!fEndlessLine) {
             // One run = one word
-            auto& run = fSection->fRuns.back();
-            auto& word = fSection->fWords.emplace_back(run.text(), SkSpan<SkRun>(&run, 1));
-            fSection->fLines.emplace_back(fAdvance, SkSpan<SkWord>(&word, 1));
-            fAdvance = SkVector::Make(0, 0);
+          auto& run = fSection->fRuns.back();
+          fSection->fWordInsertPosition =
+              fSection->fWords.emplace(fSection->fWordInsertPosition, run.text(), SkSpan<SkRun>(&run, 1)) + 1;
         } else {
             // Only one line is possible
         }

@@ -24,7 +24,7 @@ class SkWord {
   void generate(SkVector offset);
     void update(SkSpan<SkRun> runs);
 
-    SkSpan<const char> span() { return SkSpan<const char>(fText.begin(), fText.size() + fSpaces.size()); }
+    SkSpan<const char> span() const { return SkSpan<const char>(fText.begin(), fText.size() + fSpaces.size()); }
     inline void shift(SkScalar shift) { fShift += shift; }
     inline void expand(SkScalar step) { fFullWidth += step; }
     inline void trim() { bTrimmed = true; }
