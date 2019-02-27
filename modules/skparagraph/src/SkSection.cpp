@@ -27,12 +27,12 @@ inline bool operator&&(const SkSpan<T>& a, const SkSpan<T>& b) {
 SkSection::SkSection(
     SkSpan<const char> text,
     const SkParagraphStyle& style,
-    std::vector<StyledText> styles,
-    std::vector<SkSpan<const char>> softLineBreaks)
+    SkTArray<StyledText> styles,
+    SkTArray<SkWord> words)
     : fText(text)
     , fParagraphStyle(style)
     , fTextStyles(std::move(styles))
-    , fSoftLineBreaks(std::move(softLineBreaks)) {
+    , fWords(std::move(words)) {
 
   fAlphabeticBaseline = 0;
   fIdeographicBaseline = 0;
@@ -44,21 +44,13 @@ SkSection::SkSection(
 
 bool SkSection::shapeTextIntoEndlessLine() {
 
-  if (fTextStyles.empty()) return false;
-
-  auto start = fTextStyles.begin()->fText.begin();
-  auto end = fTextStyles.empty() ? start - 1
-                                 : std::prev(fTextStyles.end())->fText.end();
-  if (start >= end) return false;
-
-  SkSpan<const char> run(start, end - start);
-  MultipleFontRunIterator font(run, SkSpan<StyledText>(fTextStyles));
+  MultipleFontRunIterator font(fText, SkSpan<StyledText>(fTextStyles.data(), fTextStyles.size()));
   ShapeHandler handler(this, true /* entire text on one line */);
   SkShaper shaper(nullptr);
   shaper.shape(&handler,
                &font,
-               start,
-               end - start,
+               fText.begin(),
+               fText.size(),
                true,
                {0, 0},
                std::numeric_limits<SkScalar>::max());
@@ -69,21 +61,19 @@ bool SkSection::shapeTextIntoEndlessLine() {
 }
 
 
-void SkSection::breakEndlessLineIntoWords() {
+void SkSection::mapRunsToWords() {
 
-  SkDebugf("breakEndlessLineIntoWords\n");
-
-  auto wordIter = fSoftLineBreaks.begin();
+  auto wordIter = fWords.begin();
   auto runIter = fRuns.begin();
   auto prevRunIter = runIter;
 
-  while (wordIter != fSoftLineBreaks.end() && runIter != fRuns.end()) {
-    auto wordSpan = *wordIter;
+  while (wordIter != fWords.end() && runIter != fRuns.end()) {
+    auto wordSpan = wordIter->span();
     auto runSpan = runIter->text();
     SkASSERT(wordSpan && runSpan);
 
     // Copy all the runs affecting the word
-    fWords.emplace_back(wordSpan, SkSpan<SkRun>(prevRunIter, runIter - prevRunIter + 1));
+    wordIter->update(SkSpan<SkRun>(prevRunIter, runIter - prevRunIter + 1));
 
     // Move the iterator if we have to
     if (wordSpan.end() >= runSpan.end()) {
@@ -101,6 +91,7 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
 
   SkDebugf("breakEndlessLineIntoLinesByWords\n");
   SkVector advance = SkVector::Make(0, 0);
+
   auto lineBegin = &fWords.front();
 
   for (auto& word : fWords) {
@@ -129,7 +120,8 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
     }
 
     // Check if the word only fits without spaces (that would be the last word on the line)
-    bool lastWordOnTheLine = advance.fX + word.fullAdvance().fX > width;
+    bool lastWordOnTheLine = &word == &fWords.back();
+    if (lastWordOnTheLine) word.trim();
 
     // Keep counting words
     advance.fX += lastWordOnTheLine ? word.trimmedAdvance().fX : word.fullAdvance().fX;
@@ -152,22 +144,33 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
   fHeight += advance.fY;
 }
 
+SkSpan<StyledText> SkSection::selectStyles(SkSpan<const char> text, SkSpan<StyledText> styles) {
+
+  auto start = styles.begin();
+  while (start != styles.end() && start->fText.end() <= text.begin()) {
+    ++start;
+  }
+  auto end = start;
+  while (end != styles.end() && end->fText.begin() < text.end()) {
+    ++end;
+  }
+
+  return SkSpan<StyledText>(start, end - start);
+}
+
 void SkSection::shapeWordIntoManyLines(SkScalar width, SkWord& word) {
 
   SkDebugf("shapeWordIntoManyLines\n");
-  auto start = word.fStyles.begin()->fText.begin();
-  auto end = word.fStyles.empty() ? start - 1
-                                  : std::prev(word.fStyles.end())->fText.end();
-
-  SkSpan<const char> run(start, end - start);
-  MultipleFontRunIterator font(run, word.fStyles);
+  auto text = word.span();
+  auto styles = selectStyles(text, SkSpan<StyledText>(fTextStyles.data(), fTextStyles.size()));
+  MultipleFontRunIterator font(text, styles);
   SkShaper shaper(nullptr);
   ShapeHandler handler(this, false /* one words many lines */);
   fLines.emplace_back();
   shaper.shape(&handler,
                &font,
-               start,
-               end - start,
+               text.begin(),
+               text.size(),
                true,
                {0, 0},
       // TODO: Can we be more specific with max line number?
@@ -176,35 +179,21 @@ void SkSection::shapeWordIntoManyLines(SkScalar width, SkWord& word) {
 
 void SkSection::shapeIntoLines(SkScalar maxWidth, size_t maxLines) {
 
-  // Get rid of all the "empty text" cases
-  if (fTextStyles.empty()) {
-    // Shaper does not shape empty lines
-    fHeight = 0;
-    fWidth = 0;
-    fMaxIntrinsicWidth = 0;
-    fMinIntrinsicWidth = 0;
-    return;
-  }
-
-  auto start = fTextStyles.begin()->fText.begin();
-  auto end = fTextStyles.empty() ? start - 1
-                                 : std::prev(fTextStyles.end())->fText.end();
-  if (start == end) {
-    // Shaper does not shape empty lines
+  if (fWords.empty()) {
+    // The section contains whitespaces and controls only
+    SkASSERT(!fTextStyles.empty());
     SkFontMetrics metrics;
     fTextStyles.begin()->fStyle.getFontMetrics(&metrics);
-    fAlphabeticBaseline = -metrics.fAscent;
-    fIdeographicBaseline = -metrics.fAscent;
-    fHeight = metrics.fDescent + metrics.fLeading - metrics.fAscent;
+
     fWidth = 0;
-    fMaxIntrinsicWidth = 0;
-    fMinIntrinsicWidth = 0;
+    fHeight += metrics.fDescent + metrics.fLeading - metrics.fAscent;
+
     return;
   }
 
   shapeTextIntoEndlessLine();
 
-  breakEndlessLineIntoWords();
+  mapRunsToWords();
 
   breakEndlessLineIntoLinesByWords(maxWidth, maxLines);
 }
@@ -225,7 +214,7 @@ void SkSection::paintEachLineByStyles(SkCanvas* textCanvas) {
 
   SkScalar offset = 0;
   for (auto& line : fLines) {
-    line.paintByStyles(textCanvas, offset, SkSpan<StyledText>(fTextStyles));
+    line.paintByStyles(textCanvas, offset, SkSpan<StyledText>(fTextStyles.begin(), fTextStyles.size()));
     offset += line.advance().fY;
   }
 }

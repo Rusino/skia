@@ -101,8 +101,8 @@ class SkSection {
     SkSection(
         SkSpan<const char> text,
         const SkParagraphStyle& style,
-        std::vector<StyledText> styles,
-        std::vector<SkSpan<const char>> softBreaks);
+        SkTArray<StyledText> styles,
+        SkTArray<SkWord> words);
 
     void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
 
@@ -124,6 +124,8 @@ class SkSection {
 
     size_t lineNumber() const { return fLines.size(); }
 
+    static SkSpan<StyledText> selectStyles(SkSpan<const char> text, SkSpan<StyledText> styles);
+
   private:
 
     typedef SkShaper::RunHandler INHERITED;
@@ -132,7 +134,7 @@ class SkSection {
 
     bool shapeTextIntoEndlessLine();
 
-    void breakEndlessLineIntoWords();
+    void mapRunsToWords();
     void breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines);
 
     void shapeWordIntoManyLines(SkScalar width, SkWord& word);
@@ -140,8 +142,7 @@ class SkSection {
      // Input
     SkSpan<const char> fText;
     SkParagraphStyle fParagraphStyle;
-    std::vector<StyledText> fTextStyles;
-    std::vector<SkSpan<const char>> fSoftLineBreaks;
+    SkTArray<StyledText> fTextStyles;
 
     // Output to Flutter
     SkScalar fAlphabeticBaseline;   // TODO: Not implemented yet

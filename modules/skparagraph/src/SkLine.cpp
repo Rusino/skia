@@ -71,6 +71,9 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
 // TODO: For now we paint everything by words but we better combine words by style
 void SkLine::paintByStyles(SkCanvas* canvas, SkScalar offsetY, SkSpan<StyledText> fTextStyles) {
 
+    if (fWords.empty()) {
+        return;
+    }
     // Change positions for all the words and build text blobs
     auto offsetX = fWords[0].offset().fX;
     for (auto word : fWords) {
