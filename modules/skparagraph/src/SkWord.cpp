@@ -9,15 +9,17 @@
 #include "SkRun.h"
 
 SkWord::SkWord(SkSpan<const char> text, SkSpan<const char> spaces)
-    : fText(text), fSpaces(spaces), fShift(0), fRuns(), fBlob(nullptr), bTrimmed(false) {}
+    : fText(text), fSpaces(spaces), fShift(0), fRuns(), fBlob(nullptr), bTrimmed(false) {
 
-SkWord::SkWord(SkSpan<const char> text, SkSpan<SkRun> runs)
+}
+
+SkWord::SkWord(SkSpan<const char> text, SkArraySpan<SkRun> runs)
     : fText(text), fSpaces(SkSpan<const char>()), fShift(0), fRuns(),
       fBlob(nullptr), bTrimmed(false) {
   update(runs);
 }
 
-void SkWord::update(SkSpan<SkRun> runs) {
+void SkWord::update(SkArraySpan<SkRun> runs) {
   // begin and end runs intersect with the word
   fRuns = runs;
   auto first = fRuns.begin();
@@ -71,7 +73,7 @@ void SkWord::update(SkSpan<SkRun> runs) {
     } else {
       advance = getAdvance(*iter, gStart, gEnd);
       if (iter == first) {
-        fOffset += getOffset(*iter, gStart);
+        fOffset.fX += getOffset(*iter, gStart).fX;
       }
       auto trimmed = getAdvance(*iter, gStart, gTrim);
       fRightTrimmedWidth += trimmed.fX;
@@ -110,7 +112,9 @@ void SkWord::generate(SkVector offset) {
                       (gEnd - gStart) * sizeof(SkGlyphID));
 
     for (size_t i = gStart; i < gEnd; ++i) {
-      blobBuffer.points()[i - gStart] = iter->fPositions[SkToInt(i)] - offset;
+      SkVector point = iter->fPositions[SkToInt(i)] - offset;
+      point.fY = - first->fInfo.fAscent;
+      blobBuffer.points()[i - gStart] = point; //iter->fPositions[SkToInt(i)] - offset;
     }
 
     ++iter;
@@ -159,8 +163,8 @@ void SkWord::paint(SkCanvas* canvas,
 
   fTextStyles = SkSpan<StyledText>(start, end - start);
   // TODO: deal with different styles
-  paintBackground(canvas, SkPoint::Make(0, offsetY));
-  paintShadow(canvas);
+  //paintBackground(canvas, SkPoint::Make(0, offsetY));
+  //paintShadow(canvas);
 
   auto style = this->fTextStyles.begin()->fStyle;
   SkPaint paint;
@@ -173,7 +177,7 @@ void SkWord::paint(SkCanvas* canvas,
   paint.setAntiAlias(true);
   canvas->drawTextBlob(fBlob, fShift, offsetY, paint);
 
-  paintDecorations(canvas);
+  //paintDecorations(canvas);
 }
 
 void SkWord::paintShadow(SkCanvas* canvas) {

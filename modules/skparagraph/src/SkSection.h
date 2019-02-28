@@ -102,7 +102,7 @@ class SkSection {
         SkSpan<const char> text,
         const SkParagraphStyle& style,
         SkTArray<StyledText> styles,
-        std::vector<SkWord> words);
+        SkTArray<SkWord, true> words);
 
     void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
 
@@ -153,21 +153,44 @@ class SkSection {
     SkScalar fMinIntrinsicWidth;
 
     // Internal structures
-    SkTArray<SkRun> fRuns;      // Shaped text, one line, broken into runs
-    std::vector<SkWord> fWords; // Shaped text, one line, broken into words
+    SkTArray<SkRun, true> fRuns;      // Shaped text, one line, broken into runs
+    SkTArray<SkWord, true> fWords; // Shaped text, one line, broken into words
     SkTArray<SkLine> fLines;    // Shaped text, broken into lines
 
-    std::vector<SkWord>::iterator fWordInsertPosition;
+  // When we break a long word into few small ones with SkShaper we need the starting point
+    size_t fWordInsertIndex;
 };
 
 
 class ShapeHandler final : public SkShaper::RunHandler {
 
   public:
-    explicit ShapeHandler(SkSection* section, bool endlessLine)
+    explicit ShapeHandler(SkSection& section, bool endlessLine)
     : fEndlessLine(endlessLine)
-    , fSection(section)
+    , fSection(&section)
     , fAdvance(SkVector::Make(0, 0)) { }
+
+
+    ~ShapeHandler() {
+      if (!fEndlessLine) {
+
+        // Insert words coming from SkShaper into the list
+        // (skipping the long word that has been broken into pieces)
+        size_t left = fSection->fWordInsertIndex;
+        size_t insert = fWords.size();
+        size_t right = fSection->fWords.size() - left - 1;
+        size_t total = left + right + insert;
+
+        SkTArray<SkWord, true> bigger;
+        bigger.reserve(total);
+
+        bigger.move_back_n(left, fSection->fWords.begin());
+        bigger.move_back_n(insert, fWords.begin());
+        bigger.move_back_n(right, fSection->fWords.begin() + left + 1);
+
+        fSection->fWords.swap(bigger);
+      }
+    }
 
   private:
     // SkShaper::RunHandler interface
@@ -181,7 +204,9 @@ class ShapeHandler final : public SkShaper::RunHandler {
         return run.newRunBuffer();
     }
 
-    void commitRun() override {
+    void commitRun() override { }
+
+    void commitRun1(SkVector advance) override {
 
       // TODO: recalculate run advance for glyphCount since SkShaped does not do it
         auto& run = fSection->fRuns.back();
@@ -189,6 +214,8 @@ class ShapeHandler final : public SkShaper::RunHandler {
             fSection->fRuns.pop_back();
             return;
         }
+
+        run.setWidth(advance.fX);
         fAdvance.fX += run.advance().fX;
         fAdvance.fY = SkMaxScalar(fAdvance.fY, run.descent() + run.leading() - run.ascent());
     }
@@ -198,8 +225,7 @@ class ShapeHandler final : public SkShaper::RunHandler {
         if (!fEndlessLine) {
             // One run = one word
           auto& run = fSection->fRuns.back();
-          fSection->fWordInsertPosition =
-              fSection->fWords.emplace(fSection->fWordInsertPosition, run.text(), SkSpan<SkRun>(&run, 1)) + 1;
+          fWords.emplace_back(run.text(), SkArraySpan<SkRun>(fSection->fRuns, fSection->fRuns.size() - 1, fSection->fRuns.size()));
         } else {
             // Only one line is possible
         }
@@ -208,4 +234,5 @@ class ShapeHandler final : public SkShaper::RunHandler {
     bool fEndlessLine;
     SkSection* fSection;
     SkVector fAdvance;
+    SkTArray<SkWord> fWords;
 };

@@ -20,6 +20,7 @@ SkRun::SkRun(
     , fText(text)
      {
 
+    fInfo.fOffset.fY = 0;
     fGlyphs.push_back_n(glyphCount);
     fPositions.push_back_n(glyphCount);
     fClusters.push_back_n(glyphCount);

@@ -13,33 +13,35 @@
 
 class SkLine {
 
-  public:
+ public:
 
-    SkLine();
+  SkLine();
 
-    SkLine(SkVector advance, SkSpan<SkWord> words);
+  SkLine(SkVector advance, SkArraySpan<SkWord> words);
 
-    inline SkVector advance() { return fAdvance; }
-    inline SkSpan<SkWord>& words() { return fWords; }
+  inline SkVector advance() { return fAdvance; }
+  inline SkArraySpan<SkWord>& words() { return fWords; }
 
-    void generateWords();
+  void generateWords();
 
-    void formatByWords(SkTextAlign align, SkScalar maxWidth);
+  void formatByWords(SkTextAlign align, SkScalar maxWidth);
 
-    void paintByStyles(SkCanvas* canvas, SkScalar offset, SkSpan<StyledText> fTextStyles);
+  void paintByStyles(SkCanvas* canvas,
+                     SkScalar offset,
+                     SkSpan<StyledText> fTextStyles);
 
-    void getRectsForRange(
-        SkTextDirection textDirection,
-        const char* start,
-        const char* end,
-        std::vector<SkTextBox>& result);
+  void getRectsForRange(
+      SkTextDirection textDirection,
+      const char* start,
+      const char* end,
+      std::vector<SkTextBox>& result);
 
-  private:
+ private:
 
-    SkScalar fShift;    // Shift to left - right - center
-    SkVector fAdvance;
-    SkScalar fWidth;    // Could be different from advance because of formatting
-    SkScalar fHeight;
+  SkScalar fShift;    // Shift to left - right - center
+  SkVector fAdvance;
+  SkScalar fWidth;    // Could be different from advance because of formatting
+  SkScalar fHeight;
 
-    SkSpan<SkWord> fWords;
+  SkArraySpan<SkWord> fWords;
 };

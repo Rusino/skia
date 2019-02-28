@@ -70,6 +70,7 @@ public:
 
         // Called after run information is filled out.
         virtual void commitRun() = 0;
+        virtual void commitRun1(SkVector advance) { }
         // Callback per line.
         virtual void commitLine() = 0;
     };

@@ -35,6 +35,7 @@ class SkRun
     SkShaper::RunHandler::Buffer newRunBuffer();
 
     inline size_t size() const { return fGlyphs.size(); }
+    void setWidth(SkScalar width) { fInfo.fAdvance.fX = width; }
     SkVector advance() const {
         return SkVector::Make(fInfo.fAdvance.fX,
                               fInfo.fDescent + fInfo.fLeading - fInfo.fAscent);

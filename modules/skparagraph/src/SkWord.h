@@ -12,17 +12,20 @@
 #include "SkScalar.h"
 #include "SkShaper.h"
 #include "SkTextStyle.h"
+#include "SkArraySpan.h"
 
 // TODO: Use one handler for both the initial shaping and for words reshaping
 class SkRun;
 class SkWord {
   public:
 
-    SkWord(SkSpan<const char> text, SkSpan<const char> spaces);
-    SkWord(SkSpan<const char> text, SkSpan<SkRun> runs);
+    SkWord() { }
 
-  void generate(SkVector offset);
-    void update(SkSpan<SkRun> runs);
+    SkWord(SkSpan<const char> text, SkSpan<const char> spaces);
+    SkWord(SkSpan<const char> text, SkArraySpan<SkRun> runs);
+
+    void generate(SkVector offset);
+    void update(SkArraySpan<SkRun> runs);
 
     SkSpan<const char> span() const { return SkSpan<const char>(fText.begin(), fText.size() + fSpaces.size()); }
     inline void shift(SkScalar shift) { fShift += shift; }
@@ -60,7 +63,7 @@ class SkWord {
     SkScalar fFullWidth;
     SkScalar fRightTrimmedWidth;
     SkScalar fShift;// Caused by justify text alignment
-    SkSpan<SkRun> fRuns;
+    SkArraySpan<SkRun> fRuns;
     sk_sp<SkTextBlob> fBlob;
     size_t gLeft;   // Glyph index on the first run that starts the word
     size_t gRight;  // Glyph index on the last run that ends the word
