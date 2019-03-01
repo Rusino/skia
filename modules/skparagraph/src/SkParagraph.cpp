@@ -92,9 +92,8 @@ bool SkParagraph::layout(double doubleWidth) {
       break;
     }
 
-    fMaxLineWidth = SkMaxScalar(fMaxLineWidth, section.width());
-
     section.formatLinesByWords(width);
+    fMaxLineWidth = SkMaxScalar(fMaxLineWidth, section.width());
 
     // Get the stats
     fAlphabeticBaseline = section.alphabeticBaseline();
@@ -139,7 +138,6 @@ void SkParagraph::recordPicture() {
 
     section.paintEachLineByStyles(textCanvas);
     textCanvas->translate(0, section.height());
-    SkDebugf("Height: +%f\n", section.height());
   }
 
   fPicture = recorder.finishRecordingAsPicture();

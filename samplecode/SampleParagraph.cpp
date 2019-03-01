@@ -495,11 +495,10 @@ class ParagraphView : public Sample {
 
     auto paragraph = builder.Build();
     paragraph->layout(w - margin * 2);
-
+    paragraph->layout(w - margin);
     paragraph->paint(canvas, margin, margin);
 
     canvas->translate(0, paragraph->getHeight() + margin);
-
   }
 
   void onDrawContent(SkCanvas* canvas) override {

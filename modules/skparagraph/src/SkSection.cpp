@@ -218,15 +218,13 @@ void SkSection::shapeIntoLines(SkScalar maxWidth, size_t maxLines) {
 void SkSection::formatLinesByWords(SkScalar maxWidth) {
 
   auto effectiveAlign = fParagraphStyle.effective_align();
-  if (effectiveAlign != SkTextAlign::left) {
-    fMaxIntrinsicWidth = maxWidth;
-  }
   for (auto& line : fLines) {
 
     if (effectiveAlign == SkTextAlign::justify && &line == &fLines.back()) {
       effectiveAlign = SkTextAlign::left;
     }
     line.formatByWords(effectiveAlign, maxWidth);
+    fWidth = SkMaxScalar(fWidth, line.advance().fX);
   }
 }
 

@@ -69,6 +69,7 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
     default:
       break;
   }
+  SkDebugf("Format align=%d delta=%f shift=%f\n", (int)effectiveAlign, delta, fShift);
 }
 
 // TODO: For now we paint everything by words but we better combine words by style
