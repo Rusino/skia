@@ -23,7 +23,7 @@ SkLine::SkLine(SkVector advance, SkArraySpan<SkWord> words)
 }
 
 void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
-  SkScalar delta = maxWidth - advance().fX;
+  SkScalar delta = maxWidth - fAdvance.fX;
   if (delta <= 0) {
     // Delta can be < 0 if there are extra whitespaces at the end of the line;
     // This is a limitation of a current version
@@ -80,6 +80,7 @@ void SkLine::paintByStyles(SkCanvas* canvas,
     return;
   }
   // Change positions for all the words and build text blobs
+  canvas->translate(fShift, 0);
   auto offsetX = fWords.begin()->offset().fX;
   for (auto word = fWords.begin(); word != fWords.end(); ++word) {
 

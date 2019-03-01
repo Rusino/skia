@@ -33,7 +33,8 @@ SkSection::SkSection(
     : fText(text)
     , fParagraphStyle(style)
     , fTextStyles(std::move(styles))
-    , fWords(std::move(words)) {
+    , fWords(std::move(words))
+    , fLines() {
 
   fAlphabeticBaseline = 0;
   fIdeographicBaseline = 0;
@@ -57,7 +58,7 @@ bool SkSection::shapeTextIntoEndlessLine() {
                std::numeric_limits<SkScalar>::max());
 
   SkASSERT(fLines.empty());
-  SkDebugf("shapeTextIntoEndlessLine (%d)\n", this->fRuns.size());
+  fMaxIntrinsicWidth = handler.advance().fX;
   return true;
 }
 
@@ -110,8 +111,8 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
         continue;
       } else {
         // Add the line and start counting again
-        SkDebugf("break %d: %f + %f ? %f\n",
-                 fWordInsertIndex - lineBegin, word.fullAdvance().fX, advance.fX, width);
+        SkDebugf("break %d: %f + %f %f + %f ? %f\n",
+                 fWordInsertIndex - lineBegin, fHeight, advance.fY, word.fullAdvance().fX, advance.fX, width);
         fLines.emplace_back(advance, SkArraySpan<SkWord>(fWords, lineBegin, fWordInsertIndex));
         fWidth = SkMaxScalar(fWidth, advance.fX);
         fHeight += advance.fY;
@@ -124,12 +125,14 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
     ++fWordInsertIndex;
 
     // Check if the word only fits without spaces (that would be the last word on the line)
-    bool lastWordOnTheLine = &word == &fWords.back();
+    bool lastWordOnTheLine = &word == &fWords.back() ||
+        advance.fX + word.fullAdvance().fX > width;
     if (lastWordOnTheLine) word.trim();
 
     // Keep counting words
     advance.fX += lastWordOnTheLine ? word.trimmedAdvance().fX : word.fullAdvance().fX;
     advance.fY = SkMaxScalar(advance.fY, word.fullAdvance().fY);
+    fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, word.trimmedAdvance().fX);
 
     if (fLines.size() > maxLines) {
       // TODO: ellipsis
@@ -138,8 +141,10 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
   }
 
   // Do not forget the rest of the words
-  SkDebugf("break %d: %f + %f ? %f\n",
+  SkDebugf("break %d: %f + %f %f + %f ? %f\n",
            fWords.size() - lineBegin,
+           fHeight,
+           advance.fY,
            fWords.back().fullAdvance().fX,
            advance.fX,
            width);
@@ -164,7 +169,6 @@ SkSpan<StyledText> SkSection::selectStyles(SkSpan<const char> text, SkSpan<Style
 
 void SkSection::shapeWordIntoManyLines(SkScalar width, const SkWord& word) {
 
-  SkDebugf("shapeWordIntoManyLines\n");
   auto text = word.span();
   auto styles = selectStyles(text, SkSpan<StyledText>(fTextStyles.data(), fTextStyles.size()));
   MultipleFontRunIterator font(text, styles);
@@ -182,6 +186,15 @@ void SkSection::shapeWordIntoManyLines(SkScalar width, const SkWord& word) {
 }
 
 void SkSection::shapeIntoLines(SkScalar maxWidth, size_t maxLines) {
+
+  fLines.reset();
+  fRuns.reset();
+  fAlphabeticBaseline = 0;
+  fIdeographicBaseline = 0;
+  fHeight = 0;
+  fWidth = 0;
+  fMaxIntrinsicWidth = 0;
+  fMinIntrinsicWidth = 0;
 
   if (fWords.empty()) {
     // The section contains whitespaces and controls only
@@ -205,6 +218,9 @@ void SkSection::shapeIntoLines(SkScalar maxWidth, size_t maxLines) {
 void SkSection::formatLinesByWords(SkScalar maxWidth) {
 
   auto effectiveAlign = fParagraphStyle.effective_align();
+  if (effectiveAlign != SkTextAlign::left) {
+    fMaxIntrinsicWidth = maxWidth;
+  }
   for (auto& line : fLines) {
 
     if (effectiveAlign == SkTextAlign::justify && &line == &fLines.back()) {

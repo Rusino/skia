@@ -192,6 +192,8 @@ class ShapeHandler final : public SkShaper::RunHandler {
       }
     }
 
+    inline SkVector advance() const { return fAdvance; }
+
   private:
     // SkShaper::RunHandler interface
     SkShaper::RunHandler::Buffer newRunBuffer(

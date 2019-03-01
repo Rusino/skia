@@ -7,6 +7,13 @@
 
 #include "SkWord.h"
 #include "SkRun.h"
+#include <unicode/brkiter.h>
+std::string toString1(SkSpan<const char> text) {
+  icu::UnicodeString utf16 = icu::UnicodeString(text.begin(), text.size());
+  std::string str;
+  utf16.toUTF8String(str);
+  return str;
+}
 
 SkWord::SkWord(SkSpan<const char> text, SkSpan<const char> spaces)
     : fText(text), fSpaces(spaces), fShift(0), fRuns(), fBlob(nullptr), bTrimmed(false) {
@@ -35,7 +42,7 @@ void SkWord::update(SkArraySpan<SkRun> runs) {
   // Find the starting glyph position for the first run (in characters)
   gLeft = 0;
   if (text.begin() > first->fText.begin()) {
-    while (gLeft < first->size() && first->fClusters[gLeft] < cStart) {
+    while (gLeft < first->size() && SkToU32(first->fClusters[gLeft]) < SkToU32(cStart)) {
       ++gLeft;
     }
   }
@@ -43,14 +50,14 @@ void SkWord::update(SkArraySpan<SkRun> runs) {
   // find the ending glyph position for the last run (in characters)
   gRight = last->size();
   if (text.end() < last->fText.end()) {
-    while (gRight > gLeft && last->fClusters[gRight - 1] >= cEnd) {
+    while (gRight > gLeft && SkToU32(last->fClusters[gRight - 1]) >= SkToU32(cEnd)) {
       --gRight;
     }
   }
 
   gTrim = gRight;
   if (!fSpaces.empty()) {
-    while (gTrim > gLeft && last->fClusters[gTrim - 1] >= cTrim) {
+    while (gTrim > gLeft && SkToU32(last->fClusters[gTrim - 1]) >= SkToU32(cTrim)) {
       --gTrim;
     }
   }
@@ -84,9 +91,12 @@ void SkWord::update(SkArraySpan<SkRun> runs) {
     ++iter;
   } while (iter <= last);
 
-  SkDebugf("Word [%d:%d] %f ~ %f\n",
+  SkDebugf("Word '%s' '%s' [%d:%d:%d] %f ~ %f\n",
+           toString1(fText).c_str(),
+           toString1(fSpaces).c_str(),
            this->gLeft,
            this->gRight,
+           this->gTrim,
            this->fFullWidth,
            this->fRightTrimmedWidth);
 }
@@ -111,6 +121,7 @@ void SkWord::generate(SkVector offset) {
                       iter->fGlyphs.data() + gStart,
                       (gEnd - gStart) * sizeof(SkGlyphID));
 
+    SkDebugf("Move blob %d:%d %f %f\n", gStart, gEnd, offset.fX, -first->fInfo.fAscent);
     for (size_t i = gStart; i < gEnd; ++i) {
       SkVector point = iter->fPositions[SkToInt(i)] - offset;
       point.fY = - first->fInfo.fAscent;
@@ -124,8 +135,6 @@ void SkWord::generate(SkVector offset) {
 }
 
 SkVector SkWord::getAdvance(const SkRun& run, size_t start, size_t end) {
-  //return (end == run.size() ? run.advance() : run.fPositions[end - 1]) -
-  //                SkVector::Make(run.fPositions[start].fX, 0);
   return SkVector::Make((end == run.size()
                          ? run.advance().fX
                          : run.fPositions[end].fX) - run.fPositions[start].fX,

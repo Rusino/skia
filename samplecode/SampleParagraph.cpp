@@ -234,39 +234,6 @@ class ParagraphView : public Sample {
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(defaultStyle);
 
-    std::string line01 = "// Create a raised button.\n";
-    std::string line02 = "RaisedButton(\n";
-    std::string line03 = "  child: const Text('BUTTON TITLE'),\n";
-    std::string line04 = "  onPressed: () {\n";
-    std::string line05 = "    // Perform some action\n";
-    std::string line06 = "  }\n";
-    std::string line07 = ");\n";
-    std::string line08 = "\n";
-    std::string line09 = "// Create a disabled button.\n";
-    std::string line10 = "// Buttons are disabled when onPressed isn't\n";
-    std::string line11 = "// specified or is null.\n";
-    std::string line12 = "const RaisedButton(\n";
-    std::string line13 = "  child: Text('BUTTON TITLE'),\n";
-    std::string line14 = "  onPressed: null\n";
-    std::string line15 = ");\n";
-    std::string line16 = "\n";
-    std::string line17 = "// Create a button with an icon and a\n";
-    std::string line18 = "// title.\n";
-    std::string line19 = "RaisedButton.icon(\n";
-    std::string line20 = "  icon: const Icon(Icons.add, size: 18.0),\n";
-    std::string line21 = "  label: const Text('BUTTON TITLE'),\n";
-    std::string line22 = "  onPressed: () {\n";
-    std::string line23 = "    // Perform some action\n";
-    std::string line24 = "  },\n";
-    std::string line25 = ");";
-
-    std::vector<std::string> lines = {
-        line01, line02, line03, line04, line05, line06, line07, line08, line09,
-        line10, line11, line12, line13, line14, line15, line16, line17, line18,
-        line19,
-        line20, line21, line22, line23, line24, line25,
-    };
-
     SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
 
     //builder.PushStyle(style(comment));
@@ -495,7 +462,6 @@ class ParagraphView : public Sample {
 
     auto paragraph = builder.Build();
     paragraph->layout(w - margin * 2);
-
     paragraph->paint(canvas, margin, margin);
 
     canvas->translate(0, paragraph->getHeight() + margin);
@@ -549,6 +515,7 @@ class ParagraphView : public Sample {
     drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kDouble);
     canvas->translate(0, height);
     drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kWavy);
+    };
     */
     /*
       SkScalar width = this->width() / 3;
@@ -560,14 +527,13 @@ class ParagraphView : public Sample {
       canvas->translate(0, this->height()/2);
       drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
     */
-    std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
-    std::vector<std::string> text = {
-        "My neighbor came over to say,\n"
-        "Although not in a neighborly way,\n\n"
-        "That he'd knock me around,\n\n\n"
-        "If I didn't stop the sound,\n\n\n\n"
-        "Of the classical music I play."
-    };
+
+    std::vector<std::string> options = {"Flutter is an open-source project to help developers "
+                                        "build high-performance, high-fidelity, mobile apps for "
+                                        " iOS and Android "
+                                        "from a single codebase. This design lab is a playground "
+                                        "and showcase of Flutter's many widgets, behaviors, "
+                                        "animations, layouts, and more."};
     std::vector<std::string> code = {
         "// Create a flat button.\n",
         "FlatButton(\n",
@@ -586,7 +552,29 @@ class ParagraphView : public Sample {
         "onPressed: null\n",
         ");"
     };
+    //drawText(canvas, width(), height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 12);
+
+    SkScalar width = this->width();
+    SkScalar height = this->height()/4;
     std::string line = "Hesitation is always easy rarely useful.";
+    drawLine(canvas, width, height, line, SkTextAlign::left);
+    canvas->translate(0, height);
+    drawLine(canvas, width, height, line, SkTextAlign::right);
+    canvas->translate(0, height);
+    drawLine(canvas, width, height, line, SkTextAlign::center);
+    canvas->translate(0, height);
+    drawLine(canvas, width, height, line, SkTextAlign::justify);
+    //drawCode(canvas, width(), height());
+    /*
+    std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
+    std::vector<std::string> text = {
+        "My neighbor came over to say,\n"
+        "Although not in a neighborly way,\n\n"
+        "That he'd knock me around,\n\n\n"
+        "If I didn't stop the sound,\n\n\n\n"
+        "Of the classical music I play."
+    };
+
     std::string str(gText);
     std::vector<std::string> long_word = 
         { "A_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_text"};
@@ -594,8 +582,6 @@ class ParagraphView : public Sample {
     std::vector<std::string> very_long =
         {"A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text"};
 
-    SkScalar width = this->width() / 4;
-    SkScalar height = this->height();
     drawText(canvas, width, height, long_word, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
 
     //drawText(canvas, width, height, cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
@@ -606,7 +592,7 @@ class ParagraphView : public Sample {
 
     canvas->translate(width, 0);
     drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-
+    */
   }
 
  private:
