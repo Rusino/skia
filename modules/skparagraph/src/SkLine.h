@@ -17,7 +17,7 @@ class SkLine {
 
   SkLine();
 
-  SkLine(SkVector advance, SkArraySpan<SkWord> words);
+  SkLine(SkVector advance, SkScalar baseline, SkArraySpan<SkWord> words);
 
   inline SkVector advance() { return fAdvance; }
   inline SkArraySpan<SkWord>& words() { return fWords; }
@@ -29,6 +29,16 @@ class SkLine {
   void paintByStyles(SkCanvas* canvas,
                      SkScalar offset,
                      SkSpan<StyledText> fTextStyles);
+
+  void generateWordTextBlobs(SkScalar offsetX, SkSpan<StyledText> fTextStyles);
+
+  void paintText(SkCanvas* canvas, SkScalar offsetY);
+
+  void paintBackground(SkCanvas* canvas, SkScalar offsetY);
+
+  void paintShadow(SkCanvas* canvas, SkScalar offsetY);
+
+  void paintDecorations(SkCanvas* canvas, SkScalar offsetY);
 
   void getRectsForRange(
       SkTextDirection textDirection,
@@ -42,6 +52,7 @@ class SkLine {
   SkVector fAdvance;
   SkScalar fWidth;    // Could be different from advance because of formatting
   SkScalar fHeight;
+  SkScalar fBaseline;
 
   SkArraySpan<SkWord> fWords;
 };

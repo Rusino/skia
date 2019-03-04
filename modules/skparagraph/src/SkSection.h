@@ -104,6 +104,10 @@ class SkSection {
         SkTArray<StyledText> styles,
         SkTArray<SkWord, true> words);
 
+    ~SkSection() {
+
+    }
+
     void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
 
     void formatLinesByWords(SkScalar maxWidth);

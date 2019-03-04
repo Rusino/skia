@@ -10,8 +10,6 @@
 #include <vector>
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
-//#include "SkShapedParagraph.h"
-#include "SkSection.h"
 
 struct Block {
     Block(size_t start, size_t end, SkTextStyle style)
@@ -22,6 +20,8 @@ struct Block {
 };
 
 class SkCanvas;
+class SkSection;
+class SkPicture;
 
 class SkParagraph {
   public:
@@ -95,7 +95,7 @@ class SkParagraph {
     SkSpan<const char> fUtf8;
 
     // Shaping (list of sections separated by hard line breaks)
-    std::vector<SkSection> fSections;
+    SkTArray<std::unique_ptr<SkSection>> fSections;
 
     // Painting
     sk_sp<SkPicture> fPicture;

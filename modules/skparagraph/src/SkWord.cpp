@@ -21,8 +21,9 @@ SkWord::SkWord(SkSpan<const char> text, SkSpan<const char> spaces, bool lineBrea
     , fShift(0)
     , fRuns()
     , fBlob(nullptr)
-    , bTrimmed(false)
-    , fMayLineBreakBefore(lineBreakBefore){
+    , fTrimmed(false)
+    , fMayLineBreakBefore(lineBreakBefore)
+    , fProducedByShaper(false) {
 }
 
 SkWord::SkWord(SkSpan<const char> text, SkArraySpan<SkRun> runs)
@@ -31,8 +32,9 @@ SkWord::SkWord(SkSpan<const char> text, SkArraySpan<SkRun> runs)
     , fShift(0)
     , fRuns()
     , fBlob(nullptr)
-    , bTrimmed(false)
-    , fMayLineBreakBefore(true) {
+    , fTrimmed(false)
+    , fMayLineBreakBefore(true)
+    , fProducedByShaper(true) {
   update(runs);
 }
 
@@ -72,10 +74,11 @@ void SkWord::update(SkArraySpan<SkRun> runs) {
     }
   }
 
-  fOffset = first->offset();
+  fOffset = SkVector::Make(0, 0);
   fHeight = 0;
   fFullWidth = 0;
   fRightTrimmedWidth = 0;
+  fBaseline = 0;
   auto iter = first;
   do {
     auto gStart = iter == first ? gLeft : 0;
@@ -90,22 +93,25 @@ void SkWord::update(SkArraySpan<SkRun> runs) {
     } else {
       advance = getAdvance(*iter, gStart, gEnd);
       if (iter == first) {
-        fOffset.fX += getOffset(*iter, gStart).fX;
+         fOffset.fX = iter->fPositions[gStart].fX;
       }
       auto trimmed = getAdvance(*iter, gStart, gTrim);
       fRightTrimmedWidth += trimmed.fX;
     }
     fHeight += advance.fY;
     fFullWidth += advance.fX;
+    fBaseline = SkMaxScalar(fBaseline, - iter->fInfo.fAscent);
 
     ++iter;
   } while (iter <= last);
 
-  SkDebugf("Word%s '%s' [%d:%d]\n",
+  SkASSERT(fFullWidth >= 0);
+  SkASSERT(fRightTrimmedWidth >= 0);
+  SkDebugf("Word%s '%s' %f ~ %f\n",
            fMayLineBreakBefore ? " " : "+",
            toString1(fText).c_str(),
-           this->gLeft,
-           this->gRight);
+           fFullWidth,
+           fOffset.fX);
 }
 
 void SkWord::generate(SkVector offset) {
@@ -118,7 +124,7 @@ void SkWord::generate(SkVector offset) {
   auto iter = fRuns.begin();
   do {
     auto gStart = iter == first ? gLeft : 0;
-    auto gEnd = iter == last ? bTrimmed ? gTrim : gRight : iter->size();
+    auto gEnd = iter == last ? fTrimmed ? gTrim : gRight : iter->size();
     if (gStart >= gEnd) {
       break;
     }
@@ -131,7 +137,7 @@ void SkWord::generate(SkVector offset) {
     for (size_t i = gStart; i < gEnd; ++i) {
       SkVector point = iter->fPositions[SkToInt(i)] - offset;
       point.fY = - first->fInfo.fAscent;
-      blobBuffer.points()[i - gStart] = point; //iter->fPositions[SkToInt(i)] - offset;
+      blobBuffer.points()[i - gStart] = point;
     }
 
     ++iter;
@@ -142,26 +148,28 @@ void SkWord::generate(SkVector offset) {
 
 SkVector SkWord::getAdvance(const SkRun& run, size_t start, size_t end) {
   return SkVector::Make((end == run.size()
-                         ? run.advance().fX
-                         : run.fPositions[end].fX) - run.fPositions[start].fX,
+                         ? run.advance().fX - (run.fPositions[start].fX - run.fPositions[0].fX)
+                         : run.fPositions[end].fX - run.fPositions[start].fX),
                         run.advance().fY);
 }
 
-SkVector SkWord::getOffset(const SkRun& run, size_t start) {
-  return SkVector(
-      start == 0 ? run.offset() : run.offset() + run.fPositions[start]);
+// TODO: Optimize painting by colors (paints)
+void SkWord::paint(SkCanvas* canvas, SkScalar offsetY) {
 
+  // TODO: deal with different styles
+  auto style = this->fTextStyles.begin()->fStyle;
+  SkPaint paint;
+  if (style.hasForeground()) {
+    paint = style.getForeground();
+  } else {
+    paint.reset();
+    paint.setColor(style.getColor());
+  }
+  paint.setAntiAlias(true);
+  canvas->drawTextBlob(fBlob, fShift, offsetY, paint);
 }
 
-// TODO: Optimize painting by colors (paints)
-void SkWord::paint(SkCanvas* canvas,
-                   SkScalar offsetX,
-                   SkScalar offsetY,
-                   SkSpan<StyledText> styles) {
-
-  generate(SkVector::Make(offsetX, 0));
-
-  // TODO: deal with styles
+void SkWord::dealWithStyles(SkSpan<StyledText> styles) {
   // Do it somewhere else much earlier
   auto start = styles.begin();
   // Find the first style that affects the run
@@ -177,25 +185,9 @@ void SkWord::paint(SkCanvas* canvas,
   }
 
   fTextStyles = SkSpan<StyledText>(start, end - start);
-  // TODO: deal with different styles
-  //paintBackground(canvas, SkPoint::Make(0, offsetY));
-  //paintShadow(canvas);
-
-  auto style = this->fTextStyles.begin()->fStyle;
-  SkPaint paint;
-  if (style.hasForeground()) {
-    paint = style.getForeground();
-  } else {
-    paint.reset();
-    paint.setColor(style.getColor());
-  }
-  paint.setAntiAlias(true);
-  canvas->drawTextBlob(fBlob, fShift, offsetY, paint);
-
-  //paintDecorations(canvas);
 }
 
-void SkWord::paintShadow(SkCanvas* canvas) {
+void SkWord::paintShadow(SkCanvas* canvas, SkPoint point) {
 
   auto fStyle = this->fTextStyles.begin()->fStyle;
   if (fStyle.getShadowNumber() == 0) {
@@ -215,98 +207,22 @@ void SkWord::paintShadow(SkCanvas* canvas) {
                                                  false));
     }
     canvas->drawTextBlob(fBlob,
-                         fShift + shadow.fOffset.x(),
-                         shadow.fOffset.y(),
+                         point.fX + shadow.fOffset.x(),
+                         point.fY + shadow.fOffset.y(),
                          paint);
   }
 }
 
 void SkWord::paintBackground(SkCanvas* canvas, SkPoint point) {
 
-  SkRect fRect =
-      SkRect::MakeXYWH(point.fX + fOffset.fX, point.fY, fFullWidth, fHeight);
+  SkRect rect = SkRect::MakeXYWH(point.fX + fOffset.fX, point.fY, fFullWidth, fHeight);
   auto fStyle = this->fTextStyles.begin()->fStyle;
   if (!fStyle.hasBackground()) {
     return;
   }
 
-  fRect.offset(fShift, 0);
-  canvas->drawRect(fRect, fStyle.getBackground());
-}
-
-SkScalar SkWord::computeDecorationThickness(SkTextStyle textStyle) {
-
-  SkScalar thickness = 1.0f;
-
-  SkFontMetrics metrics;
-  textStyle.getFontMetrics(&metrics);
-
-  switch (textStyle.getDecoration()) {
-    case SkTextDecoration::kUnderline:
-      if (!metrics.hasUnderlineThickness(&thickness)) {
-        thickness = 1.f;
-      }
-      break;
-    case SkTextDecoration::kOverline:
-      break;
-    case SkTextDecoration::kLineThrough:
-      if (!metrics.hasStrikeoutThickness(&thickness)) {
-        thickness = 1.f;
-      }
-      break;
-    default:
-      SkASSERT(false);
-  }
-
-  thickness = SkMaxScalar(thickness, textStyle.getFontSize() / 14.f);
-
-  return thickness * textStyle.getDecorationThicknessMultiplier();
-}
-
-SkScalar SkWord::computeDecorationPosition(SkScalar thickness) {
-
-  SkRect fRect = SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fFullWidth, fHeight);
-  auto fStyle = this->fTextStyles.begin()->fStyle;
-  SkFontMetrics metrics;
-  fStyle.getFontMetrics(&metrics);
-
-  SkScalar position;
-
-  switch (fStyle.getDecoration()) {
-    case SkTextDecoration::kUnderline:
-      if (metrics.hasUnderlinePosition(&position)) {
-        return position - metrics.fAscent;
-      } else {
-        position = metrics.fDescent - metrics.fAscent;
-        if (fStyle.getDecorationStyle()
-            == SkTextDecorationStyle::kWavy ||
-            fStyle.getDecorationStyle()
-                == SkTextDecorationStyle::kDouble
-            ) {
-          return position - thickness * 3;
-        } else {
-          return position - thickness;
-        }
-      }
-
-      break;
-    case SkTextDecoration::kOverline:
-      return 0;
-      break;
-    case SkTextDecoration::kLineThrough: {
-      SkScalar delta = fRect.height()
-          - (metrics.fDescent - metrics.fAscent + metrics.fLeading);
-      position =
-          SkTMax(0.0f, delta) + (metrics.fDescent - metrics.fAscent) / 2;
-      break;
-    }
-    default:
-      position = 0;
-      SkASSERT(false);
-      break;
-  }
-
-  return position;
+  rect.offset(fShift, 0);
+  canvas->drawRect(rect, fStyle.getBackground());
 }
 
 void SkWord::computeDecorationPaint(SkPaint& paint, SkPath& path) {
@@ -377,19 +293,36 @@ void SkWord::computeDecorationPaint(SkPaint& paint, SkPath& path) {
   }
 }
 
-void SkWord::paintDecorations(SkCanvas* canvas) {
+void SkWord::paintDecorations(SkCanvas* canvas, SkScalar offsetY, SkScalar baseline) {
 
-  SkRect fRect = SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fFullWidth, fHeight);
   auto fStyle = this->fTextStyles.begin()->fStyle;
   if (fStyle.getDecoration() == SkTextDecoration::kNone) {
     return;
   }
 
-// Decoration thickness
-  SkScalar thickness = computeDecorationThickness(fStyle);
+  // Decoration thickness
+  SkScalar thickness = fStyle.getDecorationThicknessMultiplier() * fStyle.getFontSize() / 14.f;
 
-// Decoration position
-  SkScalar position = computeDecorationPosition(thickness);
+  // Decoration position
+  SkFontMetrics metrics;
+  fStyle.getFontMetrics(&metrics);
+  SkScalar position;
+  switch (fStyle.getDecoration()) {
+    case SkTextDecoration::kUnderline:
+      position = baseline + thickness;
+      break;
+    case SkTextDecoration::kOverline:
+      position = baseline + metrics.fAscent - thickness;
+      break;
+    case SkTextDecoration::kLineThrough: {
+      position = baseline + metrics.fDescent + (metrics.fAscent - thickness) / 2;
+      break;
+    }
+    default:
+      position = 0;
+      SkASSERT(false);
+      break;
+  }
 
 // Decoration paint (for now) and/or path
   SkPaint paint;
@@ -398,6 +331,7 @@ void SkWord::paintDecorations(SkCanvas* canvas) {
   paint.setStrokeWidth(thickness);
 
 // Draw the decoration
+  SkRect fRect = SkRect::MakeXYWH(fShift + fOffset.fX, offsetY + fOffset.fY, fFullWidth, fHeight);
   auto width = fRect.width();
   SkScalar x = fRect.left() + fShift;
   SkScalar y = fRect.top() + position;

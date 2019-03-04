@@ -14,12 +14,13 @@ SkLine::SkLine() {
   fHeight = 0;
 }
 
-SkLine::SkLine(SkVector advance, SkArraySpan<SkWord> words)
+SkLine::SkLine(SkVector advance, SkScalar baseline, SkArraySpan<SkWord> words)
     : SkLine() {
   fAdvance = advance;
   fWords = words;
   fHeight = advance.fY;
   fWidth = advance.fX;
+  fBaseline = baseline;
 }
 
 void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
@@ -83,9 +84,52 @@ void SkLine::paintByStyles(SkCanvas* canvas,
   // Change positions for all the words and build text blobs
   canvas->translate(fShift, 0);
   auto offsetX = fWords.begin()->offset().fX;
+
+  generateWordTextBlobs(offsetX, fTextStyles);
+
+  paintBackground(canvas, offsetY);
+
+  paintShadow(canvas, offsetY);
+
+  paintDecorations(canvas, offsetY);
+
+  paintText(canvas, offsetY);
+}
+
+void SkLine::generateWordTextBlobs(SkScalar offsetX, SkSpan<StyledText> fTextStyles) {
+
   for (auto word = fWords.begin(); word != fWords.end(); ++word) {
 
-    word->paint(canvas, offsetX, offsetY, fTextStyles);
+    word->generate(SkPoint::Make(offsetX, 0));
+    word->dealWithStyles(fTextStyles);
+  }
+}
+
+void SkLine::paintBackground(SkCanvas* canvas, SkScalar offsetY) {
+
+  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+    word->paintBackground(canvas, SkPoint::Make(fShift, offsetY));
+  }
+}
+
+void SkLine::paintShadow(SkCanvas* canvas, SkScalar offsetY) {
+
+  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+    word->paintShadow(canvas, SkPoint::Make(fShift, offsetY));
+  }
+}
+
+void SkLine::paintDecorations(SkCanvas* canvas, SkScalar offsetY) {
+
+  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+    word->paintDecorations(canvas, offsetY, fBaseline);
+  }
+}
+
+void SkLine::paintText(SkCanvas* canvas, SkScalar offsetY) {
+
+  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+    word->paint(canvas, offsetY);
   }
 }
 

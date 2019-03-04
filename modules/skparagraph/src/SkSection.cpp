@@ -95,7 +95,7 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
   SkVector advance = SkVector::Make(0, 0);
 
   size_t lineBegin = 0;
-
+  SkScalar baseline = 0;
   size_t wordGroupStart = 0;
   size_t wordGroupdEnd = 0;
   while (wordGroupStart != fWords.size()) {
@@ -113,6 +113,7 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
       wordsHeight = SkMaxScalar(wordsHeight, word.fullAdvance().fY);
       wordsWidth += word.fullAdvance().fX;
       trim = word.fullAdvance().fX - word.trimmedAdvance().fX;
+      baseline = SkMaxScalar(baseline, word.fBaseline);
       ++wordGroupdEnd;
     };
 
@@ -121,7 +122,7 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
     if (advance.fX + wordsWidth - trim > width) {
       // TODO: there is one limitation here - SkShaper starts breaking words from the new line
 
-      if (advance.fX == 0) {
+      if (advance.fX == 0 && !firstWord.fProducedByShaper) {
         // The word is too big!
         // Let SkShaper to break it into many words and insert these words instead of this big word
         // Then continue breaking as if nothing happened
@@ -135,12 +136,13 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
         // Add the line and start counting again
         SkDebugf("break %d: %f + %f %f + %f ? %f\n",
                  wordGroupStart - lineBegin, fHeight, advance.fY, wordsWidth, advance.fX, width);
-        fLines.emplace_back(advance, SkArraySpan<SkWord>(fWords, lineBegin, wordGroupStart));
+        fLines.emplace_back(advance, baseline, SkArraySpan<SkWord>(fWords, lineBegin, wordGroupStart));
         fWidth = SkMaxScalar(fWidth, advance.fX);
         fHeight += advance.fY;
         // Start the new line
         lineBegin = wordGroupStart;
         advance = SkVector::Make(0, 0);
+        baseline = 0;
       }
     }
 
@@ -171,7 +173,7 @@ void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines
            fWords.back().fullAdvance().fX,
            advance.fX,
            width);
-  fLines.emplace_back(advance, SkArraySpan<SkWord>(fWords, lineBegin, fWords.size()));
+  fLines.emplace_back(advance, baseline, SkArraySpan<SkWord>(fWords, lineBegin, fWords.size()));
   fWidth = SkMaxScalar(fWidth, advance.fX);
   fHeight += advance.fY;
 }

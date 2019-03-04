@@ -344,7 +344,7 @@ class ParagraphView : public Sample {
       }
 
       auto paragraph = builder.Build();
-      paragraph->layout(w - margin);
+      paragraph->layout(w - margin * 2);
 
       paragraph->paint(canvas, margin, margin);
 
@@ -502,7 +502,7 @@ class ParagraphView : public Sample {
   }
 
   void onDrawContent(SkCanvas* canvas) override {
-    //drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
+    drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
     /*
     SkScalar height = this->height() / 5;
     drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kSolid);
@@ -552,10 +552,10 @@ class ParagraphView : public Sample {
         ");"
     };
     //drawText(canvas, width(), height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
-
+/*
     SkScalar width = this->width() / 4;
     SkScalar height = this->height();
-    /*
+
 std::string line = "Hesitation is always easy rarely useful.";
 drawLine(canvas, width, height, line, SkTextAlign::left);
 canvas->translate(0, height);
@@ -566,6 +566,7 @@ canvas->translate(0, height);
 drawLine(canvas, width, height, line, SkTextAlign::justify);
 //drawCode(canvas, width(), height());
 */
+/*
 std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
 
     std::vector<std::string> text = {
@@ -592,6 +593,7 @@ std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
     drawCode(canvas, width, height);
     canvas->translate(width, 0);
     drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
+*/
   }
 
  private:

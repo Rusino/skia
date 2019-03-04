@@ -9,11 +9,12 @@
 #include <unicode/brkiter.h>
 #include "SkParagraph.h"
 #include "SkPictureRecorder.h"
+#include "SkSection.h"
 
 SkParagraph::SkParagraph(const std::string& text,
                          SkParagraphStyle style,
                          std::vector<Block> blocks)
-    : fParagraphStyle(style), fUtf8(text.data(), text.size()),
+    : fParagraphStyle(std::move(style)), fUtf8(text.data(), text.size()),
       fPicture(nullptr) {
 
   std::transform(blocks.cbegin(),
@@ -29,7 +30,7 @@ SkParagraph::SkParagraph(const std::string& text,
 SkParagraph::SkParagraph(const std::u16string& utf16text,
                          SkParagraphStyle style,
                          std::vector<Block> blocks)
-    : fParagraphStyle(style), fPicture(nullptr) {
+    : fParagraphStyle(std::move(style)), fPicture(nullptr) {
 
   icu::UnicodeString
       unicode((UChar*) utf16text.data(), SkToS32(utf16text.size()));
@@ -50,13 +51,12 @@ SkParagraph::SkParagraph(const std::u16string& utf16text,
 SkParagraph::~SkParagraph() = default;
 
 std::string toString(SkSpan<const char> text) {
-  icu::UnicodeString utf16 = icu::UnicodeString(text.begin(), text.size());
+  icu::UnicodeString utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
   std::string str;
   utf16.toUTF8String(str);
   return str;
 }
 
-// TODO: optimize for intrinsic widths
 bool SkParagraph::layout(double doubleWidth) {
 
   if (fSections.empty()) {
@@ -81,29 +81,29 @@ bool SkParagraph::layout(double doubleWidth) {
   size_t maxLines = fParagraphStyle.getMaxLines();
   for (auto& section : fSections) {
 
-    section.shapeIntoLines(width, maxLines);
+    section->shapeIntoLines(width, maxLines);
 
     // Make sure we haven't exceeded the limits
-    fLinesNumber += section.lineNumber();
+    fLinesNumber += section->lineNumber();
     if (!fParagraphStyle.unlimited_lines()) {
-      maxLines -= section.lineNumber();
+      maxLines -= section->lineNumber();
     }
     if (maxLines <= 0) {
       break;
     }
 
-    section.formatLinesByWords(width);
-    fMaxLineWidth = SkMaxScalar(fMaxLineWidth, section.width());
+    section->formatLinesByWords(width);
+    fMaxLineWidth = SkMaxScalar(fMaxLineWidth, section->width());
 
     // Get the stats
-    fAlphabeticBaseline = section.alphabeticBaseline();
-    fIdeographicBaseline = section.ideographicBaseline();
-    fHeight += section.height();
-    fWidth = SkMaxScalar(fWidth, section.width());
+    fAlphabeticBaseline = section->alphabeticBaseline();
+    fIdeographicBaseline = section->ideographicBaseline();
+    fHeight += section->height();
+    fWidth = SkMaxScalar(fWidth, section->width());
     fMaxIntrinsicWidth =
-        SkMaxScalar(fMaxIntrinsicWidth, section.maxIntrinsicWidth());
+        SkMaxScalar(fMaxIntrinsicWidth, section->maxIntrinsicWidth());
     fMinIntrinsicWidth =
-        SkMaxScalar(fMinIntrinsicWidth, section.minIntrinsicWidth());
+        SkMaxScalar(fMinIntrinsicWidth, section->minIntrinsicWidth());
   }
 
   SkDebugf("fHeight: %f\n", fHeight);
@@ -136,8 +136,8 @@ void SkParagraph::recordPicture() {
   SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
   for (auto& section : fSections) {
 
-    section.paintEachLineByStyles(textCanvas);
-    textCanvas->translate(0, section.height());
+    section->paintEachLineByStyles(textCanvas);
+    textCanvas->translate(0, section->height());
   }
 
   fPicture = recorder.finishRecordingAsPicture();
@@ -217,6 +217,7 @@ void SkParagraph::breakTextIntoSections() {
 
       auto trimControls = [this](int32_t start, int32_t end) -> SkSpan<const char> {
 
+        SkASSERT(start <= end);
         while (end > start) {
           auto ch = *(this->fText.begin() + end - 1);
           if (u_charType(ch) != U_CONTROL_CHAR) {
@@ -225,7 +226,7 @@ void SkParagraph::breakTextIntoSections() {
           --end;
         }
 
-        return SkSpan<const char>(this->fText.begin() + start, end - start);
+        return SkSpan<const char>(this->fText.begin() + start, SkToU32(end - start));
       };
 
       auto currentChar = fText.begin() + fCurrentPosition;
@@ -249,7 +250,7 @@ void SkParagraph::breakTextIntoSections() {
           }
           // Ignore soft line breaks
         }
-        fLine = SkSpan<const char>(currentChar, fNextLinePosition - fCurrentPosition);
+        fLine = SkSpan<const char>(currentChar, SkToU32(fNextLinePosition - fCurrentPosition));
       }
 
       if (fNextWordPosition <= fCurrentPosition) {
@@ -310,7 +311,7 @@ void SkParagraph::breakTextIntoSections() {
     std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> fAutoClose;
   };
 
-  fSections.clear();
+  fSections.reset();
   SkTArray<SkWord, true> words;
 
   BreakIterator breakIterator(fUtf8);
@@ -342,15 +343,14 @@ void SkParagraph::breakTextIntoSections() {
     auto limits = SkSection::selectStyles(line, SkSpan<StyledText>(fTextStyles));
 
     SkTArray<StyledText> styles;
-    styles.reserve(limits.size());
+    styles.reserve(SkToS32(limits.size()));
 
     for (auto style = limits.begin(); style < limits.end(); ++style) {
       auto start = SkTMax(style->fText.begin(), line.begin());
       auto end = SkTMin(style->fText.end(), line.end());
-      styles.emplace_back(SkSpan<const char>(start, SkToS32(end - start)), style->fStyle);
+      styles.emplace_back(SkSpan<const char>(start, SkToU32(end - start)), style->fStyle);
     }
-    fSections.emplace_back(line, fParagraphStyle, std::move(styles), std::move(words));
-    words.reset();
+    fSections.emplace_back(std::make_unique<SkSection>(line, fParagraphStyle, std::move(styles), std::move(words)));
   }
 }
 
@@ -363,7 +363,7 @@ std::vector<SkTextBox> SkParagraph::getRectsForRange(
 
   std::vector<SkTextBox> result;
   for (auto& section : fSections) {
-    section.getRectsForRange(
+    section->getRectsForRange(
         fUtf8.begin() + start,
         fUtf8.begin() + end,
         result);
