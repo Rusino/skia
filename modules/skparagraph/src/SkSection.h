@@ -137,7 +137,7 @@ class SkSection {
     void mapRunsToWords();
     void breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines);
 
-    void shapeWordIntoManyLines(SkScalar width, const SkWord& word);
+    void shapeWordsIntoManyLines(SkScalar width, SkSpan<const char> text, size_t groupStart, size_t groupEnd);
 
      // Input
     SkSpan<const char> fText;
@@ -156,19 +156,23 @@ class SkSection {
     SkTArray<SkRun, true> fRuns;      // Shaped text, one line, broken into runs
     SkTArray<SkWord, true> fWords; // Shaped text, one line, broken into words
     SkTArray<SkLine> fLines;    // Shaped text, broken into lines
-
-  // When we break a long word into few small ones with SkShaper we need the starting point
-    size_t fWordInsertIndex;
 };
 
 
 class ShapeHandler final : public SkShaper::RunHandler {
 
   public:
-    explicit ShapeHandler(SkSection& section, bool endlessLine)
-    : fEndlessLine(endlessLine)
+    explicit ShapeHandler(SkSection& section)
+    : fEndlessLine(true)
     , fSection(&section)
     , fAdvance(SkVector::Make(0, 0)) { }
+
+    explicit ShapeHandler(SkSection& section, size_t groupStart, size_t groupEnd)
+      : fEndlessLine(false)
+      , fSection(&section)
+      , fAdvance(SkVector::Make(0, 0))
+      , fWordRemoveStart(groupStart)
+      , fWordRemoveEnd(groupEnd) { }
 
 
     ~ShapeHandler() {
@@ -176,9 +180,9 @@ class ShapeHandler final : public SkShaper::RunHandler {
 
         // Insert words coming from SkShaper into the list
         // (skipping the long word that has been broken into pieces)
-        size_t left = fSection->fWordInsertIndex;
+        size_t left = fWordRemoveStart;
         size_t insert = fWords.size();
-        size_t right = fSection->fWords.size() - left - 1;
+        size_t right = fSection->fWords.size() - fWordRemoveEnd;
         size_t total = left + right + insert;
 
         SkTArray<SkWord, true> bigger;
@@ -237,4 +241,6 @@ class ShapeHandler final : public SkShaper::RunHandler {
     SkSection* fSection;
     SkVector fAdvance;
     SkTArray<SkWord> fWords;
+    size_t fWordRemoveStart;
+    size_t fWordRemoveEnd;
 };

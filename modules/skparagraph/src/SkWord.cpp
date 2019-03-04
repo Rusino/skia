@@ -15,14 +15,24 @@ std::string toString1(SkSpan<const char> text) {
   return str;
 }
 
-SkWord::SkWord(SkSpan<const char> text, SkSpan<const char> spaces)
-    : fText(text), fSpaces(spaces), fShift(0), fRuns(), fBlob(nullptr), bTrimmed(false) {
-
+SkWord::SkWord(SkSpan<const char> text, SkSpan<const char> spaces, bool lineBreakBefore)
+    : fText(text)
+    , fSpaces(spaces)
+    , fShift(0)
+    , fRuns()
+    , fBlob(nullptr)
+    , bTrimmed(false)
+    , fMayLineBreakBefore(lineBreakBefore){
 }
 
 SkWord::SkWord(SkSpan<const char> text, SkArraySpan<SkRun> runs)
-    : fText(text), fSpaces(SkSpan<const char>()), fShift(0), fRuns(),
-      fBlob(nullptr), bTrimmed(false) {
+    : fText(text)
+    , fSpaces(SkSpan<const char>())
+    , fShift(0)
+    , fRuns()
+    , fBlob(nullptr)
+    , bTrimmed(false)
+    , fMayLineBreakBefore(true) {
   update(runs);
 }
 
@@ -91,14 +101,11 @@ void SkWord::update(SkArraySpan<SkRun> runs) {
     ++iter;
   } while (iter <= last);
 
-  SkDebugf("Word '%s' '%s' [%d:%d:%d] %f ~ %f\n",
+  SkDebugf("Word%s '%s' [%d:%d]\n",
+           fMayLineBreakBefore ? " " : "+",
            toString1(fText).c_str(),
-           toString1(fSpaces).c_str(),
            this->gLeft,
-           this->gRight,
-           this->gTrim,
-           this->fFullWidth,
-           this->fRightTrimmedWidth);
+           this->gRight);
 }
 
 void SkWord::generate(SkVector offset) {
@@ -121,7 +128,6 @@ void SkWord::generate(SkVector offset) {
                       iter->fGlyphs.data() + gStart,
                       (gEnd - gStart) * sizeof(SkGlyphID));
 
-    SkDebugf("Move blob %d:%d %f %f\n", gStart, gEnd, offset.fX, -first->fInfo.fAscent);
     for (size_t i = gStart; i < gEnd; ++i) {
       SkVector point = iter->fPositions[SkToInt(i)] - offset;
       point.fY = - first->fInfo.fAscent;

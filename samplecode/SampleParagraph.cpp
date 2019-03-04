@@ -551,21 +551,23 @@ class ParagraphView : public Sample {
         "onPressed: null\n",
         ");"
     };
-    //drawText(canvas, width(), height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 12);
+    //drawText(canvas, width(), height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
 
-    SkScalar width = this->width();
-    SkScalar height = this->height()/4;
-    std::string line = "Hesitation is always easy rarely useful.";
-    drawLine(canvas, width, height, line, SkTextAlign::left);
-    canvas->translate(0, height);
-    drawLine(canvas, width, height, line, SkTextAlign::right);
-    canvas->translate(0, height);
-    drawLine(canvas, width, height, line, SkTextAlign::center);
-    canvas->translate(0, height);
-    drawLine(canvas, width, height, line, SkTextAlign::justify);
-    //drawCode(canvas, width(), height());
+    SkScalar width = this->width() / 4;
+    SkScalar height = this->height();
     /*
-    std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
+std::string line = "Hesitation is always easy rarely useful.";
+drawLine(canvas, width, height, line, SkTextAlign::left);
+canvas->translate(0, height);
+drawLine(canvas, width, height, line, SkTextAlign::right);
+canvas->translate(0, height);
+drawLine(canvas, width, height, line, SkTextAlign::center);
+canvas->translate(0, height);
+drawLine(canvas, width, height, line, SkTextAlign::justify);
+//drawCode(canvas, width(), height());
+*/
+std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
+
     std::vector<std::string> text = {
         "My neighbor came over to say,\n"
         "Although not in a neighborly way,\n\n"
@@ -588,10 +590,8 @@ class ParagraphView : public Sample {
     drawText(canvas, width, height, text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 100, u"\u2026");
     canvas->translate(width, 0);
     drawCode(canvas, width, height);
-
     canvas->translate(width, 0);
     drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-    */
   }
 
  private:

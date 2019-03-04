@@ -201,8 +201,7 @@ void SkParagraph::breakTextIntoSections() {
 
     bool next() {
 
-      auto trim = [](const char* start, int32_t size) {
-
+      auto isWhiteSpaces = [](const char* start, int32_t size) -> bool {
         auto pos = start + size - 1;
         while (pos >= start) {
           auto ch = *pos;
@@ -213,28 +212,20 @@ void SkParagraph::breakTextIntoSections() {
           }
           --pos;
         }
-
-        return SkSpan<const char>(start, SkToU32(pos - start + 1));
+        return pos < start;
       };
 
-      auto punctuation = [](const char* start, int32_t size) -> bool {
+      auto trimControls = [this](int32_t start, int32_t end) -> SkSpan<const char> {
 
-        auto pos = start + size - 1;
-        bool atLeastOnePunct = false;
-        while (pos >= start) {
-          auto ch = *pos;
-          auto mask = U_GET_GC_MASK(ch);
-
-          if (!u_isspace(ch) &&
-              (mask && (U_GC_PD_MASK|U_GC_PE_MASK|U_GC_PC_MASK|U_GC_PO_MASK|U_GC_PF_MASK) == 0) &&
-              u_charType(ch) != U_NON_SPACING_MARK) {
-            return false;
+        while (end > start) {
+          auto ch = *(this->fText.begin() + end - 1);
+          if (u_charType(ch) != U_CONTROL_CHAR) {
+            break;
           }
-          atLeastOnePunct = u_ispunct(ch);
-          --pos;
+          --end;
         }
 
-        return atLeastOnePunct;
+        return SkSpan<const char>(this->fText.begin() + start, end - start);
       };
 
       auto currentChar = fText.begin() + fCurrentPosition;
@@ -269,41 +260,28 @@ void SkParagraph::breakTextIntoSections() {
           fNextWordPosition = SkToS32(fText.size());
         }
 
-        fWord = trim(currentChar, fNextWordPosition - fCurrentPosition);
-        if (!fWord.empty()) {
-          fTrailingSpaces = SkSpan<const char>(fWord.end(), 0);
-          fCurrentPosition = fNextWordPosition;
-          // If the next word is all spaces (+ possibly controls)
-          // add them to the current word and move again
-
-          while (fNextWordPosition < fNextLinePosition) {
-            // Look ahead if possible
-            auto nextNextPosition = ubrk_following(fWordBreak, fNextWordPosition);
-            if (nextNextPosition == icu::BreakIterator::DONE ||
-                nextNextPosition > fNextLinePosition) {
-              break;
+        fWord = trimControls(fCurrentPosition, fNextWordPosition);
+        fTrailingSpaces = SkSpan<const char>(fWord.end(), 0);
+        if (!isWhiteSpaces(currentChar, fNextWordPosition - fCurrentPosition)) {
+            if (fNextWordPosition < fNextLinePosition) {
+                // Look ahead if possible
+                auto nextNextPosition = ubrk_following(fWordBreak, fNextWordPosition);
+                if (nextNextPosition == icu::BreakIterator::DONE ||
+                    nextNextPosition > fNextLinePosition) {
+                  // Next word is behind the line break
+                } else {
+                  if (isWhiteSpaces(fText.begin() + fNextWordPosition,
+                                    nextNextPosition - fNextWordPosition)) {
+                    // Add extra spaces to the current word and move the position
+                    fTrailingSpaces = trimControls(fNextWordPosition, nextNextPosition);
+                    fNextWordPosition = nextNextPosition;
+                  }
+                }
             }
-
-            if (punctuation(fText.begin() + fNextWordPosition, nextNextPosition - fNextWordPosition)) {
-              fWord = trim(currentChar, fWord.size() + nextNextPosition - fCurrentPosition);
-              fCurrentPosition = nextNextPosition;
-            } else if (!trim(fText.begin() + fNextWordPosition, nextNextPosition - fNextWordPosition).empty()) {
-              // Check if the next word consists of spaces or controls
-              break;
-            }
-
-            fNextWordPosition = nextNextPosition;
-          }
         } else {
-          // This is one tricky case when the word itself is all spaces
+          // This is one tricky case when the word itself is all spaces (leading spaces)
           // It takes care of itself, though...
         }
-
-        // Found significant characters
-        fTrailingSpaces = SkSpan<const char>
-            (fWord.end(), SkToU32(fNextWordPosition - fCurrentPosition));
-
-        SkDebugf("%d: '%s'\n", fTrailingSpaces.size(), toString(fWord).c_str());
       }
       fCurrentPosition = SkTMin(fNextWordPosition, fNextLinePosition);
 
@@ -328,7 +306,6 @@ void SkParagraph::breakTextIntoSections() {
     SkSpan<const char> fWord;
     SkSpan<const char> fTrailingSpaces;
     SkSpan<const char> fLine;
-
     SkSpan<const char> fText;
     std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> fAutoClose;
   };
@@ -337,13 +314,15 @@ void SkParagraph::breakTextIntoSections() {
   SkTArray<SkWord, true> words;
 
   BreakIterator breakIterator(fUtf8);
+  bool lineBreakBefore = true;
   while (breakIterator.next()) {
 
     if (breakIterator.isWordBreak()) {
       auto word = breakIterator.getWord();
       auto spaces = breakIterator.getTrailingSpaces();
       if (!word.empty() || !spaces.empty()) {
-        words.emplace_back(word, spaces);
+        words.emplace_back(word, spaces, lineBreakBefore);
+        lineBreakBefore = !spaces.empty();
       }
 
       if (!breakIterator.isLineBreak()) {

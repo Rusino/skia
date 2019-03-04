@@ -21,7 +21,7 @@ class SkWord {
 
     SkWord() { }
 
-    SkWord(SkSpan<const char> text, SkSpan<const char> spaces);
+    SkWord(SkSpan<const char> text, SkSpan<const char> spaces, bool lineBreakBefore);
     SkWord(SkSpan<const char> text, SkArraySpan<SkRun> runs);
 
     void generate(SkVector offset);
@@ -69,5 +69,5 @@ class SkWord {
     size_t gRight;  // Glyph index on the last run that ends the word
     size_t gTrim;
     bool bTrimmed;
-
+    bool fMayLineBreakBefore;
 };
