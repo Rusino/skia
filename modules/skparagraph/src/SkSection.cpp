@@ -93,86 +93,88 @@ void SkSection::breakShapedTextIntoLinesByWords(SkScalar width, size_t maxLines)
   SkDebugf("breakEndlessLineIntoLinesByWords\n");
   SkVector advance = SkVector::Make(0, 0);
 
+  auto styles(SkSpan<StyledText>(fTextStyles.begin(), fTextStyles.size()));
+
   size_t lineBegin = 0;
   SkScalar baseline = 0;
   size_t wordGroupStart = 0;
-  size_t wordGroupdEnd = 0;
+  size_t wordGroupEnd = 0;
+  SkWord* lastWordOnTheLine = nullptr;
   while (wordGroupStart != fWords.size()) {
 
     // Get together all words that cannot break line
-    wordGroupdEnd = wordGroupStart;
+    wordGroupEnd = wordGroupStart;
     SkScalar wordsWidth = 0;
     SkScalar wordsHeight = 0;
     SkScalar trim = 0;
-    while (wordGroupdEnd < fWords.size()) {
-      auto& word = fWords[wordGroupdEnd];
-      if (word.fMayLineBreakBefore && wordGroupStart != wordGroupdEnd) {
+    while (wordGroupEnd < fWords.size()) {
+      auto& word = fWords[wordGroupEnd];
+      if (word.fMayLineBreakBefore && wordGroupStart != wordGroupEnd) {
         break;
       }
       wordsHeight = SkMaxScalar(wordsHeight, word.fullAdvance().fY);
       wordsWidth += word.fullAdvance().fX;
       trim = word.fullAdvance().fX - word.trimmedAdvance().fX;
       baseline = SkMaxScalar(baseline, word.fBaseline);
-      ++wordGroupdEnd;
+      ++wordGroupEnd;
     };
 
     auto& firstWord = fWords[wordGroupStart];
-    auto& lastWord = fWords[wordGroupdEnd - 1];
-    if (advance.fX + wordsWidth - trim > width) {
-      // TODO: there is one limitation here - SkShaper starts breaking words from the new line
-
-      if (advance.fX == 0 && !firstWord.fProducedByShaper) {
+    auto& lastWord = fWords[wordGroupEnd - 1];
+    if (advance.fX + wordsWidth - trim > width &&
+        advance.fX == 0 && !firstWord.fProducedByShaper) {
+      // TODO: there is a limitation here - SkShaper starts breaking words from the new line
         // The word is too big!
         // Let SkShaper to break it into many words and insert these words instead of this big word
         // Then continue breaking as if nothing happened
         SkSpan<const char> text = SkSpan<const char>(
-                                        firstWord.fText.begin(),
-                                        lastWord.fText.end() - firstWord.fText.begin());
+            firstWord.fText.begin(),
+            lastWord.fText.end() - firstWord.fText.begin());
         // We insert new words after the group
-        shapeWordsIntoManyLines(width, text, wordGroupStart, wordGroupdEnd);
+        shapeWordsIntoManyLines(width, text, wordGroupStart, wordGroupEnd);
         continue;
-      } else {
-        // Add the line and start counting again
-        SkDebugf("break %d: %f + %f %f + %f ? %f\n",
-                 wordGroupStart - lineBegin, fHeight, advance.fY, wordsWidth, advance.fX, width);
-        fLines.emplace_back(advance, baseline, SkArraySpan<SkWord>(fWords, lineBegin, wordGroupStart));
-        fWidth = SkMaxScalar(fWidth, advance.fX);
-        fHeight += advance.fY;
-        // Start the new line
-        lineBegin = wordGroupStart;
-        advance = SkVector::Make(0, 0);
-        baseline = 0;
+    }
+
+    if (advance.fX + wordsWidth - trim <= width) {
+      // This words group fits the current line
+      advance.fX += wordsWidth;
+      advance.fY = SkMaxScalar(advance.fY, wordsHeight);
+      fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordsWidth - trim);
+      lastWordOnTheLine = &lastWord;
+      wordGroupStart = wordGroupEnd;
+      if (advance.fX <= width) {
+        // Go to the next word
+        continue;
       }
     }
 
-    // Check if the word only fits without spaces (that would be the last word on the line)
-    bool lastWordOnTheLine = wordGroupdEnd == fWords.size() ||
-                              advance.fX + wordsWidth > width;
-    if (lastWordOnTheLine) lastWord.trim();
-
-    // Keep counting words
-    advance.fX += lastWordOnTheLine ? wordsWidth - trim : wordsWidth;
-    advance.fY = SkMaxScalar(advance.fY, wordsHeight);
-    fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordsWidth - trim);
+    // Now the line is full (with or without the last words group)
+    advance.fX -= (lastWordOnTheLine->fFullWidth - lastWordOnTheLine->fRightTrimmedWidth);
+    lastWordOnTheLine->trim();
+    fLines.emplace_back(advance,
+                        baseline,
+                        styles,
+                        SkArraySpan<SkWord>(fWords,
+                                            lineBegin,
+                                            wordGroupStart));
+    fWidth = SkMaxScalar(fWidth, advance.fX);
+    fHeight += advance.fY;
+    // Start the new line
+    lineBegin = wordGroupStart;
+    advance = SkVector::Make(0, 0);
+    baseline = 0;
 
     if (fLines.size() > maxLines) {
       // TODO: ellipsis
       break;
     }
-
-    // Go to the next group of words
-    wordGroupStart = wordGroupdEnd;
   }
 
   // Do not forget the rest of the words
-  SkDebugf("break %d: %f + %f %f + %f ? %f\n",
-           fWords.size() - lineBegin,
-           fHeight,
-           advance.fY,
-           fWords.back().fullAdvance().fX,
-           advance.fX,
-           width);
-  fLines.emplace_back(advance, baseline, SkArraySpan<SkWord>(fWords, lineBegin, fWords.size()));
+  lastWordOnTheLine = &fWords.back();
+  advance.fX -= (lastWordOnTheLine->fFullWidth - lastWordOnTheLine->fRightTrimmedWidth);
+  lastWordOnTheLine->trim();
+  fLines.emplace_back(advance, baseline, styles, SkArraySpan<SkWord>(fWords, lineBegin, fWords.size()));
   fWidth = SkMaxScalar(fWidth, advance.fX);
   fHeight += advance.fY;
 }
@@ -258,7 +260,7 @@ void SkSection::formatLinesByWords(SkScalar maxWidth) {
 void SkSection::paintEachLineByStyles(SkCanvas* textCanvas) {
 
   for (auto& line : fLines) {
-    line.paintByStyles(textCanvas, SkSpan<StyledText>(fTextStyles.begin(), fTextStyles.size()));
+    line.paintByStyles(textCanvas);
     textCanvas->translate(0, line.advance().fY);
   }
 }

@@ -28,6 +28,7 @@ class SkArraySpan {
   constexpr T& operator [] (size_t i) { return fArray[i]; }
   constexpr T* begin() const { return fArray->begin() + fStart; }
   constexpr T* end() const { return fArray->begin() + fEnd; }
+  constexpr T* back() const { return fArray->begin() + fEnd - 1; }
   constexpr T* data() const { return fArray->begin() + fStart; }
   constexpr size_t size() const { return fEnd - fStart; }
   constexpr bool empty() const { return fStart == fEnd; }

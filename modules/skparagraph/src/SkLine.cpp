@@ -5,8 +5,19 @@
  * found in the LICENSE file.
  */
 
+#include <unicode/brkiter.h>
+#include <algorithm>
 #include "SkLine.h"
-
+/*
+namespace {
+  std::string toString2(SkSpan<const char> text) {
+    icu::UnicodeString utf16 = icu::UnicodeString(text.begin(), text.size());
+    std::string str;
+    utf16.toUTF8String(str);
+    return str;
+  }
+};
+*/
 SkLine::SkLine() {
   fShift = 0;
   fAdvance.set(0, 0);
@@ -14,8 +25,9 @@ SkLine::SkLine() {
   fHeight = 0;
 }
 
-SkLine::SkLine(SkVector advance, SkScalar baseline, SkArraySpan<SkWord> words)
-    : SkLine() {
+SkLine::SkLine(SkVector advance, SkScalar baseline, SkSpan<StyledText> styles, SkArraySpan<SkWord> words)
+    : fTextStyles(styles)
+    , fWords(words) {
   fAdvance = advance;
   fWords = words;
   fHeight = advance.fY;
@@ -47,35 +59,48 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
       break;
     }
     case SkTextAlign::justify: {
-      if (fWords.size() == 1) {
-        break;
-      }
-      SkScalar step = delta / (fWords.size() - 1);
-      SkScalar shift = 0;
-      for (auto word = fWords.begin(); word != fWords.end(); ++word) {
 
-        word->shift(shift);
-
-        if (word == fWords.end()) {
-          break;
-        }
-        word->expand(step);
-        shift += step;
-      }
       fShift = 0;
       fAdvance.fX = maxWidth;
       fWidth = maxWidth;
+
+      auto softLineBreaks = std::count_if(fWords.begin(), fWords.end(), [](SkWord word){return word.fMayLineBreakBefore; });
+      if (fWords.begin()->fMayLineBreakBefore) {
+        --softLineBreaks;
+      }
+
+      if (softLineBreaks == 0) {
+        // Expand one group of words
+        for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+          word->expand(delta);
+        }
+        break;
+      }
+
+      SkScalar step = delta / softLineBreaks;
+      SkScalar shift = 0;
+
+      SkWord* last = nullptr;
+      for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+
+        if (word->fMayLineBreakBefore && last != nullptr) {
+          --softLineBreaks;
+          last->expand(step);
+          shift += step;
+        }
+
+        last = word;
+        word->shift(shift);
+      }
       break;
     }
     default:
       break;
   }
-  SkDebugf("Format align=%d delta=%f shift=%f\n", (int)effectiveAlign, delta, fShift);
 }
 
 // TODO: For now we paint everything by words but we better combine words by style
-void SkLine::paintByStyles(SkCanvas* canvas,
-                           SkSpan<StyledText> fTextStyles) {
+void SkLine::paintByStyles(SkCanvas* canvas) {
 
   if (fWords.empty()) {
     return;
@@ -84,9 +109,9 @@ void SkLine::paintByStyles(SkCanvas* canvas,
   auto offsetX = fWords.begin()->offset().fX;
 
   canvas->save();
-  canvas->translate(-offsetX, 0);
+  canvas->translate(fShift - offsetX, 0);
 
-  generateWordTextBlobs(offsetX, fTextStyles);
+  generateWordTextBlobs(offsetX);
 
   paintBackground(canvas);
 
@@ -98,7 +123,7 @@ void SkLine::paintByStyles(SkCanvas* canvas,
   canvas->restore();
 }
 
-void SkLine::generateWordTextBlobs(SkScalar offsetX, SkSpan<StyledText> fTextStyles) {
+void SkLine::generateWordTextBlobs(SkScalar offsetX) {
 
   for (auto word = fWords.begin(); word != fWords.end(); ++word) {
 

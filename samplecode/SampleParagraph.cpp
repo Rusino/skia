@@ -578,12 +578,6 @@ class ParagraphView2 : public Sample {
 
   void onDrawContent(SkCanvas* canvas) override {
 
-    std::vector<std::string> options = {"Flutter is an open-source project to help developers "
-                                        "build high-performance, high-fidelity, mobile apps for "
-                                        " iOS and Android "
-                                        "from a single codebase. This design lab is a playground "
-                                        "and showcase of Flutter's many widgets, behaviors, "
-                                        "animations, layouts, and more."};
     std::vector<std::string> code = {
         "// Create a flat button.\n",
         "FlatButton(\n",
@@ -602,18 +596,7 @@ class ParagraphView2 : public Sample {
         "onPressed: null\n",
         ");"
     };
-    //drawText(canvas, width(), height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
-    /*
-    std::string line = "Hesitation is always easy rarely useful.";
-    drawLine(canvas, width, height, line, SkTextAlign::left);
-    canvas->translate(0, height);
-    drawLine(canvas, width, height, line, SkTextAlign::right);
-    canvas->translate(0, height);
-    drawLine(canvas, width, height, line, SkTextAlign::center);
-    canvas->translate(0, height);
-    drawLine(canvas, width, height, line, SkTextAlign::justify);
-    //drawCode(canvas, width(), height());
-    */
+
     std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
     std::vector<std::string> text = {
         "My neighbor came over to say,\n"
@@ -651,8 +634,167 @@ class ParagraphView2 : public Sample {
   sk_sp<SkFontCollection> fontCollection;
 };
 
+class ParagraphView3 : public Sample {
+ public:
+  ParagraphView3() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+    LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+
+    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
+        "fonts/GoogleSans-Regular.ttf"));
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+  }
+
+  ~ParagraphView3() {
+  }
+ protected:
+  bool onQuery(Sample::Event* evt) override {
+    if (Sample::TitleQ(*evt)) {
+      Sample::TitleR(evt, "Paragraph3");
+      return true;
+    }
+    return this->INHERITED::onQuery(evt);
+  }
+
+  SkTextStyle style(SkPaint paint) {
+    SkTextStyle style;
+    paint.setAntiAlias(true);
+    style.setForegroundColor(paint);
+    style.setFontFamily("monospace");
+    style.setFontSize(30);
+
+    return style;
+  }
+
+  void drawText(SkCanvas* canvas, SkScalar w, SkScalar h,
+                std::vector<std::string>& text,
+                SkColor fg = SK_ColorDKGRAY,
+                SkColor bg = SK_ColorWHITE,
+                std::string ff = "sans-serif",
+                SkScalar fs = 24,
+                size_t lineLimit = std::numeric_limits<size_t>::max(),
+                const std::u16string& ellipsis = u"\u2026") {
+
+    SkAutoCanvasRestore acr(canvas, true);
+
+    canvas->clipRect(SkRect::MakeWH(w, h));
+    canvas->drawColor(bg);
+
+    SkScalar margin = 20;
+
+    SkPaint paint;
+    paint.setAntiAlias(true);
+    paint.setColor(fg);
+
+    SkTextStyle style;
+    style.setBackgroundColor(SK_ColorBLUE);
+    style.setForegroundColor(paint);
+    style.setFontFamily(ff);
+    style.setFontSize(fs);
+    SkParagraphStyle paraStyle;
+    paraStyle.setTextStyle(style);
+    paraStyle.setMaxLines(lineLimit);
+
+    paraStyle.setEllipsis(ellipsis);
+    paraStyle.getTextStyle().setFontSize(20);
+    fontCollection->setTestFontManager(testFontProvider);
+    SkParagraphBuilder builder(paraStyle, fontCollection);
+
+    SkPaint foreground;
+    foreground.setColor(fg);
+    style.setForegroundColor(foreground);
+    style.setBackgroundColor(bg);
+
+    for (auto& part : text) {
+      builder.pushStyle(style);
+      builder.addText(part);
+      builder.pop();
+    }
+
+    auto paragraph = builder.Build();
+    paragraph->layout(w - margin * 2);
+    paragraph->paint(canvas, margin, margin);
+
+    canvas->translate(0, paragraph->getHeight() + margin);
+  }
+
+  void drawLine(SkCanvas* canvas, SkScalar w, SkScalar h,
+                const std::string& text,
+                SkTextAlign align) {
+    SkAutoCanvasRestore acr(canvas, true);
+
+    canvas->clipRect(SkRect::MakeWH(w, h));
+    canvas->drawColor(SK_ColorWHITE);
+
+    SkScalar margin = 20;
+
+    SkPaint paint;
+    paint.setAntiAlias(true);
+    paint.setColor(SK_ColorBLACK);
+
+    SkTextStyle style;
+    style.setBackgroundColor(SK_ColorLTGRAY);
+    style.setForegroundColor(paint);
+    style.setFontFamily("Arial");
+    style.setFontSize(30);
+    SkParagraphStyle paraStyle;
+    paraStyle.setTextStyle(style);
+    paraStyle.setTextAlign(align);
+
+    SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
+    builder.addText(text);
+
+    auto paragraph = builder.Build();
+    paragraph->layout(w - margin * 2);
+    paragraph->paint(canvas, margin, margin);
+
+    canvas->translate(0, paragraph->getHeight() + margin);
+  }
+
+  void onDrawContent(SkCanvas* canvas) override {
+
+    const std::string options = {"Flutter is an open-source project to help developers "
+                                "build high-performance, high-fidelity, mobile apps for "
+                                "iOS and Android "
+                                "from a single codebase. This design lab is a playground "
+                                "and showcase of Flutter's many widgets, behaviors, "
+                                "animations, layouts, and more."};
+
+    canvas->drawColor(SK_ColorDKGRAY);
+    SkScalar width = this->width() / 4;
+    SkScalar height = this->height();
+
+    const std::string line = "Hesitation is always easy rarely useful.";
+    //drawLine(canvas, width, height, line, SkTextAlign::left);
+    //canvas->translate(width, 0);
+    //drawLine(canvas, width, height, line, SkTextAlign::right);
+    //canvas->translate(width, 0);
+    //drawLine(canvas, width, height, line, SkTextAlign::center);
+    //canvas->translate(width, 0);
+    //drawLine(canvas, width, height, line, SkTextAlign::justify);
+    drawLine(canvas, width, height, options, SkTextAlign::justify);
+  }
+
+ private:
+  typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
+};
+
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_SAMPLE(return new ParagraphView1();)
-
 DEF_SAMPLE(return new ParagraphView2();)
+DEF_SAMPLE(return new ParagraphView3();)

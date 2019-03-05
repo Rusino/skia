@@ -123,7 +123,7 @@ void SkWord::generate() {
   auto iter = fRuns.begin();
   do {
     auto gStart = iter == first ? gLeft : 0;
-    auto gEnd = iter == last ? fTrimmed ? gTrim : gRight : iter->size();
+    auto gEnd = iter == last ? (fTrimmed ? gTrim : gRight ) : iter->size();
     if (gStart >= gEnd) {
       break;
     }
@@ -221,19 +221,17 @@ void SkWord::paintShadow(SkCanvas* canvas) {
 
 void SkWord::paintBackground(SkCanvas* canvas) {
 
-  SkRect rect = SkRect::MakeXYWH(fShift + fOffset.fX, fOffset.fY, fFullWidth, fHeight);
   auto fStyle = this->fTextStyles.begin()->fStyle;
   if (!fStyle.hasBackground()) {
     return;
   }
 
-  rect.offset(fShift, 0);
-  canvas->drawRect(rect, fStyle.getBackground());
+  canvas->drawRect(rect(), fStyle.getBackground());
 }
 
 void SkWord::computeDecorationPaint(SkPaint& paint, SkPath& path) {
 
-  SkRect fRect = SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fFullWidth, fHeight);
+  SkRect background = rect();
   auto fStyle = this->fTextStyles.begin()->fStyle;
   paint.setStyle(SkPaint::kStroke_Style);
   if (fStyle.getDecorationColor() == SK_ColorTRANSPARENT) {
@@ -285,7 +283,7 @@ void SkWord::computeDecorationPaint(SkPaint& paint, SkPath& path) {
       SkScalar wavelength = 2 * scaleFactor;
 
       path.moveTo(0, 0);
-      auto width = fRect.width();
+      auto width = background.width();
       while (x_start + wavelength * 2 < width) {
         path.rQuadTo(wavelength,
                      wave_count % 2 != 0 ? wavelength : -wavelength,
@@ -330,17 +328,17 @@ void SkWord::paintDecorations(SkCanvas* canvas, SkScalar baseline) {
       break;
   }
 
-// Decoration paint (for now) and/or path
+  // Decoration paint (for now) and/or path
   SkPaint paint;
   SkPath path;
   this->computeDecorationPaint(paint, path);
   paint.setStrokeWidth(thickness);
 
-// Draw the decoration
-  SkRect fRect = SkRect::MakeXYWH(fOffset.fX + fShift, fOffset.fY, fFullWidth, fHeight);
-  auto width = fRect.width();
-  SkScalar x = fRect.left() + fShift;
-  SkScalar y = fRect.top() + position;
+  // Draw the decoration
+  SkRect background = rect();
+  auto width = background.width();
+  SkScalar x = background.left() + fShift;
+  SkScalar y = background.top() + position;
   switch (fStyle.getDecorationStyle()) {
     case SkTextDecorationStyle::kWavy:
       path.offset(x, y);

@@ -29,14 +29,19 @@ class SkWord {
 
     SkSpan<const char> span() const { return SkSpan<const char>(fText.begin(), fText.size() + fSpaces.size()); }
     inline void shift(SkScalar shift) { fShift += shift; }
-    inline void expand(SkScalar step) { fFullWidth += step; }
+    inline void expand(SkScalar step) { (fTrimmed ? fRightTrimmedWidth : fFullWidth) += step; }
     inline void trim() { fTrimmed = true; }
     inline SkSpan<const char> text() { return fText; }
     inline SkVector fullAdvance()  { return SkVector::Make(fFullWidth, fHeight); }
     inline SkVector trimmedAdvance() { return SkVector::Make(fRightTrimmedWidth, fHeight); }
     inline SkVector offset() { return fOffset; }
 
-    SkRect rect() { return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fFullWidth, fHeight); }
+    SkRect rect() {
+      return SkRect::MakeXYWH(fShift + fOffset.fX,
+                              fOffset.fY,
+                              fTrimmed ? fRightTrimmedWidth : fFullWidth,
+                              fHeight);
+    }
 
   private:
 
