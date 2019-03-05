@@ -35,8 +35,9 @@ class SkWord {
     inline SkVector fullAdvance()  { return SkVector::Make(fFullWidth, fHeight); }
     inline SkVector trimmedAdvance() { return SkVector::Make(fRightTrimmedWidth, fHeight); }
     inline SkVector offset() { return fOffset; }
+    inline SkScalar spaces() { return fFullWidth - fRightTrimmedWidth; }
 
-    SkRect rect() {
+    SkRect rect() const {
       return SkRect::MakeXYWH(fShift + fOffset.fX,
                               fOffset.fY,
                               fTrimmed ? fRightTrimmedWidth : fFullWidth,

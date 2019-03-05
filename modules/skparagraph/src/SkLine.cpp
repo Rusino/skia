@@ -45,57 +45,66 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
 
   switch (effectiveAlign) {
     case SkTextAlign::left:
+
       fShift = 0;
       fAdvance.fX = fWidth;
       break;
     case SkTextAlign::right:
+
       fAdvance.fX = maxWidth;
       fShift = delta;
       break;
     case SkTextAlign::center: {
-      auto half = delta / 2;
+
       fAdvance.fX = maxWidth;
-      fShift = half;
+      fShift = delta / 2;
       break;
     }
     case SkTextAlign::justify: {
 
+      justify(delta);
+
       fShift = 0;
       fAdvance.fX = maxWidth;
       fWidth = maxWidth;
-
-      auto softLineBreaks = std::count_if(fWords.begin(), fWords.end(), [](SkWord word){return word.fMayLineBreakBefore; });
-      if (fWords.begin()->fMayLineBreakBefore) {
-        --softLineBreaks;
-      }
-
-      if (softLineBreaks == 0) {
-        // Expand one group of words
-        for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-          word->expand(delta);
-        }
-        break;
-      }
-
-      SkScalar step = delta / softLineBreaks;
-      SkScalar shift = 0;
-
-      SkWord* last = nullptr;
-      for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-
-        if (word->fMayLineBreakBefore && last != nullptr) {
-          --softLineBreaks;
-          last->expand(step);
-          shift += step;
-        }
-
-        last = word;
-        word->shift(shift);
-      }
       break;
     }
     default:
       break;
+  }
+}
+
+void SkLine::justify(SkScalar delta) {
+
+  auto softLineBreaks = std::count_if(fWords.begin(),
+                                      fWords.end(),
+                                      [](SkWord word){ return word.fMayLineBreakBefore; });
+  if (fWords.begin()->fMayLineBreakBefore) {
+    --softLineBreaks;
+  }
+
+  if (softLineBreaks == 0) {
+    // Expand one group of words
+    for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+      word->expand(delta);
+    }
+    return;
+  }
+
+  SkScalar step = delta / softLineBreaks;
+  SkScalar shift = 0;
+
+  SkWord* last = nullptr;
+  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+
+    if (word->fMayLineBreakBefore && last != nullptr) {
+      --softLineBreaks;
+      last->expand(step);
+      shift += step;
+    }
+
+    last = word;
+    word->shift(shift);
   }
 }
 

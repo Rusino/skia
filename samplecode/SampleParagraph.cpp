@@ -776,14 +776,14 @@ class ParagraphView3 : public Sample {
     SkScalar height = this->height();
 
     const std::string line = "Hesitation is always easy rarely useful.";
-    //drawLine(canvas, width, height, line, SkTextAlign::left);
-    //canvas->translate(width, 0);
-    //drawLine(canvas, width, height, line, SkTextAlign::right);
-    //canvas->translate(width, 0);
-    //drawLine(canvas, width, height, line, SkTextAlign::center);
-    //canvas->translate(width, 0);
-    //drawLine(canvas, width, height, line, SkTextAlign::justify);
+    drawLine(canvas, width, height, options, SkTextAlign::left);
+    canvas->translate(width, 0);
+    drawLine(canvas, width, height, options, SkTextAlign::right);
+    canvas->translate(width, 0);
+    drawLine(canvas, width, height, options, SkTextAlign::center);
+    canvas->translate(width, 0);
     drawLine(canvas, width, height, options, SkTextAlign::justify);
+    //drawLine(canvas, width, height, options, SkTextAlign::justify);
   }
 
  private:

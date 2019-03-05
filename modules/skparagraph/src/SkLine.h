@@ -19,12 +19,19 @@ class SkLine {
 
   SkLine(SkVector advance, SkScalar baseline, SkSpan<StyledText> styles, SkArraySpan<SkWord> words);
 
-  inline SkVector advance() { return fAdvance; }
-  inline SkArraySpan<SkWord>& words() { return fWords; }
+  inline SkVector advance() const { return fAdvance; }
 
   void formatByWords(SkTextAlign align, SkScalar maxWidth);
 
   void paintByStyles(SkCanvas* canvas);
+
+  void getRectsForRange(
+      SkTextDirection textDirection,
+      const char* start,
+      const char* end,
+      std::vector<SkTextBox>& result);
+
+ private:
 
   void generateWordTextBlobs(SkScalar offsetX);
 
@@ -36,13 +43,7 @@ class SkLine {
 
   void paintDecorations(SkCanvas* canvas);
 
-  void getRectsForRange(
-      SkTextDirection textDirection,
-      const char* start,
-      const char* end,
-      std::vector<SkTextBox>& result);
-
- private:
+  void justify(SkScalar delta);
 
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;
