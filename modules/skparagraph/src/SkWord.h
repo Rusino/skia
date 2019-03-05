@@ -19,13 +19,13 @@ class SkRun;
 class SkWord {
   public:
 
-    SkWord() { }
+    SkWord() = default;
 
     SkWord(SkSpan<const char> text, SkSpan<const char> spaces, bool lineBreakBefore);
     SkWord(SkSpan<const char> text, SkArraySpan<SkRun> runs);
 
     void generate(SkVector offset);
-    void update(SkArraySpan<SkRun> runs);
+    void mapToRuns(SkArraySpan<SkRun> runs);
 
     SkSpan<const char> span() const { return SkSpan<const char>(fText.begin(), fText.size() + fSpaces.size()); }
     inline void shift(SkScalar shift) { fShift += shift; }
@@ -45,10 +45,10 @@ class SkWord {
     SkVector getAdvance(const SkRun& run, size_t start, size_t end);
 
     void dealWithStyles(SkSpan<StyledText> styles);
-    void paint(SkCanvas* canvas, SkScalar offsetY);
-    void paintShadow(SkCanvas* canvas, SkPoint point);
-    void paintBackground(SkCanvas* canvas, SkPoint point);
-    void paintDecorations(SkCanvas* canvas, SkScalar offsetY, SkScalar baseline);
+    void paint(SkCanvas* canvas);
+    void paintShadow(SkCanvas* canvas);
+    void paintBackground(SkCanvas* canvas);
+    void paintDecorations(SkCanvas* canvas, SkScalar baseline);
     void computeDecorationPaint(SkPaint& paint, SkPath& path);
 
     friend class SkSection;

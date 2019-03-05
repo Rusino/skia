@@ -62,8 +62,7 @@ bool SkSection::shapeTextIntoEndlessLine() {
   return true;
 }
 
-
-void SkSection::mapRunsToWords() {
+void SkSection::mapWordsToRuns() {
 
   auto wordIter = fWords.begin();
   auto runIter = fRuns.begin();
@@ -75,7 +74,9 @@ void SkSection::mapRunsToWords() {
     SkASSERT(wordSpan && runSpan);
 
     // Copy all the runs affecting the word
-    wordIter->update(SkArraySpan<SkRun>(fRuns, prevRunIter, runIter - prevRunIter + 1));
+    wordIter->mapToRuns(SkArraySpan<SkRun>(fRuns,
+                                           prevRunIter,
+                                           runIter - prevRunIter + 1));
 
     // Move the iterator if we have to
     if (wordSpan.end() >= runSpan.end()) {
@@ -87,9 +88,7 @@ void SkSection::mapRunsToWords() {
   }
 }
 
-// This is the trickiest part: we need to break/merge shaper buffers
-// Actually, the tricky part is hidden inside SkWord constructor
-void SkSection::breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines) {
+void SkSection::breakShapedTextIntoLinesByWords(SkScalar width, size_t maxLines) {
 
   SkDebugf("breakEndlessLineIntoLinesByWords\n");
   SkVector advance = SkVector::Make(0, 0);
@@ -238,9 +237,9 @@ void SkSection::shapeIntoLines(SkScalar maxWidth, size_t maxLines) {
 
   shapeTextIntoEndlessLine();
 
-  mapRunsToWords();
+  mapWordsToRuns();
 
-  breakEndlessLineIntoLinesByWords(maxWidth, maxLines);
+  breakShapedTextIntoLinesByWords(maxWidth, maxLines);
 }
 
 void SkSection::formatLinesByWords(SkScalar maxWidth) {
@@ -258,10 +257,9 @@ void SkSection::formatLinesByWords(SkScalar maxWidth) {
 
 void SkSection::paintEachLineByStyles(SkCanvas* textCanvas) {
 
-  SkScalar offset = 0;
   for (auto& line : fLines) {
-    line.paintByStyles(textCanvas, offset, SkSpan<StyledText>(fTextStyles.begin(), fTextStyles.size()));
-    offset += line.advance().fY;
+    line.paintByStyles(textCanvas, SkSpan<StyledText>(fTextStyles.begin(), fTextStyles.size()));
+    textCanvas->translate(0, line.advance().fY);
   }
 }
 

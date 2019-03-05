@@ -27,18 +27,17 @@ class SkLine {
   void formatByWords(SkTextAlign align, SkScalar maxWidth);
 
   void paintByStyles(SkCanvas* canvas,
-                     SkScalar offset,
                      SkSpan<StyledText> fTextStyles);
 
   void generateWordTextBlobs(SkScalar offsetX, SkSpan<StyledText> fTextStyles);
 
-  void paintText(SkCanvas* canvas, SkScalar offsetY);
+  void paintText(SkCanvas* canvas);
 
-  void paintBackground(SkCanvas* canvas, SkScalar offsetY);
+  void paintBackground(SkCanvas* canvas);
 
-  void paintShadow(SkCanvas* canvas, SkScalar offsetY);
+  void paintShadow(SkCanvas* canvas);
 
-  void paintDecorations(SkCanvas* canvas, SkScalar offsetY);
+  void paintDecorations(SkCanvas* canvas);
 
   void getRectsForRange(
       SkTextDirection textDirection,

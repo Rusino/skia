@@ -138,8 +138,8 @@ class SkSection {
 
     bool shapeTextIntoEndlessLine();
 
-    void mapRunsToWords();
-    void breakEndlessLineIntoLinesByWords(SkScalar width, size_t maxLines);
+    void mapWordsToRuns();
+    void breakShapedTextIntoLinesByWords(SkScalar width, size_t maxLines);
 
     void shapeWordsIntoManyLines(SkScalar width, SkSpan<const char> text, size_t groupStart, size_t groupEnd);
 

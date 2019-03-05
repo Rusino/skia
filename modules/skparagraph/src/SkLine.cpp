@@ -75,25 +75,27 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
 
 // TODO: For now we paint everything by words but we better combine words by style
 void SkLine::paintByStyles(SkCanvas* canvas,
-                           SkScalar offsetY,
                            SkSpan<StyledText> fTextStyles) {
 
   if (fWords.empty()) {
     return;
   }
-  // Change positions for all the words and build text blobs
-  canvas->translate(fShift, 0);
+
   auto offsetX = fWords.begin()->offset().fX;
+
+  //canvas->save();
+  //canvas->translate(offsetX, 0);
 
   generateWordTextBlobs(offsetX, fTextStyles);
 
-  paintBackground(canvas, offsetY);
+  paintBackground(canvas);
 
-  paintShadow(canvas, offsetY);
+  paintShadow(canvas);
 
-  paintDecorations(canvas, offsetY);
+  paintDecorations(canvas);
 
-  paintText(canvas, offsetY);
+  paintText(canvas);
+  //canvas->restore();
 }
 
 void SkLine::generateWordTextBlobs(SkScalar offsetX, SkSpan<StyledText> fTextStyles) {
@@ -105,31 +107,31 @@ void SkLine::generateWordTextBlobs(SkScalar offsetX, SkSpan<StyledText> fTextSty
   }
 }
 
-void SkLine::paintBackground(SkCanvas* canvas, SkScalar offsetY) {
+void SkLine::paintBackground(SkCanvas* canvas) {
 
   for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-    word->paintBackground(canvas, SkPoint::Make(fShift, offsetY));
+    word->paintBackground(canvas);
   }
 }
 
-void SkLine::paintShadow(SkCanvas* canvas, SkScalar offsetY) {
+void SkLine::paintShadow(SkCanvas* canvas) {
 
   for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-    word->paintShadow(canvas, SkPoint::Make(fShift, offsetY));
+    word->paintShadow(canvas);
   }
 }
 
-void SkLine::paintDecorations(SkCanvas* canvas, SkScalar offsetY) {
+void SkLine::paintDecorations(SkCanvas* canvas) {
 
   for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-    word->paintDecorations(canvas, offsetY, fBaseline);
+    word->paintDecorations(canvas, fBaseline);
   }
 }
 
-void SkLine::paintText(SkCanvas* canvas, SkScalar offsetY) {
+void SkLine::paintText(SkCanvas* canvas) {
 
   for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-    word->paint(canvas, offsetY);
+    word->paint(canvas);
   }
 }
 

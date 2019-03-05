@@ -173,12 +173,11 @@ class TestFontProvider : public SkFontMgr {
   TestFontStyleSet _set;
   SkString _familyName;
 };
-
 }
 
-class ParagraphView : public Sample {
+class ParagraphView1 : public Sample {
  public:
-  ParagraphView() {
+  ParagraphView1() {
 #if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
     LOGFONT lf;
         sk_bzero(&lf, sizeof(lf));
@@ -198,70 +197,15 @@ class ParagraphView : public Sample {
     fontCollection = sk_make_sp<SkFontCollection>();
   }
 
-  ~ParagraphView() {
+  ~ParagraphView1() {
   }
  protected:
   bool onQuery(Sample::Event* evt) override {
     if (Sample::TitleQ(*evt)) {
-      Sample::TitleR(evt, "Paragraph");
+      Sample::TitleR(evt, "Paragraph1");
       return true;
     }
     return this->INHERITED::onQuery(evt);
-  }
-
-  void drawCode(SkCanvas* canvas, SkScalar w, SkScalar h) {
-
-    SkPaint comment;
-    comment.setColor(SK_ColorGRAY);
-    SkPaint constant;
-    constant.setColor(SK_ColorMAGENTA);
-    SkPaint null;
-    null.setColor(SK_ColorMAGENTA);
-    SkPaint literal;
-    literal.setColor(SK_ColorGREEN);
-    SkPaint code;
-    code.setColor(SK_ColorDKGRAY);
-    SkPaint number;
-    number.setColor(SK_ColorBLUE);
-    SkPaint name;
-    name.setColor(SK_ColorRED);
-
-    SkTextStyle defaultStyle;
-    defaultStyle.setBackgroundColor(SK_ColorWHITE);
-    defaultStyle.setForegroundColor(code);
-    defaultStyle.setFontFamily("monospace");
-    defaultStyle.setFontSize(30);
-    SkParagraphStyle paraStyle;
-    paraStyle.setTextStyle(defaultStyle);
-
-    SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
-
-    //builder.PushStyle(style(comment));
-    //builder.AddText("// Create a raised button.\n");
-    //builder.Pop();
-
-    builder.pushStyle(style(name));
-    builder.addText("RaisedButton");
-    builder.pop();
-    builder.addText("(\n");
-    builder.addText("  child: ");
-    builder.pushStyle(style(constant));
-    builder.addText("const");
-    builder.pop();
-    builder.addText(" ");
-    builder.pushStyle(style(name));
-    builder.addText("Text");
-    builder.pop();
-    builder.addText("(");
-    builder.pushStyle(style(literal));
-    builder.addText("'BUTTON TITLE'");
-    builder.pop();
-    builder.addText("),\n");
-
-    auto paragraph = builder.Build();
-    paragraph->layout(w - 20);
-
-    paragraph->paint(canvas, 20, 20);
   }
 
   SkTextStyle style(SkPaint paint) {
@@ -274,8 +218,7 @@ class ParagraphView : public Sample {
     return style;
   }
 
-  void
-  drawTest(SkCanvas* canvas, SkScalar w, SkScalar h, SkColor fg, SkColor bg) {
+  void drawTest(SkCanvas* canvas, SkScalar w, SkScalar h, SkColor fg, SkColor bg) {
     SkAutoCanvasRestore acr(canvas, true);
 
     canvas->clipRect(SkRect::MakeWH(w, h));
@@ -415,6 +358,138 @@ class ParagraphView : public Sample {
     canvas->translate(0, paragraph->getHeight() + margin);
   }
 
+  void onDrawContent(SkCanvas* canvas) override {
+    drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
+    /*
+    SkScalar height = this->height() / 5;
+    drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kSolid);
+    canvas->translate(0, height);
+    drawSimpleTest(canvas, width(), height, SkTextDecoration::kUnderline, SkTextDecorationStyle::kWavy);
+    canvas->translate(0, height);
+    drawSimpleTest(canvas, width(), height, SkTextDecoration::kLineThrough, SkTextDecorationStyle::kWavy);
+    canvas->translate(0, height);
+    drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kDouble);
+    canvas->translate(0, height);
+    drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kWavy);
+    };
+    */
+    /*
+      SkScalar width = this->width() / 3;
+      drawTest(canvas, width, this->height(), SK_ColorBLACK, SK_ColorWHITE);
+      canvas->translate(width, 0);
+      drawTest(canvas, width, this->height(), SK_ColorWHITE, SK_ColorBLACK);
+      canvas->translate(width, 0);
+      drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorWHITE);
+      canvas->translate(0, this->height()/2);
+      drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
+    */
+  }
+
+ private:
+  typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
+};
+
+class ParagraphView2 : public Sample {
+ public:
+  ParagraphView2() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+    LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+
+    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
+        "fonts/GoogleSans-Regular.ttf"));
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+  }
+
+  ~ParagraphView2() {
+  }
+ protected:
+  bool onQuery(Sample::Event* evt) override {
+    if (Sample::TitleQ(*evt)) {
+      Sample::TitleR(evt, "Paragraph2");
+      return true;
+    }
+    return this->INHERITED::onQuery(evt);
+  }
+
+  void drawCode(SkCanvas* canvas, SkScalar w, SkScalar h) {
+
+    SkPaint comment;
+    comment.setColor(SK_ColorGRAY);
+    SkPaint constant;
+    constant.setColor(SK_ColorMAGENTA);
+    SkPaint null;
+    null.setColor(SK_ColorMAGENTA);
+    SkPaint literal;
+    literal.setColor(SK_ColorGREEN);
+    SkPaint code;
+    code.setColor(SK_ColorDKGRAY);
+    SkPaint number;
+    number.setColor(SK_ColorBLUE);
+    SkPaint name;
+    name.setColor(SK_ColorRED);
+
+    SkTextStyle defaultStyle;
+    defaultStyle.setBackgroundColor(SK_ColorWHITE);
+    defaultStyle.setForegroundColor(code);
+    defaultStyle.setFontFamily("monospace");
+    defaultStyle.setFontSize(30);
+    SkParagraphStyle paraStyle;
+    paraStyle.setTextStyle(defaultStyle);
+
+    SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
+
+    //builder.PushStyle(style(comment));
+    //builder.AddText("// Create a raised button.\n");
+    //builder.Pop();
+
+    builder.pushStyle(style(name));
+    builder.addText("RaisedButton");
+    builder.pop();
+    builder.addText("(\n");
+    builder.addText("  child: ");
+    builder.pushStyle(style(constant));
+    builder.addText("const");
+    builder.pop();
+    builder.addText(" ");
+    builder.pushStyle(style(name));
+    builder.addText("Text");
+    builder.pop();
+    builder.addText("(");
+    builder.pushStyle(style(literal));
+    builder.addText("'BUTTON TITLE'");
+    builder.pop();
+    builder.addText("),\n");
+
+    auto paragraph = builder.Build();
+    paragraph->layout(w - 20);
+
+    paragraph->paint(canvas, 20, 20);
+  }
+
+  SkTextStyle style(SkPaint paint) {
+    SkTextStyle style;
+    paint.setAntiAlias(true);
+    style.setForegroundColor(paint);
+    style.setFontFamily("monospace");
+    style.setFontSize(30);
+
+    return style;
+  }
+
   void drawText(SkCanvas* canvas, SkScalar w, SkScalar h,
                 std::vector<std::string>& text,
                 SkColor fg = SK_ColorDKGRAY,
@@ -502,30 +577,6 @@ class ParagraphView : public Sample {
   }
 
   void onDrawContent(SkCanvas* canvas) override {
-    drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
-    /*
-    SkScalar height = this->height() / 5;
-    drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kSolid);
-    canvas->translate(0, height);
-    drawSimpleTest(canvas, width(), height, SkTextDecoration::kUnderline, SkTextDecorationStyle::kWavy);
-    canvas->translate(0, height);
-    drawSimpleTest(canvas, width(), height, SkTextDecoration::kLineThrough, SkTextDecorationStyle::kWavy);
-    canvas->translate(0, height);
-    drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kDouble);
-    canvas->translate(0, height);
-    drawSimpleTest(canvas, width(), height, SkTextDecoration::kOverline, SkTextDecorationStyle::kWavy);
-    };
-    */
-    /*
-      SkScalar width = this->width() / 3;
-      drawTest(canvas, width, this->height(), SK_ColorBLACK, SK_ColorWHITE);
-      canvas->translate(width, 0);
-      drawTest(canvas, width, this->height(), SK_ColorWHITE, SK_ColorBLACK);
-      canvas->translate(width, 0);
-      drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorWHITE);
-      canvas->translate(0, this->height()/2);
-      drawTest(canvas, width, this->height()/2, SK_ColorGRAY, SK_ColorBLACK);
-    */
 
     std::vector<std::string> options = {"Flutter is an open-source project to help developers "
                                         "build high-performance, high-fidelity, mobile apps for "
@@ -552,23 +603,18 @@ class ParagraphView : public Sample {
         ");"
     };
     //drawText(canvas, width(), height(), code, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20);
-/*
-    SkScalar width = this->width() / 4;
-    SkScalar height = this->height();
-
-std::string line = "Hesitation is always easy rarely useful.";
-drawLine(canvas, width, height, line, SkTextAlign::left);
-canvas->translate(0, height);
-drawLine(canvas, width, height, line, SkTextAlign::right);
-canvas->translate(0, height);
-drawLine(canvas, width, height, line, SkTextAlign::center);
-canvas->translate(0, height);
-drawLine(canvas, width, height, line, SkTextAlign::justify);
-//drawCode(canvas, width(), height());
-*/
-/*
-std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
-
+    /*
+    std::string line = "Hesitation is always easy rarely useful.";
+    drawLine(canvas, width, height, line, SkTextAlign::left);
+    canvas->translate(0, height);
+    drawLine(canvas, width, height, line, SkTextAlign::right);
+    canvas->translate(0, height);
+    drawLine(canvas, width, height, line, SkTextAlign::center);
+    canvas->translate(0, height);
+    drawLine(canvas, width, height, line, SkTextAlign::justify);
+    //drawCode(canvas, width(), height());
+    */
+    std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
     std::vector<std::string> text = {
         "My neighbor came over to say,\n"
         "Although not in a neighborly way,\n\n"
@@ -578,22 +624,24 @@ std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
     };
 
     std::string str(gText);
-    std::vector<std::string> long_word = 
+    std::vector<std::string> long_word =
         { "A_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_very_long_text"};
 
     std::vector<std::string> very_long =
         {"A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text"};
 
+    SkScalar width = this->width() / 5;
+    SkScalar height = this->height();
     drawText(canvas, width, height, long_word, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-
-    //drawText(canvas, width, height, cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
+    canvas->translate(width, 0);
+    drawText(canvas, width, height, cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
     canvas->translate(width, 0);
     drawText(canvas, width, height, text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 100, u"\u2026");
     canvas->translate(width, 0);
     drawCode(canvas, width, height);
     canvas->translate(width, 0);
     drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-*/
+
   }
 
  private:
@@ -605,4 +653,6 @@ std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
 
 //////////////////////////////////////////////////////////////////////////////
 
-DEF_SAMPLE(return new ParagraphView();)
+DEF_SAMPLE(return new ParagraphView1();)
+
+DEF_SAMPLE(return new ParagraphView2();)
