@@ -83,8 +83,8 @@ void SkLine::paintByStyles(SkCanvas* canvas,
 
   auto offsetX = fWords.begin()->offset().fX;
 
-  //canvas->save();
-  //canvas->translate(offsetX, 0);
+  canvas->save();
+  canvas->translate(-offsetX, 0);
 
   generateWordTextBlobs(offsetX, fTextStyles);
 
@@ -95,14 +95,14 @@ void SkLine::paintByStyles(SkCanvas* canvas,
   paintDecorations(canvas);
 
   paintText(canvas);
-  //canvas->restore();
+  canvas->restore();
 }
 
 void SkLine::generateWordTextBlobs(SkScalar offsetX, SkSpan<StyledText> fTextStyles) {
 
   for (auto word = fWords.begin(); word != fWords.end(); ++word) {
 
-    word->generate(SkPoint::Make(offsetX, 0));
+    word->generate();
     word->dealWithStyles(fTextStyles);
   }
 }

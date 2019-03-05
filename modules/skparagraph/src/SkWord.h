@@ -24,7 +24,7 @@ class SkWord {
     SkWord(SkSpan<const char> text, SkSpan<const char> spaces, bool lineBreakBefore);
     SkWord(SkSpan<const char> text, SkArraySpan<SkRun> runs);
 
-    void generate(SkVector offset);
+    void generate();
     void mapToRuns(SkArraySpan<SkRun> runs);
 
     SkSpan<const char> span() const { return SkSpan<const char>(fText.begin(), fText.size() + fSpaces.size()); }
