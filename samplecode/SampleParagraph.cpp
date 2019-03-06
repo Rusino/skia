@@ -597,7 +597,33 @@ class ParagraphView2 : public Sample {
         ");"
     };
 
-    std::vector<std::string> cupertino = {"google_logogoogle_gsuper_g_logo"};
+    std::vector<std::string> cupertino = {
+         "google_logogoogle_gsuper_g_logo 1 "
+         "google_logogoogle_gsuper_g_logo 12 "
+         "google_logogoogle_gsuper_g_logo 123 "
+         "google_logogoogle_gsuper_g_logo 1234 "
+         "google_logogoogle_gsuper_g_logo 12345 "
+         "google_logogoogle_gsuper_g_logo 123456 "
+         "google_logogoogle_gsuper_g_logo 1234567 "
+         "google_logogoogle_gsuper_g_logo 12345678 "
+         "google_logogoogle_gsuper_g_logo 123456789 "
+         "google_logogoogle_gsuper_g_logo 1234567890 "
+         "google_logogoogle_gsuper_g_logo 123456789 "
+         "google_logogoogle_gsuper_g_logo 12345678 "
+         "google_logogoogle_gsuper_g_logo 1234567 "
+         "google_logogoogle_gsuper_g_logo 123456 "
+         "google_logogoogle_gsuper_g_logo 12345 "
+         "google_logogoogle_gsuper_g_logo 1234 "
+         "google_logogoogle_gsuper_g_logo 123 "
+         "google_logogoogle_gsuper_g_logo 12 "
+         "google_logogoogle_gsuper_g_logo 1 "
+         "google_logogoogle_gsuper_g_logo "
+         "google_logogoogle_gsuper_g_logo "
+         "google_logogoogle_gsuper_g_logo "
+         "google_logogoogle_gsuper_g_logo "
+         "google_logogoogle_gsuper_g_logo "
+         "google_logogoogle_gsuper_g_logo"
+    };
     std::vector<std::string> text = {
         "My neighbor came over to say,\n"
         "Although not in a neighborly way,\n\n"
@@ -793,8 +819,158 @@ class ParagraphView3 : public Sample {
   sk_sp<SkFontCollection> fontCollection;
 };
 
+class ParagraphView4 : public Sample {
+ public:
+  ParagraphView4() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+    LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+
+    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
+        "fonts/GoogleSans-Regular.ttf"));
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+  }
+
+  ~ParagraphView4() {
+  }
+ protected:
+  bool onQuery(Sample::Event* evt) override {
+    if (Sample::TitleQ(*evt)) {
+      Sample::TitleR(evt, "Paragraph4");
+      return true;
+    }
+    return this->INHERITED::onQuery(evt);
+  }
+
+  SkTextStyle style(SkPaint paint) {
+    SkTextStyle style;
+    paint.setAntiAlias(true);
+    style.setForegroundColor(paint);
+    style.setFontFamily("monospace");
+    style.setFontSize(30);
+
+    return style;
+  }
+
+  void drawFlutter(SkCanvas* canvas, SkScalar w, SkScalar h,
+                std::string ff = "sans-serif",
+                SkScalar fs = 30,
+                size_t lineLimit = std::numeric_limits<size_t>::max(),
+                const std::u16string& ellipsis = u"\u2026") {
+
+    SkAutoCanvasRestore acr(canvas, true);
+
+    canvas->clipRect(SkRect::MakeWH(w, h));
+
+    SkScalar margin = 20;
+
+    SkPaint black;
+    black.setAntiAlias(true);
+    black.setColor(SK_ColorBLACK);
+
+    SkPaint blue;
+    blue.setAntiAlias(true);
+    blue.setColor(SK_ColorBLUE);
+
+    SkPaint red;
+    red.setAntiAlias(true);
+    red.setColor(SK_ColorRED);
+
+    SkPaint green;
+    green.setAntiAlias(true);
+    green.setColor(SK_ColorGREEN);
+
+    SkPaint magenta;
+    magenta.setAntiAlias(true);
+    magenta.setColor(SK_ColorMAGENTA);
+
+    SkTextStyle style0;
+    style0.setForegroundColor(black);
+    style0.setFontFamily(ff);
+    style0.setFontSize(fs);
+
+    SkTextStyle style1;
+    style1.setForegroundColor(blue);
+
+    SkTextStyle style2;
+    style2.setForegroundColor(red);
+
+    SkTextStyle style3;
+    style3.setForegroundColor(green);
+
+    SkTextStyle style4;
+    style4.setForegroundColor(magenta);
+
+    SkParagraphStyle paraStyle;
+    paraStyle.setTextStyle(style0);
+    paraStyle.setMaxLines(lineLimit);
+
+    paraStyle.setEllipsis(ellipsis);
+    paraStyle.getTextStyle().setFontSize(fs);
+    fontCollection->setTestFontManager(testFontProvider);
+    SkParagraphBuilder builder(paraStyle, fontCollection);
+
+    const std::string text1 = "Flutter is an open-source project to help developers "
+                              "build high-performance, high-fidelity, mobile apps for "
+                              "iOS and Android "
+                              "from a single codebase. This design lab is a playground "
+                              "and showcase of Flutter's many widgets, behaviors, "
+                              "animations, layouts, and more.  Learn more about Flutter at ";
+    const std::string text2 = "https://flutter.io";
+    const std::string text3 = ".\n\nTo see the source code for this app, please visit the ";
+    const std::string text4 = "flutter github repo";
+
+    builder.pushStyle(style1);
+    builder.addText(text1);
+    builder.pop();
+
+    builder.pushStyle(style2);
+    builder.addText(text2);
+    builder.pop();
+
+    builder.pushStyle(style3);
+    builder.addText(text3);
+    builder.pop();
+
+    builder.pushStyle(style4);
+    builder.addText(text4);
+    builder.pop();
+
+    auto paragraph = builder.Build();
+    paragraph->layout(w - margin * 2);
+    paragraph->paint(canvas, margin, margin);
+
+    canvas->translate(0, paragraph->getHeight() + margin);
+  }
+
+  void onDrawContent(SkCanvas* canvas) override {
+
+    canvas->drawColor(SK_ColorWHITE);
+    SkScalar width = this->width();
+    SkScalar height = this->height();
+
+    drawFlutter(canvas, width, height, "Roboto", 14);
+  }
+
+ private:
+  typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
+};
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_SAMPLE(return new ParagraphView1();)
 DEF_SAMPLE(return new ParagraphView2();)
 DEF_SAMPLE(return new ParagraphView3();)
+DEF_SAMPLE(return new ParagraphView4();)

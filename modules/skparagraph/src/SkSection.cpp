@@ -260,10 +260,12 @@ void SkSection::formatLinesByWords(SkScalar maxWidth) {
 
 void SkSection::paintEachLineByStyles(SkCanvas* textCanvas) {
 
+  textCanvas->save();
   for (auto& line : fLines) {
     line.paintByStyles(textCanvas);
     textCanvas->translate(0, line.advance().fY);
   }
+  textCanvas->restore();
 }
 
 void SkSection::getRectsForRange(
