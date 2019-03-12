@@ -10,52 +10,32 @@
 #include "SkParagraph.h"
 #include "SkPictureRecorder.h"
 #include "SkSection.h"
+#include "SkBlock.h"
 
 SkParagraph::SkParagraph(const std::string& text,
                          SkParagraphStyle style,
                          std::vector<Block> blocks)
-    : fParagraphStyle(std::move(style)), fUtf8(text.data(), text.size()),
+    : fParagraphStyle(std::move(style))
+    , fTextStyles(std::move(blocks))
+    , fUtf8(text.data(), text.size()),
       fPicture(nullptr) {
-
-  std::transform(blocks.cbegin(),
-                 blocks.cend(),
-                 std::back_inserter(fTextStyles),
-                 [this](const Block& value) {
-                   return StyledText(SkSpan<const char>(
-                       fUtf8.begin() + value.fStart,
-                       value.fEnd - value.fStart), value.fStyle);
-                 });
 }
 
 SkParagraph::SkParagraph(const std::u16string& utf16text,
                          SkParagraphStyle style,
                          std::vector<Block> blocks)
-    : fParagraphStyle(std::move(style)), fPicture(nullptr) {
+    : fParagraphStyle(std::move(style))
+    , fTextStyles(std::move(blocks))
+    , fPicture(nullptr) {
 
   icu::UnicodeString
       unicode((UChar*) utf16text.data(), SkToS32(utf16text.size()));
   std::string str;
   unicode.toUTF8String(str);
   fUtf8 = SkSpan<const char>(str.data(), str.size());
-
-  std::transform(blocks.cbegin(),
-                 blocks.cend(),
-                 std::back_inserter(fTextStyles),
-                 [this](const Block& value) {
-                   return StyledText(SkSpan<const char>(
-                       fUtf8.begin() + value.fStart,
-                       value.fEnd - value.fStart), value.fStyle);
-                 });
 }
 
 SkParagraph::~SkParagraph() = default;
-
-std::string toString(SkSpan<const char> text) {
-  icu::UnicodeString utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
-  std::string str;
-  utf16.toUTF8String(str);
-  return str;
-}
 
 bool SkParagraph::layout(double doubleWidth) {
 
@@ -121,12 +101,11 @@ bool SkParagraph::layout(double doubleWidth) {
 void SkParagraph::paint(SkCanvas* canvas, double x, double y) {
 
   if (nullptr == fPicture) {
-    // Postpone painting until we actually have to paint
+    // Postpone painting until we actually have to paint (or never)
     this->recordPicture();
   }
 
-  SkMatrix matrix =
-      SkMatrix::MakeTrans(SkDoubleToScalar(x), SkDoubleToScalar(y));
+  SkMatrix matrix = SkMatrix::MakeTrans(SkDoubleToScalar(x), SkDoubleToScalar(y));
   canvas->drawPicture(fPicture, &matrix, nullptr);
 }
 
@@ -262,28 +241,9 @@ void SkParagraph::breakTextIntoSections() {
         }
 
         fWord = trimControls(fCurrentPosition, fNextWordPosition);
-        fTrailingSpaces = SkSpan<const char>(fWord.end(), 0);
-        if (!isWhiteSpaces(currentChar, fNextWordPosition - fCurrentPosition)) {
-            if (fNextWordPosition < fNextLinePosition) {
-                // Look ahead if possible
-                auto nextNextPosition = ubrk_following(fWordBreak, fNextWordPosition);
-                if (nextNextPosition == icu::BreakIterator::DONE ||
-                    nextNextPosition > fNextLinePosition) {
-                  // Next word is behind the line break
-                } else {
-                  if (isWhiteSpaces(fText.begin() + fNextWordPosition,
-                                    nextNextPosition - fNextWordPosition)) {
-                    // Add extra spaces to the current word and move the position
-                    fTrailingSpaces = trimControls(fNextWordPosition, nextNextPosition);
-                    fNextWordPosition = nextNextPosition;
-                  }
-                }
-            }
-        } else {
-          // This is one tricky case when the word itself is all spaces (leading spaces)
-          // It takes care of itself, though...
-        }
+        fWhiteSpaces = isWhiteSpaces(currentChar, fNextWordPosition - fCurrentPosition);
       }
+
       fCurrentPosition = SkTMin(fNextWordPosition, fNextLinePosition);
 
       return true;
@@ -291,7 +251,7 @@ void SkParagraph::breakTextIntoSections() {
 
     inline SkSpan<const char> getLine() { return fLine; }
     inline SkSpan<const char> getWord() { return fWord; }
-    inline SkSpan<const char> getTrailingSpaces() { return fTrailingSpaces; }
+    inline bool isWhiteSpaces() { return fWhiteSpaces; }
 
     inline bool isWordBreak() { return fCurrentPosition == fNextWordPosition; }
     inline bool isLineBreak() { return fCurrentPosition == fNextLinePosition; }
@@ -305,14 +265,17 @@ void SkParagraph::breakTextIntoSections() {
     int32_t fNextWordPosition;
 
     SkSpan<const char> fWord;
-    SkSpan<const char> fTrailingSpaces;
     SkSpan<const char> fLine;
     SkSpan<const char> fText;
+    bool fWhiteSpaces;
     std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> fAutoClose;
   };
 
   fSections.reset();
-  SkTArray<SkWord, true> words;
+  SkTArray<SkWords, true> unbreakable;
+  SkTArray<size_t, true> bounds;
+  SkSpan<const char> spaces;
+  const char* start = nullptr;
 
   BreakIterator breakIterator(fUtf8);
   bool lineBreakBefore = true;
@@ -320,10 +283,26 @@ void SkParagraph::breakTextIntoSections() {
 
     if (breakIterator.isWordBreak()) {
       auto word = breakIterator.getWord();
-      auto spaces = breakIterator.getTrailingSpaces();
-      if (!word.empty() || !spaces.empty()) {
-        words.emplace_back(word, spaces, lineBreakBefore);
-        lineBreakBefore = !spaces.empty();
+
+      if (lineBreakBefore) {
+        if (start != nullptr) {
+          unbreakable.emplace_back(SkSpan<const char>(start, word.begin() - start),
+                                   spaces,
+                                   std::move(bounds));
+          bounds.reset();
+        }
+        start = word.begin();
+      }
+
+      if (!word.empty()) {
+        if (breakIterator.isWhiteSpaces()) {
+          spaces = word;
+          lineBreakBefore = true;
+        } else {
+          spaces = SkSpan<const char>();
+          lineBreakBefore = false;
+        }
+        bounds.emplace_back(word.end() - start);
       }
 
       if (!breakIterator.isLineBreak()) {
@@ -334,23 +313,35 @@ void SkParagraph::breakTextIntoSections() {
     // Line break situation
     SkASSERT(breakIterator.isLineBreak());
     auto line = breakIterator.getLine();
-    SkDebugf("Section [%d : %d] %d\n",
-             line.begin() - &fUtf8[0],
-             line.end() - &fUtf8[0],
-             words.size());
 
     // Copy all the styles (corrected)
-    auto limits = SkSection::selectStyles(line, SkSpan<StyledText>(fTextStyles));
-
-    SkTArray<StyledText> styles;
-    styles.reserve(SkToS32(limits.size()));
-
-    for (auto style = limits.begin(); style < limits.end(); ++style) {
-      auto start = SkTMax(style->fText.begin(), line.begin());
-      auto end = SkTMin(style->fText.end(), line.end());
-      styles.emplace_back(SkSpan<const char>(start, SkToU32(end - start)), style->fStyle);
+    auto start = fTextStyles.begin();
+    while (start != fTextStyles.end() && start->fEnd <= size_t(line.begin() - fUtf8.begin())) {
+      ++start;
     }
-    fSections.emplace_back(std::make_unique<SkSection>(line, fParagraphStyle, std::move(styles), std::move(words)));
+    auto end = start;
+    while (end != fTextStyles.end() && end->fStart < size_t(line.end() - fUtf8.begin())) {
+      ++end;
+    }
+
+    SkTArray<SkBlock, true> styles;
+    styles.reserve(SkToS32(end - start));
+    for (auto i = start; i != end; ++i) {
+      styles.emplace_back(
+          SkSpan<const char>(fUtf8.begin() + i->fStart, i->fEnd - i->fStart),
+          i->fStyle);
+    }
+
+    // TODO: Some of the word breaks can be invalidated later by SkShaper
+    // creating a group of "unbreakable" words
+    // (that way we do not need to worry about spaces in ligatures)
+    SkDebugf("Section %d %d\n", fSections.size(), unbreakable.size());
+    fSections.emplace_back(
+        std::make_unique<SkSection>(
+            line,
+            fParagraphStyle,
+            std::move(styles),
+            std::move(unbreakable)));
   }
 }
 

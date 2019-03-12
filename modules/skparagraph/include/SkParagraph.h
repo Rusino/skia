@@ -11,92 +11,96 @@
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
 
-struct Block {
-    Block(size_t start, size_t end, SkTextStyle style)
-        : fStart(start), fEnd(end), fStyle(style) {}
-    size_t fStart;
-    size_t fEnd;
-    SkTextStyle fStyle;
-};
-
 class SkCanvas;
 class SkSection;
 class SkPicture;
 
 class SkParagraph {
-  public:
-    SkParagraph(
-        const std::u16string& utf16text,
-        SkParagraphStyle style,
-        std::vector<Block> blocks);
+ private:
+  struct Block {
+    Block(size_t start, size_t end, SkTextStyle style)
+        : fStart(start), fEnd(end), fStyle(style) {}
+    size_t fStart;
+    size_t fEnd;
+    SkTextStyle fStyle;
+  };
 
-    SkParagraph(
-        const std::string& utf8text,
-        SkParagraphStyle style,
-        std::vector<Block> blocks);
+ public:
+  SkParagraph(
+      const std::u16string& utf16text,
+      SkParagraphStyle style,
+      std::vector<Block> blocks);
 
-    ~SkParagraph();
+  SkParagraph(
+      const std::string& utf8text,
+      SkParagraphStyle style,
+      std::vector<Block> blocks);
 
-    double getMaxWidth() { return SkScalarToDouble(fWidth); }
+  ~SkParagraph();
 
-    double getHeight() { return SkScalarToDouble(fHeight); }
+  double getMaxWidth() { return SkScalarToDouble(fWidth); }
 
-    double getMinIntrinsicWidth() { return SkScalarToDouble(fMinIntrinsicWidth); }
+  double getHeight() { return SkScalarToDouble(fHeight); }
 
-    double getMaxIntrinsicWidth() { return SkScalarToDouble(fMaxIntrinsicWidth); }
+  double getMinIntrinsicWidth() { return SkScalarToDouble(fMinIntrinsicWidth); }
 
-    double getAlphabeticBaseline() { return SkScalarToDouble(fAlphabeticBaseline); }
+  double getMaxIntrinsicWidth() { return SkScalarToDouble(fMaxIntrinsicWidth); }
 
-    double getIdeographicBaseline() { return SkScalarToDouble(fIdeographicBaseline); }
+  double
+  getAlphabeticBaseline() { return SkScalarToDouble(fAlphabeticBaseline); }
 
-    bool didExceedMaxLines() {
+  double
+  getIdeographicBaseline() { return SkScalarToDouble(fIdeographicBaseline); }
 
-        return !fParagraphStyle.unlimited_lines()
-            && fLinesNumber > fParagraphStyle.getMaxLines();
-    }
+  bool didExceedMaxLines() {
 
-    bool layout(double width);
+    return !fParagraphStyle.unlimited_lines()
+        && fLinesNumber > fParagraphStyle.getMaxLines();
+  }
 
-    void paint(SkCanvas* canvas, double x, double y);
+  bool layout(double width);
 
-    std::vector<SkTextBox> getRectsForRange(
-        unsigned start,
-        unsigned end,
-        RectHeightStyle rectHeightStyle,
-        RectWidthStyle rectWidthStyle);
+  void paint(SkCanvas* canvas, double x, double y);
 
-    SkPositionWithAffinity getGlyphPositionAtCoordinate(double dx, double dy) const;
+  std::vector<SkTextBox> getRectsForRange(
+      unsigned start,
+      unsigned end,
+      RectHeightStyle rectHeightStyle,
+      RectWidthStyle rectWidthStyle);
 
-    SkRange<size_t> getWordBoundary(unsigned offset);
+  SkPositionWithAffinity
+  getGlyphPositionAtCoordinate(double dx, double dy) const;
 
-  private:
+  SkRange<size_t> getWordBoundary(unsigned offset);
 
-    friend class ParagraphTester;
+ private:
 
-    // Record a picture drawing all small text blobs
-    void recordPicture();
+  friend class SkParagraphBuilder;
 
-    // Break the text by explicit line breaks
-    void breakTextIntoSections();
+  // Record a picture drawing all small text blobs
+  void recordPicture();
 
-    // Things for Flutter
-    SkScalar fAlphabeticBaseline;
-    SkScalar fIdeographicBaseline;
-    SkScalar fHeight;
-    SkScalar fWidth;
-    SkScalar fMaxIntrinsicWidth;
-    SkScalar fMinIntrinsicWidth;
-    SkScalar fMaxLineWidth;
-    size_t fLinesNumber;
+  // Break the text by explicit line breaks
+  void breakTextIntoSections();
 
-    // Input
-    SkParagraphStyle fParagraphStyle;
-    std::vector<StyledText> fTextStyles;
-    SkSpan<const char> fUtf8;
+  // Things for Flutter
+  SkScalar fAlphabeticBaseline;
+  SkScalar fIdeographicBaseline;
+  SkScalar fHeight;
+  SkScalar fWidth;
+  SkScalar fMaxIntrinsicWidth;
+  SkScalar fMinIntrinsicWidth;
+  SkScalar fMaxLineWidth;
+  size_t fLinesNumber;
 
-    // Shaping (list of sections separated by hard line breaks)
-    SkTArray<std::unique_ptr<SkSection>> fSections;
+  // Input
+  SkParagraphStyle fParagraphStyle;
+  std::vector<Block> fTextStyles;
+  SkSpan<const char> fUtf8;
 
-    // Painting
-    sk_sp<SkPicture> fPicture;
+  // Shaping (list of sections separated by hard line breaks)
+  SkTArray<std::unique_ptr<SkSection>> fSections;
+
+  // Painting
+  sk_sp<SkPicture> fPicture;
 };

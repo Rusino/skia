@@ -41,12 +41,6 @@ SkTextStyle::SkTextStyle()
     fHasForeground = false;
 }
 
-// TODO: use font provider to resolve the font
-sk_sp<SkTypeface> SkTextStyle::getTypeface() const {
-
-    return fTypeface;
-}
-
 bool SkTextStyle::equals(const SkTextStyle& other) const {
 
     if (fColor != other.fColor) {
@@ -97,4 +91,37 @@ bool SkTextStyle::equals(const SkTextStyle& other) const {
     }
 
     return true;
+}
+
+bool SkTextStyle::matchOneAttribute(SkStyleType styleType, const SkTextStyle& other) const {
+
+  switch (styleType) {
+      case Foreground:
+          return fColor == other.fColor && fForeground == other.fForeground;
+
+      case Background:
+          return fBackground == other.fBackground;
+
+      case Shadow:
+          if (fTextShadows.size() != other.fTextShadows.size()) {
+              return false;
+          }
+
+      for (int32_t i = 0; i < SkToInt(fTextShadows.size()); ++i) {
+          if (fTextShadows[i] != other.fTextShadows[i]) {
+              return false;
+          }
+      }
+      return true;
+
+      case Decorations:
+          return fDecoration == other.fDecoration &&
+              fDecorationColor == other.fDecorationColor &&
+              fDecorationStyle == other.fDecorationStyle &&
+              fDecorationThicknessMultiplier == other.fDecorationThicknessMultiplier;
+
+      default:
+          SkASSERT(false);
+      return false;
+  }
 }

@@ -17,45 +17,76 @@
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
 #include "SkTextBlobPriv.h"
-#include "SkDashPathEffect.h"
-#include "SkDiscretePathEffect.h"
+#include "SkTHash.h"
+#include "SkArraySpan.h"
+
+class SkRun;
+struct SkGlyphsPos {
+
+  explicit SkGlyphsPos(SkRun* run) : fRun(run), fPos(0), fShift(0) {}
+  SkGlyphsPos() : fRun(nullptr) {}
+  SkGlyphsPos(SkRun* run, size_t pos, SkScalar shift)
+      : fRun(run), fPos(pos), fShift(shift) {}
+  SkRun* fRun;
+  size_t fPos;
+  SkScalar
+      fShift;  // Negative: shift pos to right, positive: clip rect from right
+};
+
+struct SkCluster {
+  SkRun* fRun;
+  SkSpan<const char> fCluster;
+  size_t fStart;
+  size_t fEnd;
+  SkScalar fWidth;
+  SkScalar fHeight;
+};
 
 // The smallest part of the text that is painted separately
-class SkRun
-{
-  public:
+class SkRun {
+ public:
 
-    SkRun() { }
-    SkRun(
-        const SkFont& font,
-        const SkShaper::RunHandler::RunInfo& info,
-        int glyphCount,
-        SkSpan<const char> text);
+  SkRun() {}
+  SkRun(
+      const SkFont& font,
+      const SkShaper::RunHandler::RunInfo& info,
+      int glyphCount,
+      SkSpan<const char> text);
 
-    SkShaper::RunHandler::Buffer newRunBuffer();
+  SkShaper::RunHandler::Buffer newRunBuffer();
 
-    inline size_t size() const { return fGlyphs.size(); }
-    void setWidth(SkScalar width) { fInfo.fAdvance.fX = width; }
-    SkVector advance() const {
-        return SkVector::Make(fInfo.fAdvance.fX,
-                              fInfo.fDescent + fInfo.fLeading - fInfo.fAscent);
-    }
-    inline SkVector offset() const { return fInfo.fOffset; }
-    inline SkScalar ascent() const { return fInfo.fAscent; }
-    inline SkScalar descent() const { return fInfo.fDescent; }
-    inline SkScalar leading() const { return fInfo.fLeading; }
+  inline size_t size() const { return fGlyphs.size(); }
+  void setWidth(SkScalar width) { fInfo.fAdvance.fX = width; }
+  SkVector advance() const {
+    return SkVector::Make(fInfo.fAdvance.fX,
+                          fInfo.fDescent + fInfo.fLeading - fInfo.fAscent);
+  }
+  inline SkVector offset() const { return fInfo.fOffset; }
+  inline SkScalar ascent() const { return fInfo.fAscent; }
+  inline SkScalar descent() const { return fInfo.fDescent; }
+  inline SkScalar leading() const { return fInfo.fLeading; }
 
-    inline SkSpan<const char> text() const { return fText; }
+  inline SkSpan<const char> text() const { return fText; }
 
-  private:
+  static SkGlyphsPos findPosition(SkSpan<SkRun> runs, const char* character);
 
-    friend class SkWord;
+  static void iterateThrough(SkArraySpan<SkRun> runs, std::function<void(SkCluster)> apply);
 
-    SkFont fFont;
-    SkShaper::RunHandler::RunInfo fInfo;
-    SkSTArray<128, SkGlyphID, true> fGlyphs;
-    SkSTArray<128, SkPoint, true> fPositions;
-    SkSTArray<128, uint32_t, true> fClusters;
+  //static void iterateThrough(
+  //    SkGlyphsPos start,
+  //    SkGlyphsPos end,
+  //    std::function<void(SkGlyphsPos pos)> apply);
 
-    SkSpan<const char> fText;
+ private:
+
+  friend class SkSection;
+  friend class SkLine;
+
+  SkFont fFont;
+  SkShaper::RunHandler::RunInfo fInfo;
+  SkSTArray<128, SkGlyphID, true> fGlyphs;
+  SkSTArray<128, SkPoint, true> fPositions;
+  SkSTArray<128, uint32_t, true> fClusters;
+
+  SkSpan<const char> fText;
 };

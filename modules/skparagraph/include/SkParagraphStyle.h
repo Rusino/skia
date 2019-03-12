@@ -22,7 +22,6 @@
 #include "SkFontStyle.h"
 #include "SkTextStyle.h"
 
-// TODO: Introduce line break strategy later
 struct SkParagraphStyle {
     SkParagraphStyle();
 

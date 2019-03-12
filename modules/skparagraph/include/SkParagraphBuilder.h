@@ -69,13 +69,11 @@ class SkParagraphBuilder {
 
   private:
 
-    friend class ParagraphTester;
-
     void endRunIfNeeded();
 
     std::string fUtf8;
     std::stack<SkTextStyle> fTextStyles;
-    std::vector<Block> fStyledBlocks;
+    std::vector<SkParagraph::Block> fStyledBlocks;
     sk_sp<SkFontCollection> fFontCollection;
     SkParagraphStyle fParagraphStyle;
 };

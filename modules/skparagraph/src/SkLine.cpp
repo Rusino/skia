@@ -8,6 +8,8 @@
 #include <unicode/brkiter.h>
 #include <algorithm>
 #include "SkLine.h"
+#include "SkDashPathEffect.h"
+#include "SkDiscretePathEffect.h"
 /*
 namespace {
   std::string toString2(SkSpan<const char> text) {
@@ -25,14 +27,17 @@ SkLine::SkLine() {
   fHeight = 0;
 }
 
-SkLine::SkLine(SkVector advance, SkScalar baseline, SkSpan<StyledText> styles, SkArraySpan<SkWord> words)
-    : fTextStyles(styles)
-    , fWords(words) {
-  fAdvance = advance;
-  fWords = words;
-  fHeight = advance.fY;
-  fWidth = advance.fX;
-  fBaseline = baseline;
+SkLine::SkLine(SkScalar width, SkScalar height, SkArraySpan<SkWords> words, SkArraySpan<SkRun> runs)
+    : fUnbreakableWords(words)
+    , fRuns(runs) {
+  fAdvance = SkVector::Make(width, height);
+  fOffset = runs.begin()->fInfo.fOffset;
+  fHeight = height;
+  fWidth = width;
+  fText = SkSpan<const char>(
+      words.begin()->text().begin(),
+      words.back()->text().end() - words.begin()->text().begin()
+      );
 }
 
 void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
@@ -76,16 +81,10 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
 
 void SkLine::justify(SkScalar delta) {
 
-  auto softLineBreaks = std::count_if(fWords.begin(),
-                                      fWords.end(),
-                                      [](SkWord word){ return word.fMayLineBreakBefore; });
-  if (fWords.begin()->fMayLineBreakBefore) {
-    --softLineBreaks;
-  }
-
+  auto softLineBreaks = fUnbreakableWords.size() - 1;
   if (softLineBreaks == 0) {
     // Expand one group of words
-    for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+    for (auto word = fUnbreakableWords.begin(); word != fUnbreakableWords.end(); ++word) {
       word->expand(delta);
     }
     return;
@@ -94,10 +93,10 @@ void SkLine::justify(SkScalar delta) {
   SkScalar step = delta / softLineBreaks;
   SkScalar shift = 0;
 
-  SkWord* last = nullptr;
-  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
+  SkWords* last = nullptr;
+  for (auto word = fUnbreakableWords.begin(); word != fUnbreakableWords.end(); ++word) {
 
-    if (word->fMayLineBreakBefore && last != nullptr) {
+    if (last != nullptr) {
       --softLineBreaks;
       last->expand(step);
       shift += step;
@@ -108,77 +107,245 @@ void SkLine::justify(SkScalar delta) {
   }
 }
 
-// TODO: For now we paint everything by words but we better combine words by style
-void SkLine::paintByStyles(SkCanvas* canvas) {
+void SkLine::iterateThroughRuns(
+    SkSpan<const char> text,
+    std::function<void(SkRun* run, int32_t pos, size_t size, SkRect clip)> apply) const {
 
-  if (fWords.empty()) {
+  // Find the correct style positions (taking in account cluster limits)
+  auto startPos = SkRun::findPosition(SkSpan<SkRun>(fRuns.begin(), fRuns.size()), text.begin());
+  auto endPos = SkRun::findPosition(SkSpan<SkRun>(fRuns.begin(), fRuns.size()), text.end());   // inclusive
+
+  for (auto& run = startPos.fRun; run <= endPos.fRun; ++run) {
+
+    auto start = 0;
+    auto size = run->size();
+
+    SkRect clip = SkRect::MakeEmpty();
+    if (run == startPos.fRun) {
+      start = SkToU32(startPos.fPos);
+      clip.fLeft = run->fPositions[start].fX + startPos.fShift;
+      clip.fTop = run->fPositions[start].fY;
+    }
+    if (run == endPos.fRun) {
+      size -= endPos.fPos;
+      clip.fRight = run->fPositions[start].fX + run->fInfo.fAdvance.fX - endPos.fShift;
+      clip.fBottom = run->fPositions[start].fY + run->fInfo.fAdvance.fY;
+    }
+
+    apply(run, start, size, clip);
+  }
+}
+
+// TODO: Justification dropped again for now. It's really gets in a way!
+void SkLine::paintText(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const {
+
+  // Build the blob from all the runs
+  SkTextBlobBuilder builder;
+  iterateThroughRuns(text,
+      [&builder](SkRun* run, int32_t pos, size_t size, SkRect rect) {
+        const auto& blobBuffer = builder.allocRunPos(run->fFont, SkToInt(size - pos));
+        sk_careful_memcpy(blobBuffer.glyphs,
+                          run->fGlyphs.data() + pos,
+                          (size - pos) * sizeof(SkGlyphID));
+        sk_careful_memcpy(blobBuffer.points(),
+                          run->fPositions.data() + pos,
+                          (size - pos) * sizeof(int32_t));
+  });
+
+  // Paint the blob with one foreground color
+  SkPaint paint;
+  if (style.hasForeground()) {
+    paint = style.getForeground();
+  } else {
+    paint.reset();
+    paint.setColor(style.getColor());
+  }
+  paint.setAntiAlias(true);
+  canvas->drawTextBlob(builder.make(), 0, 0, paint);
+
+}
+
+void SkLine::paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const {
+
+  if (!style.hasBackground()) {
     return;
   }
 
-  auto offsetX = fWords.begin()->offset().fX;
-
-  canvas->save();
-  canvas->translate(fShift - offsetX, 0);
-
-  generateWordTextBlobs(offsetX);
-
-  paintBackground(canvas);
-
-  paintShadow(canvas);
-
-  paintDecorations(canvas);
-
-  paintText(canvas);
-  canvas->restore();
+  iterateThroughRuns(
+      text,
+      [canvas, style](SkRun* run, int32_t pos, size_t size, SkRect clip) {
+        canvas->drawRect(clip, style.getBackground());
+      });
 }
 
-void SkLine::generateWordTextBlobs(SkScalar offsetX) {
+void SkLine::paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const {
 
-  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-
-    word->generate();
-    word->dealWithStyles(fTextStyles);
+  if (style.getShadowNumber() == 0) {
+    return;
   }
-}
 
-void SkLine::paintBackground(SkCanvas* canvas) {
-
-  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-    word->paintBackground(canvas);
-  }
-}
-
-void SkLine::paintShadow(SkCanvas* canvas) {
-
-  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-    word->paintShadow(canvas);
-  }
-}
-
-void SkLine::paintDecorations(SkCanvas* canvas) {
-
-  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-    word->paintDecorations(canvas, fBaseline);
-  }
-}
-
-void SkLine::paintText(SkCanvas* canvas) {
-
-  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-    word->paint(canvas);
-  }
-}
-
-void SkLine::getRectsForRange(
-    SkTextDirection textDirection,
-    const char* start,
-    const char* end,
-    std::vector<SkTextBox>& result) {
-
-  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
-    if (word->text().end() <= start || word->text().begin() >= end) {
+  for (SkTextShadow shadow : style.getShadows()) {
+    if (!shadow.hasShadow()) {
       continue;
     }
-    result.emplace_back(word->rect(), textDirection);
+
+    SkPaint paint;
+    paint.setColor(shadow.fColor);
+    if (shadow.fBlurRadius != 0.0) {
+      paint.setMaskFilter(SkMaskFilter::MakeBlur(kNormal_SkBlurStyle,
+                                                 shadow.fBlurRadius,
+                                                 false));
+    }
+
+    SkTextBlobBuilder builder;
+    iterateThroughRuns(text,
+                       [&builder](SkRun* run, int32_t pos, size_t size, SkRect rect) {
+                         const auto& blobBuffer = builder.allocRunPos(run->fFont, SkToInt(size - pos));
+                         sk_careful_memcpy(blobBuffer.glyphs,
+                                           run->fGlyphs.data() + pos,
+                                           (size - pos) * sizeof(SkGlyphID));
+                         sk_careful_memcpy(blobBuffer.points(),
+                                           run->fPositions.data() + pos,
+                                           (size - pos) * sizeof(int32_t));
+                       });
+
+    canvas->drawTextBlob(builder.make(),
+                         shadow.fOffset.x(),
+                         shadow.fOffset.y(),
+                         paint);
   }
+}
+
+void SkLine::computeDecorationPaint(SkPaint& paint, SkRect clip, SkTextStyle textStyle, SkPath& path) const {
+
+  paint.setStyle(SkPaint::kStroke_Style);
+  if (textStyle.getDecorationColor() == SK_ColorTRANSPARENT) {
+    paint.setColor(textStyle.getColor());
+  } else {
+    paint.setColor(textStyle.getDecorationColor());
+  }
+  paint.setAntiAlias(true);
+
+  SkScalar scaleFactor = textStyle.getFontSize() / 14.f;
+
+  switch (textStyle.getDecorationStyle()) {
+    case SkTextDecorationStyle::kSolid:
+      break;
+
+    case SkTextDecorationStyle::kDouble:
+      break;
+
+      // Note: the intervals are scaled by the thickness of the line, so it is
+      // possible to change spacing by changing the decoration_thickness
+      // property of TextStyle.
+    case SkTextDecorationStyle::kDotted: {
+      const SkScalar intervals[] =
+          {1.0f * scaleFactor, 1.5f * scaleFactor, 1.0f * scaleFactor,
+           1.5f * scaleFactor};
+      size_t count = sizeof(intervals) / sizeof(intervals[0]);
+      paint.setPathEffect(SkPathEffect::MakeCompose(
+          SkDashPathEffect::Make(intervals, (int32_t) count, 0.0f),
+          SkDiscretePathEffect::Make(0, 0)));
+      break;
+    }
+      // Note: the intervals are scaled by the thickness of the line, so it is
+      // possible to change spacing by changing the decoration_thickness
+      // property of TextStyle.
+    case SkTextDecorationStyle::kDashed: {
+      const SkScalar intervals[] =
+          {4.0f * scaleFactor, 2.0f * scaleFactor, 4.0f * scaleFactor,
+           2.0f * scaleFactor};
+      size_t count = sizeof(intervals) / sizeof(intervals[0]);
+      paint.setPathEffect(SkPathEffect::MakeCompose(
+          SkDashPathEffect::Make(intervals, (int32_t) count, 0.0f),
+          SkDiscretePathEffect::Make(0, 0)));
+      break;
+    }
+    case SkTextDecorationStyle::kWavy: {
+
+      int wave_count = 0;
+      SkScalar x_start = 0;
+      SkScalar wavelength = 2 * scaleFactor;
+      auto width = clip.width();
+      path.moveTo(0, 0);
+      while (x_start + wavelength * 2 < width) {
+        path.rQuadTo(wavelength,
+                     wave_count % 2 != 0 ? wavelength : -wavelength,
+                     wavelength * 2,
+                     0);
+        x_start += wavelength * 2;
+        ++wave_count;
+      }
+      break;
+    }
+  }
+}
+
+// TODO: Make the thickness reasonable
+void SkLine::paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle textStyle) const {
+
+  if (textStyle.getDecoration() == SkTextDecoration::kNone) {
+    return;
+  }
+
+  // Decoration thickness
+  SkScalar thickness = textStyle.getDecorationThicknessMultiplier();
+
+  // Decoration position
+  SkScalar position;
+  switch (textStyle.getDecoration()) {
+    case SkTextDecoration::kUnderline:
+      position = fBaseline + thickness;
+      break;
+    case SkTextDecoration::kOverline:
+      position = thickness;
+      break;
+    case SkTextDecoration::kLineThrough: {
+      position = (fBaseline - thickness) / 2;
+      break;
+    }
+    default:
+      position = 0;
+      SkASSERT(false);
+      break;
+  }
+
+  // Draw the decoration
+  iterateThroughRuns(
+      text,
+      [this, canvas, textStyle, position, thickness](SkRun* run, int32_t pos, size_t size, SkRect clip) {
+        auto width = clip.width();
+        SkScalar x = clip.left();
+        SkScalar y = clip.top() + position;
+
+        // Decoration paint (for now) and/or path
+        SkPaint paint;
+        SkPath path;
+        this->computeDecorationPaint(paint, clip, textStyle, path);
+        paint.setStrokeWidth(thickness);
+
+        switch (textStyle.getDecorationStyle()) {
+          case SkTextDecorationStyle::kWavy:
+            path.offset(x, y);
+            canvas->drawPath(path, paint);
+            break;
+          case SkTextDecorationStyle::kDouble: {
+            canvas->drawLine(x, y, x + width, y, paint);
+            SkScalar bottom = y + thickness * 2;
+            canvas->drawLine(x, bottom, x + width, bottom, paint);
+            break;
+          }
+          case SkTextDecorationStyle::kDashed:
+          case SkTextDecorationStyle::kDotted:
+          case SkTextDecorationStyle::kSolid:
+            canvas->drawLine(x,
+                             y,
+                             x + width,
+                             y,
+                             paint);
+            break;
+          default:
+            break;
+        }
+      });
 }
