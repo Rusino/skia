@@ -22,6 +22,85 @@
 #include "SkLine.h"
 #include "SkBlock.h"
 
+class SkSection {
+ public:
+
+  SkSection(
+      SkSpan<const char> text,
+      const SkParagraphStyle& style,
+      SkTArray<SkBlock, true> styles,
+      SkTArray<SkWords, true> words);
+
+  ~SkSection() = default;
+
+  void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
+
+  void formatLinesByWords(SkScalar maxWidth);
+
+  void paintEachLineByStyles(SkCanvas* textCanvas);
+
+  SkScalar alphabeticBaseline() const { return fAlphabeticBaseline; }
+  SkScalar height() const { return fHeight; }
+  SkScalar width() const { return fWidth; }
+  SkScalar ideographicBaseline() const { return fIdeographicBaseline; }
+  SkScalar maxIntrinsicWidth() const { return fMaxIntrinsicWidth; }
+  SkScalar minIntrinsicWidth() const { return fMinIntrinsicWidth; }
+
+  void getRectsForRange(
+      const char* start,
+      const char* end,
+      std::vector<SkTextBox>& result);
+
+  inline size_t lineNumber() const { return fLines.size(); }
+
+  SkSpan<SkBlock> selectStyles(SkSpan<const char> text);
+
+ private:
+
+  typedef SkShaper::RunHandler INHERITED;
+
+  friend class ShapeHandler;
+
+  void resetContext();
+
+  bool shapeTextIntoEndlessLine();
+
+  void mapRunsToWords();
+
+  void breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
+                                                  size_t maxLines);
+
+  void shapeWordsIntoManyLines(SkWords* words, SkScalar width);
+
+  void iterateThroughRuns(
+      std::function<void(SkSpan<const char> text, SkRun& run)> apply
+      );
+
+  void iterateThroughStyles(
+      SkLine& line,
+      SkStyleType styleType,
+      std::function<void(SkSpan<const char> text, SkTextStyle style)> apply);
+
+  // Input
+  SkSpan<const char> fText;
+  SkParagraphStyle fParagraphStyle;
+  SkTArray<SkBlock, true> fTextStyles;
+  SkTArray<SkWords, true> fUnbreakableWords;
+
+  // Output to Flutter
+  SkScalar fAlphabeticBaseline;   // TODO: Not implemented yet
+  SkScalar fIdeographicBaseline;  // TODO: Not implemented yet
+  SkScalar fHeight;
+  SkScalar fWidth;
+  SkScalar fMaxIntrinsicWidth;
+  SkScalar fMinIntrinsicWidth;
+
+  // Internal structures
+  SkTArray<SkRun, true> fRuns;
+  SkTArray<SkLine, true> fLines;
+  SkTArray<SkCluster, true> fClusters;
+};
+
 class MultipleFontRunIterator final : public FontRunIterator {
  public:
   MultipleFontRunIterator(
@@ -87,78 +166,6 @@ class MultipleFontRunIterator final : public FontRunIterator {
   SkBlock* fNext;
   SkBlock* fLast;
   sk_sp<SkTypeface> fCurrentTypeface;
-};
-
-class SkSection {
- public:
-
-  SkSection(
-      SkSpan<const char> text,
-      const SkParagraphStyle& style,
-      SkTArray<SkBlock, true> styles,
-      SkTArray<SkWords, true> words);
-
-  //~SkSection() = default;
-
-  void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
-
-  void formatLinesByWords(SkScalar maxWidth);
-
-  void paintEachLineByStyles(SkCanvas* textCanvas);
-
-  SkScalar alphabeticBaseline() { return fAlphabeticBaseline; }
-  SkScalar height() { return fHeight; }
-  SkScalar width() { return fWidth; }
-  SkScalar ideographicBaseline() { return fIdeographicBaseline; }
-  SkScalar maxIntrinsicWidth() { return fMaxIntrinsicWidth; }
-  SkScalar minIntrinsicWidth() { return fMinIntrinsicWidth; }
-
-  void getRectsForRange(
-      const char* start,
-      const char* end,
-      std::vector<SkTextBox>& result);
-
-  size_t lineNumber() const { return fLines.size(); }
-
-  SkSpan<SkBlock> selectStyles(SkSpan<const char> text);
-
- private:
-
-  typedef SkShaper::RunHandler INHERITED;
-
-  friend class ShapeHandler;
-
-  void resetContext();
-
-  bool shapeTextIntoEndlessLine();
-
-  void breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
-                                                  size_t maxLines);
-
-  void shapeWordsIntoManyLines(SkWords* words, SkScalar width);
-
-  void iterateThroughStyles(
-      SkLine& line,
-      SkStyleType styleType,
-      std::function<void(SkSpan<const char> text, SkTextStyle style)> apply);
-
-  // Input
-  SkSpan<const char> fText;
-  SkParagraphStyle fParagraphStyle;
-  SkTArray<SkBlock, true> fTextStyles;
-  SkTArray<SkWords, true> fUnbreakableWords;
-
-  // Output to Flutter
-  SkScalar fAlphabeticBaseline;   // TODO: Not implemented yet
-  SkScalar fIdeographicBaseline;  // TODO: Not implemented yet
-  SkScalar fHeight;
-  SkScalar fWidth;
-  SkScalar fMaxIntrinsicWidth;
-  SkScalar fMinIntrinsicWidth;
-
-  // Internal structures
-  SkTArray<SkRun, true> fRuns;
-  SkTArray<SkLine> fLines;
 };
 
 class ShapeHandler final : public SkShaper::RunHandler {
@@ -231,6 +238,11 @@ class ShapeHandler final : public SkShaper::RunHandler {
       // One run = one word
       auto& run = fSection->fRuns.back();
       fWordsProducedByShaper.emplace_back(run.text());
+      auto& words = fWordsProducedByShaper.back();
+      words.setStartRun(&run);
+      words.setEndRun(&run);
+      words.setAdvance(run.advance());
+      words.setTrimmedWidth(run.advance().fX);
     } else {
       // Only one line is possible
     }

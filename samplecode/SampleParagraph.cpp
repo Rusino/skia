@@ -864,7 +864,7 @@ class ParagraphView4 : public Sample {
 
   void drawFlutter(SkCanvas* canvas, SkScalar w, SkScalar h,
                 std::string ff = "sans-serif",
-                SkScalar fs = 30,
+                SkScalar fs = 49,
                 size_t lineLimit = std::numeric_limits<size_t>::max(),
                 const std::u16string& ellipsis = u"\u2026") {
 
@@ -901,15 +901,19 @@ class ParagraphView4 : public Sample {
 
     SkTextStyle style1;
     style1.setForegroundColor(blue);
+    style1.setFontSize(fs);
 
     SkTextStyle style2;
     style2.setForegroundColor(red);
+    style2.setFontSize(fs);
 
     SkTextStyle style3;
     style3.setForegroundColor(green);
+    style3.setFontSize(fs);
 
     SkTextStyle style4;
     style4.setForegroundColor(magenta);
+    style4.setFontSize(fs);
 
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style0);
@@ -959,7 +963,7 @@ class ParagraphView4 : public Sample {
     SkScalar width = this->width();
     SkScalar height = this->height();
 
-    drawFlutter(canvas, width, height, "Roboto", 14);
+    drawFlutter(canvas, width, height, "Roboto", 30);
   }
 
  private:

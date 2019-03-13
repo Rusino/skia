@@ -10,7 +10,7 @@
 #include "SkLine.h"
 #include "SkDashPathEffect.h"
 #include "SkDiscretePathEffect.h"
-/*
+
 namespace {
   std::string toString2(SkSpan<const char> text) {
     icu::UnicodeString utf16 = icu::UnicodeString(text.begin(), text.size());
@@ -19,7 +19,7 @@ namespace {
     return str;
   }
 };
-*/
+
 SkLine::SkLine() {
   fShift = 0;
   fAdvance.set(0, 0);
@@ -112,9 +112,11 @@ void SkLine::iterateThroughRuns(
     std::function<void(SkRun* run, int32_t pos, size_t size, SkRect clip)> apply) const {
 
   // Find the correct style positions (taking in account cluster limits)
+  SkDebugf("iterateThroughRuns '%s'\n", toString2(text).c_str());
   auto startPos = SkRun::findPosition(SkSpan<SkRun>(fRuns.begin(), fRuns.size()), text.begin());
   auto endPos = SkRun::findPosition(SkSpan<SkRun>(fRuns.begin(), fRuns.size()), text.end());   // inclusive
 
+  SkDebugf("%d:%d\n", startPos.fPos, endPos.fPos);
   for (auto& run = startPos.fRun; run <= endPos.fRun; ++run) {
 
     auto start = 0;
@@ -127,11 +129,15 @@ void SkLine::iterateThroughRuns(
       clip.fTop = run->fPositions[start].fY;
     }
     if (run == endPos.fRun) {
-      size -= endPos.fPos;
+      size = SkToU32(endPos.fPos + 1);
+      if (size == 0) {
+        continue;
+      }
       clip.fRight = run->fPositions[start].fX + run->fInfo.fAdvance.fX - endPos.fShift;
-      clip.fBottom = run->fPositions[start].fY + run->fInfo.fAdvance.fY;
+      clip.fBottom = run->fPositions[start].fY + run->calculateHeight();
     }
 
+    SkDebugf("Clip: %f:%f %f:%f\n", clip.fLeft, clip.fRight, clip.fTop, clip.fBottom);
     apply(run, start, size, clip);
   }
 }
@@ -143,6 +149,8 @@ void SkLine::paintText(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle st
   SkTextBlobBuilder builder;
   iterateThroughRuns(text,
       [&builder](SkRun* run, int32_t pos, size_t size, SkRect rect) {
+
+        SkDebugf("blob %d:%d\n", pos, size);
         const auto& blobBuffer = builder.allocRunPos(run->fFont, SkToInt(size - pos));
         sk_careful_memcpy(blobBuffer.glyphs,
                           run->fGlyphs.data() + pos,

@@ -29,15 +29,19 @@ struct SkGlyphsPos {
       : fRun(run), fPos(pos), fShift(shift) {}
   SkRun* fRun;
   size_t fPos;
-  SkScalar
-      fShift;  // Negative: shift pos to right, positive: clip rect from right
+  SkScalar fShift;
 };
 
 struct SkCluster {
-  SkRun* fRun;
-  SkSpan<const char> fCluster;
+
+  SkCluster() : fRun(nullptr) { }
+
+  SkSpan<const char> fText;
+
+  const SkRun* fRun;
   size_t fStart;
   size_t fEnd;
+
   SkScalar fWidth;
   SkScalar fHeight;
 };
@@ -67,10 +71,16 @@ class SkRun {
   inline SkScalar leading() const { return fInfo.fLeading; }
 
   inline SkSpan<const char> text() const { return fText; }
+  inline size_t cluster(size_t pos) const { return fClusters[pos]; }
 
   static SkGlyphsPos findPosition(SkSpan<SkRun> runs, const char* character);
+  static void iterateThrough(SkSpan<SkRun> runs, std::function<void(SkCluster)> apply);
 
-  static void iterateThrough(SkArraySpan<SkRun> runs, std::function<void(SkCluster)> apply);
+  void iterateThrough(std::function<void(SkCluster)> apply);
+
+  bool findCluster(const char* character, SkCluster& cluster);
+  SkScalar calculateWidth(size_t start, size_t end);
+  SkScalar calculateHeight();
 
   //static void iterateThrough(
   //    SkGlyphsPos start,

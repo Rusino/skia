@@ -81,7 +81,20 @@ class SkParagraph {
   void recordPicture();
 
   // Break the text by explicit line breaks
-  void breakTextIntoSections();
+  void breakTextIntoSectionsAndWords();
+
+  void resetContext();
+
+  size_t linesLeft() { return fParagraphStyle.unlimited_lines()
+                                ? fParagraphStyle.getMaxLines()
+                                : fParagraphStyle.getMaxLines()  - fLinesNumber; }
+
+  bool addLines(size_t increment) {
+    fLinesNumber += increment;
+    return fLinesNumber < fParagraphStyle.getMaxLines();
+  }
+
+  void updateStats(const SkSection& section);
 
   // Things for Flutter
   SkScalar fAlphabeticBaseline;

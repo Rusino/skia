@@ -26,24 +26,26 @@ inline bool operator<=(const SkSpan<T>& a, const SkSpan<T>& b) {
   return a.begin() >= b.begin() && a.end() <= b.end();
 }
 
-template<typename T>
-inline bool operator&&(const SkSpan<T>& a, const SkSpan<T>& b) {
-  return a.end() > b.begin() && a.begin() < b.end();
+inline bool operator&&(const SkSpan<const char>& a, const SkSpan<const char>& b) {
+  if (a.empty() || b.empty()) {
+    return false;
+  }
+  return SkTMax(a.begin(), b.begin()) < SkTMin(a.end(), b.end());
 }
 
 class SkBlock {
  public:
 
   SkBlock() : fText(), fTextStyle() {}
-  SkBlock(SkSpan<const char> text, SkTextStyle style)
+  SkBlock(SkSpan<const char> text, SkTextStyle* style)
       : fText(text), fTextStyle(style) {}
 
   inline SkSpan<const char> text() const { return fText; }
-  inline SkTextStyle style() const { return fTextStyle; }
+  inline SkTextStyle style() const { return *fTextStyle; }
 
  protected:
   SkSpan<const char> fText;
-  SkTextStyle fTextStyle;
+  SkTextStyle* fTextStyle;
 };
 
 // A set of "unbreakable" words - they do not break glyph clusters
@@ -51,16 +53,23 @@ class SkBlock {
 class SkWords {
  public:
   SkWords(SkSpan<const char> text,
-          SkSpan<const char> spaces,
-          SkTArray<size_t, true> words)
-      : fText(text), fTrailingSpaces(spaces), fWords(std::move(words)) {}
+          SkSpan<const char> spaces)
+      : fText(text)
+      , fTrailingSpaces(spaces)
+      , fTrimmed(false)
+      , fStartRun(nullptr)
+      , fEndRun(nullptr) {}
 
   SkWords(SkSpan<const char> text)
-      : fText(text), fTrailingSpaces(SkSpan<const char>()), fWords() {}
+      : fText(text)
+      , fTrailingSpaces(SkSpan<const char>())
+      , fTrimmed(false)
+      , fStartRun(nullptr)
+      , fEndRun(nullptr) {}
 
   inline bool isProducedByShaper() { return fProducedByShaper; }
-  bool hasTrailingSpaces();
-  SkScalar trim();
+  bool hasTrailingSpaces() { return !fTrailingSpaces.empty(); }
+  void trim() { fTrimmed = true; }
   //inline SkSpan<SkWord> words() const { return fWords; }
   inline SkScalar trimmedWidth() const { return fTrimmedWidth; }
   inline void setTrimmedWidth(SkScalar tw) { fTrimmedWidth = tw; }
@@ -68,12 +77,20 @@ class SkWords {
   inline SkScalar width() const { return fAdvance.fX; }
   inline SkScalar height() const { return fAdvance.fY; }
   inline SkSpan<const char> text() const { return fText; }
+  inline SkSpan<const char> trimmed() const { return fTrailingSpaces; }
   inline void setAdvance(SkVector advance) { fAdvance = advance; }
   inline void setAdvance(SkScalar width, SkScalar height) { fAdvance =
                                                                 SkVector::Make(
                                                                     width,
                                                                     height);
   }
+
+  void setStartRun(SkRun* start) {
+    fStartRun = start;
+  }
+  void setEndRun(SkRun* end) { fEndRun = end; }
+  SkRun* getStartRun() const { return fStartRun; }
+  SkRun* getEndRun() const { return fEndRun; }
 
   void shift(SkScalar shift) { fOffset.offset(shift, 0); }
   void expand(SkScalar step) { fAdvance.fX += step; }
@@ -93,7 +110,9 @@ class SkWords {
   SkScalar fTrimmedWidth;
   SkSpan<const char> fText;
   SkSpan<const char> fTrailingSpaces;
-  SkTArray<size_t, true> fWords;
+  bool fTrimmed;
+  SkRun* fStartRun;
+  SkRun* fEndRun;
   bool fProducedByShaper;
 };
 
@@ -101,11 +120,11 @@ class SkStyle : public SkBlock {
 
  public:
 
-  SkStyle(SkSpan<const char> text, SkTextStyle style)
+  SkStyle(SkSpan<const char> text, SkTextStyle* style)
       : SkBlock(text, style), fClip(SkRect::MakeEmpty()) {}
 
   SkStyle(SkSpan<const char> text,
-          SkTextStyle style,
+          SkTextStyle* style,
           sk_sp<SkTextBlob> blob,
           SkRect clip)
       : SkBlock(text, style), fTextBlob(blob), fClip(clip) {}

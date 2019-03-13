@@ -52,7 +52,6 @@ class SkLine : public SkBlock {
   SkScalar fHeight;
   SkScalar fBaseline;
 
-  SkSpan<const char> fText;
   SkArraySpan<SkWords> fUnbreakableWords; // For flutter and for justification
   SkArraySpan<SkRun> fRuns;
   SkTArray<SkStyle> fStyledBlocks;

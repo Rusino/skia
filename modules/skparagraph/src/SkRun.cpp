@@ -36,6 +36,27 @@ SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
     };
 }
 
+bool SkRun::findCluster(const char* ch, SkCluster& data) {
+
+  iterateThrough([&data, ch](SkCluster cluster) {
+    if (cluster.fText.begin() <= ch && cluster.fText.end() > ch) {
+      data = cluster;
+    }
+  });
+  return data.fRun != nullptr;
+}
+
+SkScalar SkRun::calculateWidth(size_t start, size_t end) {
+
+  return (end == size()
+          ? fInfo.fAdvance.fX + fPositions[0].fX
+          : fPositions[end].fX) - fPositions[start].fX;
+}
+
+SkScalar SkRun::calculateHeight() {
+  return fInfo.fDescent - fInfo.fAscent + fInfo.fLeading;
+}
+
 SkGlyphsPos SkRun::findPosition(SkSpan<SkRun> runs, const char* character) {
   // Find the run
   SkRun* run;
@@ -75,44 +96,33 @@ SkGlyphsPos SkRun::findPosition(SkSpan<SkRun> runs, const char* character) {
   return SkGlyphsPos(run, cStart - run->fText.begin(), SkDoubleToScalar(ratio * len));
 }
 
-void SkRun::iterateThrough(SkArraySpan<SkRun> runs, std::function<void(SkCluster)> apply) {
-
-  const char* start = runs.begin()->text().begin();
-  const char* end = runs.back()->text().end();
+void SkRun::iterateThrough(std::function<void(SkCluster)> apply) {
   size_t prevCluster = 0;
-  SkRun* prevRun = runs.begin();
-  SkScalar width = 0;
-  for (auto run = runs.begin(); run != runs.end(); ++run) {
-    for (size_t pos = 0; pos != run->size(); ++pos) {
-      auto cluster = run->fClusters[pos];
-      if (cluster == prevCluster) {
-        width += (pos + 1 == run->size()
-                  ? run->fInfo.fAdvance.fX + run->fPositions[0].fX
-                  : run->fPositions[pos + 1].fX) - run->fPositions[pos].fX;
-        continue;
-      }
-      SkCluster data;
-      data.fCluster = SkSpan<const char>(start + prevCluster, cluster - prevCluster);
-      data.fRun = prevRun;
-      data.fStart = prevCluster;
-      data.fEnd = cluster;
-      data.fWidth = width;
-      data.fHeight = prevRun->fInfo.fAdvance.fY;
-
-      apply(data);
-
-      prevRun = run;
-      prevCluster = cluster;
-      width = 0;
+  size_t prevPos = 0;
+  for (size_t pos = 0; pos <= size(); ++pos) {
+    auto cluster = pos == size() ? fText.size() : fClusters[pos];
+    if (cluster == prevCluster) {
+      continue;
     }
+    SkCluster data;
+    data.fText = SkSpan<const char>(fText.begin() + prevCluster, cluster - prevCluster);
+    data.fRun = this;
+    data.fStart = prevPos;
+    data.fEnd = pos;
+    data.fWidth = (pos == size()
+                   ? fInfo.fAdvance.fX + fPositions[0].fX
+                   : fPositions[pos].fX) - fPositions[prevPos].fX;
+    data.fHeight = fInfo.fAdvance.fY;
+    apply(data);
+    prevCluster = cluster;
+    prevPos = pos;
   }
+}
 
-  SkCluster data;
-  data.fCluster = SkSpan<const char>(start + prevCluster, end - start);
-  data.fRun = prevRun;
-  data.fStart = prevCluster;
-  data.fEnd = end - start;
-  data.fWidth = width;
-  data.fHeight = prevRun->fInfo.fAdvance.fY;
-  apply(data);
+void SkRun::iterateThrough(SkSpan<SkRun> runs, std::function<void(SkCluster)> apply) {
+
+  for (auto run = runs.begin(); run != runs.end(); ++run) {
+
+    run->iterateThrough(apply);
+  }
 }

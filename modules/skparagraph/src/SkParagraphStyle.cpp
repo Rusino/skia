@@ -25,14 +25,6 @@ SkParagraphStyle::SkParagraphStyle() {
     fLineHeight = 1;
 }
 
-bool SkParagraphStyle::unlimited_lines() const {
-    return fLinesLimit == std::numeric_limits<size_t>::max();
-};
-
-bool SkParagraphStyle::ellipsized() const {
-    return !fEllipsis.empty();
-}
-
 SkTextAlign SkParagraphStyle::effective_align() const {
     if (fTextAlign == SkTextAlign::start) {
         return (fTextDirection == SkTextDirection::ltr) ? SkTextAlign::left
