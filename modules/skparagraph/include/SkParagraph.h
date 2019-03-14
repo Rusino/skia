@@ -77,10 +77,8 @@ class SkParagraph {
 
   friend class SkParagraphBuilder;
 
-  // Record a picture drawing all small text blobs
   void recordPicture();
 
-  // Break the text by explicit line breaks
   void breakTextIntoSectionsAndWords();
 
   void resetContext();

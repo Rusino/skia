@@ -863,8 +863,8 @@ class ParagraphView4 : public Sample {
   }
 
   void drawFlutter(SkCanvas* canvas, SkScalar w, SkScalar h,
-                std::string ff = "sans-serif",
-                SkScalar fs = 49,
+                std::string ff = "Google Sans",
+                SkScalar fs = 30,
                 size_t lineLimit = std::numeric_limits<size_t>::max(),
                 const std::u16string& ellipsis = u"\u2026") {
 
@@ -894,76 +894,167 @@ class ParagraphView4 : public Sample {
     magenta.setAntiAlias(true);
     magenta.setColor(SK_ColorMAGENTA);
 
+    SkTextStyle style;
+    style.setFontFamily(ff);
+    style.setFontSize(fs);
+
     SkTextStyle style0;
     style0.setForegroundColor(black);
+    style0.setBackgroundColor(SK_ColorLTGRAY);
     style0.setFontFamily(ff);
     style0.setFontSize(fs);
+    //style0.addShadow(SkTextShadow(SK_ColorBLACK, SkPoint::Make(5, 5), 2));
+    //style0.setFontStyle(SkFontStyle(
+    //    SkFontStyle::Weight::kExtraBold_Weight,
+    //    SkFontStyle::Width::kNormal_Width,
+    //    SkFontStyle::Slant::kUpright_Slant));
+    style0.setDecoration(SkTextDecoration::kUnderline);
+    style0.setDecorationStyle(SkTextDecorationStyle::kDouble);
+    style0.setDecorationColor(SK_ColorBLACK);
 
     SkTextStyle style1;
     style1.setForegroundColor(blue);
+    style1.setBackgroundColor(SK_ColorYELLOW);
+    style1.setFontFamily(ff);
     style1.setFontSize(fs);
+    //style1.addShadow(SkTextShadow(SK_ColorGREEN, SkPoint::Make(5, 5), 2));
+    //style1.setFontStyle(SkFontStyle(
+    //    SkFontStyle::Weight::kNormal_Weight,
+    //    SkFontStyle::Width::kNormal_Width,
+    //    SkFontStyle::Slant::kItalic_Slant));
+    style1.setDecoration(SkTextDecoration::kOverline);
+    style1.setDecorationStyle(SkTextDecorationStyle::kWavy);
+    style1.setDecorationColor(SK_ColorBLACK);
 
     SkTextStyle style2;
     style2.setForegroundColor(red);
+    style2.setFontFamily(ff);
     style2.setFontSize(fs);
 
     SkTextStyle style3;
     style3.setForegroundColor(green);
+    style3.setFontFamily(ff);
     style3.setFontSize(fs);
 
     SkTextStyle style4;
     style4.setForegroundColor(magenta);
+    style4.setFontFamily(ff);
     style4.setFontSize(fs);
 
     SkParagraphStyle paraStyle;
-    paraStyle.setTextStyle(style0);
+    paraStyle.setTextStyle(style);
     paraStyle.setMaxLines(lineLimit);
 
     paraStyle.setEllipsis(ellipsis);
-    paraStyle.getTextStyle().setFontSize(fs);
     fontCollection->setTestFontManager(testFontProvider);
-    SkParagraphBuilder builder(paraStyle, fontCollection);
 
-    const std::string text1 = "Flutter is an open-source project to help developers "
-                              "build high-performance, high-fidelity, mobile apps for "
+    const std::string line = "Hesitation is always easy rarely useful.";
+    const std::string logo1 = "google_";
+    const std::string logo2 = "logo";
+    const std::string logo3 = "go";
+    const std::string logo4 = "ogle_logo";
+    const std::string logo5 = "google_lo";
+    const std::string logo6 = "go";
+    {
+      SkParagraphBuilder builder(paraStyle, fontCollection);
+
+      builder.pushStyle(style0);
+      builder.addText(logo1);
+      builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(logo2);
+      builder.pop();
+
+      builder.addText(" ");
+
+      builder.pushStyle(style0);
+      builder.addText(logo3);
+      builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(logo4);
+      builder.pop();
+
+      builder.addText(" ");
+
+      builder.pushStyle(style0);
+      builder.addText(logo5);
+      builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(logo6);
+      builder.pop();
+
+      auto paragraph = builder.Build();
+      paragraph->layout(w - margin * 2);
+      paragraph->paint(canvas, margin, margin);
+      canvas->translate(0, h + margin);
+    }
+
+    const std::string text0 = "Flutter is an open-source project to help developers "
+                              "build high-performance, high-f";
+    const std::string text1 = "idelity, mobile apps for "
                               "iOS and Android "
                               "from a single codebase. This design lab is a playground "
                               "and showcase of Flutter's many widgets, behaviors, "
-                              "animations, layouts, and more.  Learn more about Flutter at ";
-    const std::string text2 = "https://flutter.io";
-    const std::string text3 = ".\n\nTo see the source code for this app, please visit the ";
+                              "anima";
+    const std::string text2 =       "tions, layouts, and more.  Learn more about Flutter at "
+                                    "https://flutter.io google";
+    const std::string text3 = "_logo.\n\nTo see the source code for this app, please visit the ";
     const std::string text4 = "flutter github repo";
+/*
+    {
+      SkParagraphBuilder builder(paraStyle, fontCollection);
+      builder.pushStyle(style0);
+      builder.addText(text0);
+      builder.pop();
 
-    builder.pushStyle(style1);
-    builder.addText(text1);
-    builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(text1);
+      builder.pop();
 
-    builder.pushStyle(style2);
-    builder.addText(text2);
-    builder.pop();
+      builder.pushStyle(style2);
+      builder.addText(text2);
+      builder.pop();
 
-    builder.pushStyle(style3);
-    builder.addText(text3);
-    builder.pop();
+      builder.pushStyle(style3);
+      builder.addText(text3);
+      builder.pop();
 
-    builder.pushStyle(style4);
-    builder.addText(text4);
-    builder.pop();
+      builder.pushStyle(style4);
+      builder.addText(text4);
+      builder.pop();
 
-    auto paragraph = builder.Build();
-    paragraph->layout(w - margin * 2);
-    paragraph->paint(canvas, margin, margin);
-
-    canvas->translate(0, paragraph->getHeight() + margin);
+      auto paragraph = builder.Build();
+      paragraph->layout(w - margin * 2);
+      paragraph->paint(canvas, margin, margin);
+    }
   }
+*/
+    const std::string word0 = "Hesitation ";
+    const std::string tail0 = "is always easy rarely useful.";
+    /*
+    {
+      SkParagraphBuilder builder(paraStyle, fontCollection);
+      builder.pushStyle(style0);
+      builder.addText(word0);
+      builder.pop();
 
+      builder.pushStyle(style1);
+      builder.addText(tail0);
+      builder.pop();
+
+      auto paragraph = builder.Build();
+      paragraph->layout(w - margin * 2);
+      paragraph->paint(canvas, margin, margin);
+    }
+     */
+  }
   void onDrawContent(SkCanvas* canvas) override {
 
     canvas->drawColor(SK_ColorWHITE);
     SkScalar width = this->width();
     SkScalar height = this->height();
 
-    drawFlutter(canvas, width, height, "Roboto", 30);
+    drawFlutter(canvas, width, height/2);//, "sans-serif", 30);
   }
 
  private:
@@ -974,7 +1065,7 @@ class ParagraphView4 : public Sample {
 };
 //////////////////////////////////////////////////////////////////////////////
 
-//DEF_SAMPLE(return new ParagraphView1();)
+DEF_SAMPLE(return new ParagraphView1();)
 //DEF_SAMPLE(return new ParagraphView2();)
-//DEF_SAMPLE(return new ParagraphView3();)
+DEF_SAMPLE(return new ParagraphView3();)
 DEF_SAMPLE(return new ParagraphView4();)

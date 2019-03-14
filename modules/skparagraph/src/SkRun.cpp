@@ -9,11 +9,13 @@
 #include "SkSpan.h"
 
 SkRun::SkRun(
+    size_t index,
     const SkFont& font,
     const SkShaper::RunHandler::RunInfo& info,
     int glyphCount,
     SkSpan<const char> text)
-    : fFont(font)
+    : fIndex(index)
+    , fFont(font)
     , fInfo(info)
     , fGlyphs(glyphCount)
     , fPositions(glyphCount)
@@ -38,12 +40,15 @@ SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
 
 bool SkRun::findCluster(const char* ch, SkCluster& data) {
 
-  iterateThrough([&data, ch](SkCluster cluster) {
+  bool found = false;
+  iterateThrough([&data, &found, ch](SkCluster cluster) -> bool {
     if (cluster.fText.begin() <= ch && cluster.fText.end() > ch) {
       data = cluster;
+      found = true;
     }
+    return found;
   });
-  return data.fRun != nullptr;
+  return found;
 }
 
 SkScalar SkRun::calculateWidth(size_t start, size_t end) {
@@ -96,7 +101,7 @@ SkGlyphsPos SkRun::findPosition(SkSpan<SkRun> runs, const char* character) {
   return SkGlyphsPos(run, cStart - run->fText.begin(), SkDoubleToScalar(ratio * len));
 }
 
-void SkRun::iterateThrough(std::function<void(SkCluster)> apply) {
+void SkRun::iterateThrough(std::function<bool(SkCluster)> apply) {
   size_t prevCluster = 0;
   size_t prevPos = 0;
   for (size_t pos = 0; pos <= size(); ++pos) {
@@ -106,20 +111,22 @@ void SkRun::iterateThrough(std::function<void(SkCluster)> apply) {
     }
     SkCluster data;
     data.fText = SkSpan<const char>(fText.begin() + prevCluster, cluster - prevCluster);
-    data.fRun = this;
+    data.fRunIndex = fIndex;
     data.fStart = prevPos;
     data.fEnd = pos;
     data.fWidth = (pos == size()
                    ? fInfo.fAdvance.fX + fPositions[0].fX
                    : fPositions[pos].fX) - fPositions[prevPos].fX;
     data.fHeight = fInfo.fAdvance.fY;
-    apply(data);
+    if (apply(data)) {
+      break;
+    }
     prevCluster = cluster;
     prevPos = pos;
   }
 }
 
-void SkRun::iterateThrough(SkSpan<SkRun> runs, std::function<void(SkCluster)> apply) {
+void SkRun::iterateThrough(SkSpan<SkRun> runs, std::function<bool(SkCluster)> apply) {
 
   for (auto run = runs.begin(); run != runs.end(); ++run) {
 

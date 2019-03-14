@@ -9,6 +9,7 @@
 
 #include <vector>
 #include "uchar.h"
+#include <unicode/brkiter.h>
 #include "SkColor.h"
 #include "SkCanvas.h"
 #include "SkFontMetrics.h"
@@ -29,7 +30,7 @@ class SkSection {
       SkSpan<const char> text,
       const SkParagraphStyle& style,
       SkTArray<SkBlock, true> styles,
-      SkTArray<SkWords, true> words);
+      SkTArray<SkWords, true> unbreakableWords);
 
   ~SkSection() = default;
 
@@ -57,29 +58,33 @@ class SkSection {
 
  private:
 
-  typedef SkShaper::RunHandler INHERITED;
-
   friend class ShapeHandler;
 
   void resetContext();
-
   bool shapeTextIntoEndlessLine();
-
-  void mapRunsToWords();
-
+  void buildClusterTable();
   void breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
                                                   size_t maxLines);
-
   void shapeWordsIntoManyLines(SkWords* words, SkScalar width);
 
-  void iterateThroughRuns(
-      std::function<void(SkSpan<const char> text, SkRun& run)> apply
-      );
+  void paintText(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
+  void paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
+  void paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
+  void paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
+  void computeDecorationPaint(SkPaint& paint, SkRect clip, SkTextStyle style, SkPath& path) const;
+
+  size_t findCluster(const char* ch) const;
+  SkVector measureText(SkSpan<const char> text) const;
+  void measureWords(SkWords& words) const;
+  SkScalar findOffset(const char* ch) const;
 
   void iterateThroughStyles(
-      SkLine& line,
+      SkSpan<const char> text,
       SkStyleType styleType,
-      std::function<void(SkSpan<const char> text, SkTextStyle style)> apply);
+      std::function<void(SkSpan<const char> text, SkTextStyle style)> apply) const;
+  void iterateThroughRuns(
+      SkSpan<const char> text,
+      std::function<void(const SkRun* run, size_t pos, size_t size, SkRect clip)> apply) const;
 
   // Input
   SkSpan<const char> fText;
@@ -151,7 +156,12 @@ class MultipleFontRunIterator final : public FontRunIterator {
       return;
     }
     auto nextTypeface = fNext->style().getTypeface();
-    while (fNext != fLast && fNext->style().getTypeface() == nextTypeface) {
+    auto nextFontSize = fNext->style().getFontSize();
+    auto nextFontStyle = fNext->style().getFontStyle();
+    while (fNext != fLast
+            && fNext->style().getTypeface() == nextTypeface
+            && nextFontSize == fNext->style().getFontSize()
+            && nextFontStyle == fNext->style().getFontStyle()) {
       ++fNext;
     }
   }
@@ -211,7 +221,7 @@ class ShapeHandler final : public SkShaper::RunHandler {
       int glyphCount,
       SkSpan<const char> utf8) override {
     // Runs always go to the end of the list even if we insert words in the middle
-    auto& run = fSection->fRuns.emplace_back(font, info, glyphCount, utf8);
+    auto& run = fSection->fRuns.emplace_back(fSection->fRuns.size(), font, info, glyphCount, utf8);
     return run.newRunBuffer();
   }
 
@@ -239,10 +249,7 @@ class ShapeHandler final : public SkShaper::RunHandler {
       auto& run = fSection->fRuns.back();
       fWordsProducedByShaper.emplace_back(run.text());
       auto& words = fWordsProducedByShaper.back();
-      words.setStartRun(&run);
-      words.setEndRun(&run);
-      words.setAdvance(run.advance());
-      words.setTrimmedWidth(run.advance().fX);
+      words.setSizes(run.advance(), run.advance().fX);
     } else {
       // Only one line is possible
     }

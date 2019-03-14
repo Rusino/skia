@@ -56,44 +56,39 @@ class SkWords {
           SkSpan<const char> spaces)
       : fText(text)
       , fTrailingSpaces(spaces)
-      , fTrimmed(false)
-      , fStartRun(nullptr)
-      , fEndRun(nullptr) {}
+      , fTrimmed(false) {}
 
   SkWords(SkSpan<const char> text)
       : fText(text)
       , fTrailingSpaces(SkSpan<const char>())
-      , fTrimmed(false)
-      , fStartRun(nullptr)
-      , fEndRun(nullptr) {}
+      , fTrimmed(false) {}
 
   inline bool isProducedByShaper() { return fProducedByShaper; }
   bool hasTrailingSpaces() { return !fTrailingSpaces.empty(); }
-  void trim() { fTrimmed = true; }
-  //inline SkSpan<SkWord> words() const { return fWords; }
-  inline SkScalar trimmedWidth() const { return fTrimmedWidth; }
-  inline void setTrimmedWidth(SkScalar tw) { fTrimmedWidth = tw; }
-  inline SkScalar spaceWidth() const { return fAdvance.fX - fTrimmedWidth; }
-  inline SkScalar width() const { return fAdvance.fX; }
-  inline SkScalar height() const { return fAdvance.fY; }
-  inline SkSpan<const char> text() const { return fText; }
-  inline SkSpan<const char> trimmed() const { return fTrailingSpaces; }
-  inline void setAdvance(SkVector advance) { fAdvance = advance; }
-  inline void setAdvance(SkScalar width, SkScalar height) { fAdvance =
-                                                                SkVector::Make(
-                                                                    width,
-                                                                    height);
+  void trim() {
+    fAdvance.fX = fTrimmedWidth;
+    fTrimmed = true;
   }
 
-  void setStartRun(SkRun* start) {
-    fStartRun = start;
+  inline SkScalar width() const { return fAdvance.fX; }
+  inline SkScalar height() const { return fAdvance.fY; }
+  inline SkScalar trimmedWidth() const { return fTrimmedWidth; }
+  inline SkScalar spaceWidth() const { return fAdvance.fX - fTrimmedWidth; }
+  inline SkSpan<const char> trimmed() const { return fText; }
+  inline SkSpan<const char> full() const {
+    if (fTrimmed) {
+      return fText;
+    }
+    return SkSpan<const char>(fText.begin(), fText.size() + fTrailingSpaces.size());
   }
-  void setEndRun(SkRun* end) { fEndRun = end; }
-  SkRun* getStartRun() const { return fStartRun; }
-  SkRun* getEndRun() const { return fEndRun; }
+  inline SkSpan<const char> spaces() const { return fTrailingSpaces; }
 
   void shift(SkScalar shift) { fOffset.offset(shift, 0); }
   void expand(SkScalar step) { fAdvance.fX += step; }
+  void setSizes(SkVector advance, SkScalar trimmedWidth) {
+    fAdvance = advance;
+    fTrimmedWidth = trimmedWidth;
+  }
 
   void getRectsForRange(
       SkTextDirection textDirection,
@@ -111,8 +106,6 @@ class SkWords {
   SkSpan<const char> fText;
   SkSpan<const char> fTrailingSpaces;
   bool fTrimmed;
-  SkRun* fStartRun;
-  SkRun* fEndRun;
   bool fProducedByShaper;
 };
 

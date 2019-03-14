@@ -34,11 +34,33 @@ struct SkGlyphsPos {
 
 struct SkCluster {
 
-  SkCluster() : fRun(nullptr) { }
+  SkCluster() : fRunIndex(0) { }
+
+  SkScalar sizeToChar(const char* ch) const {
+
+    if (ch < fText.begin() || ch >= fText.end()) {
+      return 0;
+    }
+    auto shift = ch - fText.begin();
+    auto ratio = shift * 1.0 / fText.size();
+
+    return fWidth * ratio;
+  }
+
+  SkScalar sizeFromChar(const char* ch) const {
+
+    if (ch < fText.begin() || ch >= fText.end()) {
+      return 0;
+    }
+    auto shift = fText.end() - ch - 1;
+    auto ratio = shift * 1.0 / fText.size();
+
+    return fWidth * (1 - ratio);
+  }
 
   SkSpan<const char> fText;
 
-  const SkRun* fRun;
+  size_t fRunIndex;
   size_t fStart;
   size_t fEnd;
 
@@ -52,6 +74,7 @@ class SkRun {
 
   SkRun() {}
   SkRun(
+      size_t index,
       const SkFont& font,
       const SkShaper::RunHandler::RunInfo& info,
       int glyphCount,
@@ -74,24 +97,20 @@ class SkRun {
   inline size_t cluster(size_t pos) const { return fClusters[pos]; }
 
   static SkGlyphsPos findPosition(SkSpan<SkRun> runs, const char* character);
-  static void iterateThrough(SkSpan<SkRun> runs, std::function<void(SkCluster)> apply);
+  static void iterateThrough(SkSpan<SkRun> runs, std::function<bool(SkCluster)> apply);
 
-  void iterateThrough(std::function<void(SkCluster)> apply);
+  void iterateThrough(std::function<bool(SkCluster)> apply);
 
   bool findCluster(const char* character, SkCluster& cluster);
   SkScalar calculateWidth(size_t start, size_t end);
   SkScalar calculateHeight();
-
-  //static void iterateThrough(
-  //    SkGlyphsPos start,
-  //    SkGlyphsPos end,
-  //    std::function<void(SkGlyphsPos pos)> apply);
 
  private:
 
   friend class SkSection;
   friend class SkLine;
 
+  size_t fIndex;
   SkFont fFont;
   SkShaper::RunHandler::RunInfo fInfo;
   SkSTArray<128, SkGlyphID, true> fGlyphs;

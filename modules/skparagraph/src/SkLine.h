@@ -17,21 +17,11 @@ class SkLine : public SkBlock {
 
   SkLine();
 
-  SkLine(SkScalar width, SkScalar height, SkArraySpan<SkWords> words, SkArraySpan<SkRun> runs);
+  SkLine(SkVector offset, SkVector advance, SkArraySpan<SkWords> words);
 
   inline SkVector advance() const { return fAdvance; }
 
   void formatByWords(SkTextAlign align, SkScalar maxWidth);
-
-  void paintText(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void computeDecorationPaint(SkPaint& paint, SkRect clip, SkTextStyle style, SkPath& path) const;
-
-  void iterateThroughRuns(
-      SkSpan<const char> text,
-      std::function<void(SkRun* run, int32_t pos, size_t size, SkRect clip)> apply) const;
 
   void getRectsForRange(
       SkTextDirection textDirection,
@@ -48,11 +38,7 @@ class SkLine : public SkBlock {
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size
   SkVector fOffset;
-  SkScalar fWidth;    // Could be different from advance because of formatting
-  SkScalar fHeight;
-  SkScalar fBaseline;
 
   SkArraySpan<SkWords> fUnbreakableWords; // For flutter and for justification
-  SkArraySpan<SkRun> fRuns;
   SkTArray<SkStyle> fStyledBlocks;
 };
