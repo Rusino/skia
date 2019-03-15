@@ -85,6 +85,9 @@ class SkSection {
   void iterateThroughRuns(
       SkSpan<const char> text,
       std::function<void(const SkRun* run, size_t pos, size_t size, SkRect clip)> apply) const;
+  void iterateThroughClusters(
+      SkSpan<const char> text,
+      std::function<void(SkCluster& cluster)> apply);
 
   // Input
   SkSpan<const char> fText;
@@ -197,7 +200,7 @@ class ShapeHandler final : public SkShaper::RunHandler {
       // (skipping the long word that has been broken into pieces)
       size_t left = fWordsToBreak - fSection->fUnbreakableWords.begin();
       size_t insert = fWordsProducedByShaper.size();
-      size_t right = fSection->fUnbreakableWords.end() - fWordsToBreak;
+      size_t right = fSection->fUnbreakableWords.end() - fWordsToBreak - 1;
       size_t total = left + right + insert;
 
       SkTArray<SkWords, true> bigger;
@@ -227,7 +230,7 @@ class ShapeHandler final : public SkShaper::RunHandler {
 
   void commitRun() override {}
 
-  void commitRun1(SkVector advance) override {
+  void commitRun1(SkVector advance, size_t startText, size_t endText) override {
 
     // TODO: this method is temp solution. SkShaper has to deal with it
     auto& run = fSection->fRuns.back();
@@ -237,6 +240,8 @@ class ShapeHandler final : public SkShaper::RunHandler {
     }
 
     run.setWidth(advance.fX);
+    // Carve out the line text out of the entire run text
+    run.setText(startText, endText);
     fAdvance.fX += run.advance().fX;
     fAdvance.fY =
         SkMaxScalar(fAdvance.fY, run.descent() + run.leading() - run.ascent());
@@ -246,10 +251,7 @@ class ShapeHandler final : public SkShaper::RunHandler {
 
     if (fWordsToBreak != nullptr) {
       // One run = one word
-      auto& run = fSection->fRuns.back();
-      fWordsProducedByShaper.emplace_back(run.text());
-      auto& words = fWordsProducedByShaper.back();
-      words.setSizes(run.advance(), run.advance().fX);
+      fWordsProducedByShaper.emplace_back(fSection->fRuns.back());
     } else {
       // Only one line is possible
     }

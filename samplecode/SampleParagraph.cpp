@@ -1066,6 +1066,6 @@ class ParagraphView4 : public Sample {
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_SAMPLE(return new ParagraphView1();)
-//DEF_SAMPLE(return new ParagraphView2();)
+DEF_SAMPLE(return new ParagraphView2();)
 DEF_SAMPLE(return new ParagraphView3();)
 DEF_SAMPLE(return new ParagraphView4();)

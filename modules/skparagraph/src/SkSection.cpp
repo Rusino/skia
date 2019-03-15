@@ -97,9 +97,10 @@ void SkSection::breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
 
   SkVector lineAdvance = SkVector::Make(0, 0);
   SkVector lineOffset = SkVector::Make(0, 0);
-  for (size_t i = 0; i < fUnbreakableWords.size(); ++i) {
+  size_t index = 0;
+  while (index < fUnbreakableWords.size()) {
 
-    words = &fUnbreakableWords[i];
+    words = &fUnbreakableWords[index];
     measureWords(*words);
 
     auto wordsWidth = words->width();
@@ -110,7 +111,10 @@ void SkSection::breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
     if (lineAdvance.fX + wordsTrimmedWidth > maxWidth) {
       if (lineAdvance.fX == 0) {
         // This is the beginning of the line; the word is too long. Aaaa!!!
+        // TODO: break it by clusters here without SkShaper
         shapeWordsIntoManyLines(words, maxWidth);
+        wordsStart = &fUnbreakableWords[index];
+        // Start from the same index again
         continue;
       }
 
@@ -141,6 +145,8 @@ void SkSection::breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
     fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordsTrimmedWidth);
     fMaxIntrinsicWidth = SkTMax(fMaxIntrinsicWidth, lineAdvance.fX);
     lastWords = words;
+
+    ++index;
   }
 
   // Last hanging line
@@ -315,7 +321,7 @@ void SkSection::iterateThroughStyles(
     auto begin = SkTMax(textStyle.text().begin(), text.begin());
     auto end = SkTMin(textStyle.text().end(), text.end());
     auto intersect = SkSpan<const char>(begin, end - begin);
-    if (style.matchOneAttribute(styleType, prevStyle)) {
+    if (start != nullptr && style.matchOneAttribute(styleType, prevStyle)) {
       size += intersect.size();
       continue;
     } else if (size == 0) {
@@ -382,6 +388,23 @@ void SkSection::iterateThroughRuns(
 
   //SkDebugf("Clip: @%d,%d [%f:%f]\n", pos, size, clip.fLeft, clip.fRight);
   apply(run, pos, size, clip);
+}
+
+void SkSection::iterateThroughClusters(
+    SkSpan<const char> text,
+    std::function<void(SkCluster& cluster)> apply) {
+
+  size_t index = 0;
+  while (index < fClusters.size() && fClusters[index].fText.begin() > text.begin()) ++index;
+
+  while (index < fClusters.size()) {
+    auto& cluster = fClusters[index];
+    if (cluster.fText.begin() > text.end()) {
+      break;
+    }
+    apply(cluster);
+    ++index;
+  }
 }
 
 // TODO: Justification dropped again for now. It's really gets in a way!

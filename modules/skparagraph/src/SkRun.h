@@ -96,14 +96,12 @@ class SkRun {
   inline SkSpan<const char> text() const { return fText; }
   inline size_t cluster(size_t pos) const { return fClusters[pos]; }
 
-  static SkGlyphsPos findPosition(SkSpan<SkRun> runs, const char* character);
-  static void iterateThrough(SkSpan<SkRun> runs, std::function<bool(SkCluster)> apply);
-
   void iterateThrough(std::function<bool(SkCluster)> apply);
 
-  bool findCluster(const char* character, SkCluster& cluster);
-  SkScalar calculateWidth(size_t start, size_t end);
   SkScalar calculateHeight();
+  void setText(size_t start, size_t end) {
+    fText = SkSpan<const char>(fText.begin() + start, end - start);
+  }
 
  private:
 

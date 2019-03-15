@@ -58,10 +58,15 @@ class SkWords {
       , fTrailingSpaces(spaces)
       , fTrimmed(false) {}
 
-  SkWords(SkSpan<const char> text)
-      : fText(text)
+  SkWords(const SkRun& run)
+      : fText(run.text())
       , fTrailingSpaces(SkSpan<const char>())
-      , fTrimmed(false) {}
+      , fTrimmed(false) {
+    fProducedBy = &run;
+    fAdvance = run.advance();
+    fOffset = SkVector::Make(0, 0);
+    fTrimmedWidth = fAdvance.fX;
+  }
 
   inline bool isProducedByShaper() { return fProducedByShaper; }
   bool hasTrailingSpaces() { return !fTrailingSpaces.empty(); }
@@ -89,6 +94,7 @@ class SkWords {
     fAdvance = advance;
     fTrimmedWidth = trimmedWidth;
   }
+  const SkRun* producedBy() { return fProducedBy; }
 
   void getRectsForRange(
       SkTextDirection textDirection,
@@ -107,6 +113,7 @@ class SkWords {
   SkSpan<const char> fTrailingSpaces;
   bool fTrimmed;
   bool fProducedByShaper;
+  const SkRun* fProducedBy;
 };
 
 class SkStyle : public SkBlock {
