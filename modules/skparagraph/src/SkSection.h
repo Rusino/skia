@@ -65,7 +65,7 @@ class SkSection {
   void buildClusterTable();
   void breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
                                                   size_t maxLines);
-  void shapeWordsIntoManyLines(SkWords* words, SkScalar width);
+  void shapeWordsIntoManyLines(SkWords* words, SkScalar width, bool force /* do it anyway */);
 
   void paintText(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
   void paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
@@ -79,7 +79,7 @@ class SkSection {
   SkScalar findOffset(const char* ch) const;
 
   void iterateThroughStyles(
-      SkSpan<const char> text,
+      const SkBlock& block,
       SkStyleType styleType,
       std::function<void(SkSpan<const char> text, SkTextStyle style)> apply) const;
   void iterateThroughRuns(
@@ -87,7 +87,7 @@ class SkSection {
       std::function<void(const SkRun* run, size_t pos, size_t size, SkRect clip)> apply) const;
   void iterateThroughClusters(
       SkSpan<const char> text,
-      std::function<void(SkCluster& cluster)> apply);
+      std::function<void(SkCluster& cluster, bool last)> apply);
 
   // Input
   SkSpan<const char> fText;
@@ -186,33 +186,7 @@ class ShapeHandler final : public SkShaper::RunHandler {
  public:
   explicit ShapeHandler(SkSection& section)
       : fSection(&section)
-      , fAdvance(SkVector::Make(0, 0))
-      , fWordsToBreak(nullptr) {}
-
-  explicit ShapeHandler(SkSection& section, SkWords* words)
-      : fSection(&section)
-      , fAdvance(SkVector::Make(0, 0))
-      , fWordsToBreak(words) {}
-
-  ~ShapeHandler() {
-    if (fWordsToBreak != nullptr) {
-      // Insert words coming from SkShaper into the list
-      // (skipping the long word that has been broken into pieces)
-      size_t left = fWordsToBreak - fSection->fUnbreakableWords.begin();
-      size_t insert = fWordsProducedByShaper.size();
-      size_t right = fSection->fUnbreakableWords.end() - fWordsToBreak - 1;
-      size_t total = left + right + insert;
-
-      SkTArray<SkWords, true> bigger;
-      bigger.reserve(total);
-
-      bigger.move_back_n(left, fSection->fUnbreakableWords.begin());
-      bigger.move_back_n(insert, fWordsProducedByShaper.begin());
-      bigger.move_back_n(right, fSection->fUnbreakableWords.begin() + left + 1);
-
-      fSection->fUnbreakableWords.swap(bigger);
-    }
-  }
+      , fAdvance(SkVector::Make(0, 0)) {}
 
   inline SkVector advance() const { return fAdvance; }
 
@@ -228,37 +202,21 @@ class ShapeHandler final : public SkShaper::RunHandler {
     return run.newRunBuffer();
   }
 
-  void commitRun() override {}
+  void commitRun() override {
 
-  void commitRun1(SkVector advance, size_t startText, size_t endText) override {
-
-    // TODO: this method is temp solution. SkShaper has to deal with it
     auto& run = fSection->fRuns.back();
     if (run.size() == 0) {
       fSection->fRuns.pop_back();
       return;
     }
 
-    run.setWidth(advance.fX);
     // Carve out the line text out of the entire run text
-    run.setText(startText, endText);
     fAdvance.fX += run.advance().fX;
-    fAdvance.fY =
-        SkMaxScalar(fAdvance.fY, run.descent() + run.leading() - run.ascent());
+    fAdvance.fY = SkMaxScalar(fAdvance.fY, run.descent() + run.leading() - run.ascent());
   }
 
-  void commitLine() override {
-
-    if (fWordsToBreak != nullptr) {
-      // One run = one word
-      fWordsProducedByShaper.emplace_back(fSection->fRuns.back());
-    } else {
-      // Only one line is possible
-    }
-  }
+  void commitLine() override { }
 
   SkSection* fSection;
   SkVector fAdvance;
-  SkWords* fWordsToBreak;
-  SkTArray<SkWords> fWordsProducedByShaper;
 };

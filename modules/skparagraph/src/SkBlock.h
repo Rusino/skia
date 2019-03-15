@@ -58,17 +58,20 @@ class SkWords {
       , fTrailingSpaces(spaces)
       , fTrimmed(false) {}
 
-  SkWords(const SkRun& run)
-      : fText(run.text())
-      , fTrailingSpaces(SkSpan<const char>())
-      , fTrimmed(false) {
-    fProducedBy = &run;
-    fAdvance = run.advance();
+  SkWords(const SkCluster* start, const SkCluster* end)
+    : fTrailingSpaces()
+    , fTrimmed(false) {
+
     fOffset = SkVector::Make(0, 0);
+    fAdvance = SkVector::Make(0, 0);
+    for (auto cluster = start; cluster <= end; ++cluster) {
+      fAdvance.fX += cluster->fWidth;
+      fAdvance.fY = SkTMax(fAdvance.fY, cluster->fHeight);
+    }
     fTrimmedWidth = fAdvance.fX;
+    fText = SkSpan<const char>(start->fText.begin(), end->fText.end() - start->fText.begin());
   }
 
-  inline bool isProducedByShaper() { return fProducedByShaper; }
   bool hasTrailingSpaces() { return !fTrailingSpaces.empty(); }
   void trim() {
     fAdvance.fX = fTrimmedWidth;
@@ -94,7 +97,6 @@ class SkWords {
     fAdvance = advance;
     fTrimmedWidth = trimmedWidth;
   }
-  const SkRun* producedBy() { return fProducedBy; }
 
   void getRectsForRange(
       SkTextDirection textDirection,
@@ -112,35 +114,5 @@ class SkWords {
   SkSpan<const char> fText;
   SkSpan<const char> fTrailingSpaces;
   bool fTrimmed;
-  bool fProducedByShaper;
-  const SkRun* fProducedBy;
 };
 
-class SkStyle : public SkBlock {
-
- public:
-
-  SkStyle(SkSpan<const char> text, SkTextStyle* style)
-      : SkBlock(text, style), fClip(SkRect::MakeEmpty()) {}
-
-  SkStyle(SkSpan<const char> text,
-          SkTextStyle* style,
-          sk_sp<SkTextBlob> blob,
-          SkRect clip)
-      : SkBlock(text, style), fTextBlob(blob), fClip(clip) {}
-
-
-  inline sk_sp<SkTextBlob> blob() const { return fTextBlob; }
-  inline SkRect clip() const { return fClip; }
-  inline SkScalar width() const { return fClip.width(); }
-  inline SkScalar height() const { return fClip.height(); }
-
- private:
-
-  friend class SkSection;
-  friend class SkLine;
-  friend class MultipleFontRunIterator;
-
-  sk_sp<SkTextBlob> fTextBlob;
-  SkRect fClip;
-};

@@ -65,6 +65,7 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
   }
 }
 
+// TODO: we need to propagate shifts down to runs
 void SkLine::justify(SkScalar delta) {
 
   auto softLineBreaks = fUnbreakableWords.size() - 1;

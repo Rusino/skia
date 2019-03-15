@@ -20,18 +20,6 @@
 #include "SkTHash.h"
 #include "SkArraySpan.h"
 
-class SkRun;
-struct SkGlyphsPos {
-
-  explicit SkGlyphsPos(SkRun* run) : fRun(run), fPos(0), fShift(0) {}
-  SkGlyphsPos() : fRun(nullptr) {}
-  SkGlyphsPos(SkRun* run, size_t pos, SkScalar shift)
-      : fRun(run), fPos(pos), fShift(shift) {}
-  SkRun* fRun;
-  size_t fPos;
-  SkScalar fShift;
-};
-
 struct SkCluster {
 
   SkCluster() : fRunIndex(0) { }
@@ -95,18 +83,17 @@ class SkRun {
 
   inline SkSpan<const char> text() const { return fText; }
   inline size_t cluster(size_t pos) const { return fClusters[pos]; }
-
-  void iterateThrough(std::function<bool(SkCluster)> apply);
+  inline SkPoint position(size_t pos) const { return fPositions[pos]; }
 
   SkScalar calculateHeight();
+  SkScalar calculateWidth(size_t start, size_t end);
   void setText(size_t start, size_t end) {
     fText = SkSpan<const char>(fText.begin() + start, end - start);
   }
 
- private:
+  void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size) const;
 
-  friend class SkSection;
-  friend class SkLine;
+ private:
 
   size_t fIndex;
   SkFont fFont;

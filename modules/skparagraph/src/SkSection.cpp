@@ -60,12 +60,8 @@ void SkSection::buildClusterTable() {
     SkDebugf("Cluster: %d\n", run.size());
     for (size_t pos = 0; pos <= run.size(); ++pos) {
 
-      auto next = pos == run.size() ? run.fText.size() : run.fClusters[pos];
-      if (pos == run.size()) {
-        width += run.fInfo.fAdvance.fX - run.fPositions[start].fX + run.fPositions[0].fX;
-      } else if (pos > 0) {
-        width += run.fPositions[pos].fX - run.fPositions[start].fX;
-      }
+      auto next = pos == run.size() ? run.text().size() : run.cluster(pos);
+      width += run.calculateWidth(start, pos);
       if (cluster == next) {
         // Many glyphs in one cluster
         continue;
@@ -76,7 +72,7 @@ void SkSection::buildClusterTable() {
       data.fRunIndex = runIndex;
       data.fStart = start;
       data.fEnd = pos;
-      data.fText = SkSpan<const char>(run.fText.begin() + cluster, next - cluster);
+      data.fText = SkSpan<const char>(run.text().begin() + cluster, next - cluster);
       data.fWidth = width;
       data.fHeight = run.calculateHeight();
       fClusters.emplace_back(data);
@@ -91,16 +87,15 @@ void SkSection::buildClusterTable() {
 
 void SkSection::breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
                                                            size_t maxLines) {
-  SkWords* wordsStart = fUnbreakableWords.begin();
-  SkWords* words = fUnbreakableWords.begin();
-  SkWords* lastWords = nullptr;
-
   SkVector lineAdvance = SkVector::Make(0, 0);
   SkVector lineOffset = SkVector::Make(0, 0);
+
+  SkWords* firstWords = fUnbreakableWords.begin();
+  SkWords* lastWords = nullptr;
   size_t index = 0;
   while (index < fUnbreakableWords.size()) {
 
-    words = &fUnbreakableWords[index];
+    auto words = &fUnbreakableWords[index];
     measureWords(*words);
 
     auto wordsWidth = words->width();
@@ -112,8 +107,8 @@ void SkSection::breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
       if (lineAdvance.fX == 0) {
         // This is the beginning of the line; the word is too long. Aaaa!!!
         // TODO: break it by clusters here without SkShaper
-        shapeWordsIntoManyLines(words, maxWidth);
-        wordsStart = &fUnbreakableWords[index];
+        shapeWordsIntoManyLines(words, maxWidth, true);
+        firstWords = &fUnbreakableWords[index];
         // Start from the same index again
         continue;
       }
@@ -126,11 +121,11 @@ void SkSection::breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
       fLines.emplace_back(
           lineOffset,
           lineAdvance,
-          SkArraySpan<SkWords>(fUnbreakableWords, wordsStart, words - wordsStart));
-      wordsStart = words;
+          SkArraySpan<SkWords>(fUnbreakableWords, firstWords, words - firstWords));
+      firstWords = words;
       lastWords = words;
       auto& line = fLines.back();
-      SkDebugf("Line #%d @%f,%f: '%s'\n", fLines.size(), line.fOffset.fX, line.fOffset.fY, toString(line.text()).c_str());
+      SkDebugf("Line #%d: '%s'\n", fLines.size(), toString(line.text()).c_str());
 
       lineOffset.fY += lineAdvance.fY;
       // Shift the rest of the line horizontally to the left
@@ -155,31 +150,51 @@ void SkSection::breakShapedTextIntoLinesByUnbreakableWords(SkScalar maxWidth,
   fLines.emplace_back(
       lineOffset,
       lineAdvance,
-      SkArraySpan<SkWords>(fUnbreakableWords, wordsStart, fUnbreakableWords.end() - wordsStart));
+      SkArraySpan<SkWords>(fUnbreakableWords, firstWords, fUnbreakableWords.end() - firstWords));
   auto& line = fLines.back();
-  SkDebugf("Line #%d @%f,%f: '%s'\n", fLines.size(), line.fOffset.fX, line.fOffset.fY, toString(line.text()).c_str());
+  SkDebugf("Line #%d: '%s'\n", fLines.size(), toString(line.text()).c_str());
 }
 
-void SkSection::shapeWordsIntoManyLines(SkWords* words, SkScalar width) {
+// The words are longer than the width; let's break it anyhow
+// TODO: This is where the hyphenation and other trickinesses go
+void SkSection::shapeWordsIntoManyLines(SkWords* words, SkScalar width, bool force) {
 
-  if (words->isProducedByShaper()) {
-    // TODO: What should be do in this case? We cannot call Shaper second time
-    SkASSERT(false);
-    return;
-  }
+  SkTArray<SkWords, true> wordsParts;
+  SkScalar widthToFit = words->width();
+  SkScalar lineWidth = 0;
+  SkCluster* start = nullptr;
+  iterateThroughClusters(words->full(),
+      [&start, &wordsParts, &widthToFit, &lineWidth, width](SkCluster& cluster, bool last) {
 
-  auto text(words->full());
-  MultipleFontRunIterator font(text, selectStyles(text));
-  SkShaper shaper(nullptr);
-  ShapeHandler handler(*this, words);
+    if (lineWidth + cluster.fWidth > width) {
+      wordsParts.emplace_back(start, &cluster - 1);
+      widthToFit -= lineWidth;
+      lineWidth = 0;
+      start = &cluster;
+    } else if (start == nullptr) {
+      start = &cluster;
+    }
+    if (last) {
+      wordsParts.emplace_back(start, &cluster);
+    }
+    lineWidth += cluster.fWidth;
+  });
 
-  shaper.shape(&handler,
-               &font,
-               text.begin(),
-               text.size(),
-               true,
-               {0, 0},
-               width);
+  // Insert words coming from SkShaper into the list
+  // (skipping the long word that has been broken into pieces)
+  size_t left = words - fUnbreakableWords.begin();
+  size_t insert = wordsParts.size();
+  size_t right = fUnbreakableWords.end() - words - 1;
+  size_t total = left + right + insert;
+
+  SkTArray<SkWords, true> bigger;
+  bigger.reserve(total);
+
+  bigger.move_back_n(left, fUnbreakableWords.begin());
+  bigger.move_back_n(insert, wordsParts.begin());
+  bigger.move_back_n(right, fUnbreakableWords.begin() + left + 1);
+
+  fUnbreakableWords.swap(bigger);
 }
 
 void SkSection::resetContext() {
@@ -216,7 +231,7 @@ SkScalar SkSection::findOffset(const char* ch) const {
   SkASSERT(cluster.fText.begin() == ch);
 
   auto run = fRuns[cluster.fRunIndex];
-  return run.fPositions[cluster.fStart].fX;
+  return run.position(cluster.fStart).fX;
 }
 
 SkVector SkSection::measureText(SkSpan<const char> text) const {
@@ -305,7 +320,7 @@ SkSpan<SkBlock> SkSection::selectStyles(SkSpan<const char> text) {
 }
 
 void SkSection::iterateThroughStyles(
-    SkSpan<const char> text,
+    const SkBlock& block,
     SkStyleType styleType,
     std::function<void(SkSpan<const char> text, SkTextStyle style)> apply) const {
 
@@ -314,12 +329,12 @@ void SkSection::iterateThroughStyles(
   SkTextStyle prevStyle;
   for (auto& textStyle : fTextStyles) {
 
-    if (!(textStyle.text() && text)) {
+    if (!(textStyle.text() && block.text())) {
       continue;
     }
     auto style = textStyle.style();
-    auto begin = SkTMax(textStyle.text().begin(), text.begin());
-    auto end = SkTMin(textStyle.text().end(), text.end());
+    auto begin = SkTMax(textStyle.text().begin(), block.text().begin());
+    auto end = SkTMin(textStyle.text().end(), block.text().end());
     auto intersect = SkSpan<const char>(begin, end - begin);
     if (start != nullptr && style.matchOneAttribute(styleType, prevStyle)) {
       size += intersect.size();
@@ -365,14 +380,14 @@ void SkSection::iterateThroughRuns(
         apply(run, pos, size, clip);
       }
       run = clusterRun;
-      clip = SkRect::MakeXYWH(run->fInfo.fOffset.fX, run->fInfo.fOffset.fY, 0, 0);
+      clip = SkRect::MakeXYWH(run->offset().fX, run->offset().fY, 0, 0);
       size = 0;
       pos = cluster.fStart;
     }
 
     size += (cluster.fEnd - cluster.fStart);
     if (cl == start) {
-      clip.fLeft = clusterRun->fPositions[cluster.fStart].fX;
+      clip.fLeft = clusterRun->position(cluster.fStart).fX;
       clip.fRight = clip.fLeft;
       clip.fLeft += cluster.sizeToChar(text.begin());
     }
@@ -392,7 +407,7 @@ void SkSection::iterateThroughRuns(
 
 void SkSection::iterateThroughClusters(
     SkSpan<const char> text,
-    std::function<void(SkCluster& cluster)> apply) {
+    std::function<void(SkCluster& cluster, bool last)> apply) {
 
   size_t index = 0;
   while (index < fClusters.size() && fClusters[index].fText.begin() > text.begin()) ++index;
@@ -402,7 +417,7 @@ void SkSection::iterateThroughClusters(
     if (cluster.fText.begin() > text.end()) {
       break;
     }
-    apply(cluster);
+    apply(cluster, index == fClusters.size() - 1);
     ++index;
   }
 }
@@ -428,18 +443,11 @@ void SkSection::paintText(
      [canvas, paint](const SkRun* run, int32_t pos, size_t size, SkRect rect) {
 
        SkTextBlobBuilder builder;
-       const auto& blobBuffer = builder.allocRunPos(run->fFont, SkToInt(size));
-       sk_careful_memcpy(blobBuffer.glyphs,
-                         run->fGlyphs.data() + pos,
-                         size * sizeof(SkGlyphID));
-       sk_careful_memcpy(blobBuffer.points(),
-                         run->fPositions.data() + pos,
-                         size * sizeof(SkPoint));
+       run->copyTo(builder, pos, size);
 
-       auto blob = builder.make();
        canvas->save();
        canvas->clipRect(rect);
-       canvas->drawTextBlob(blob, 0, 0, paint);
+       canvas->drawTextBlob(builder.make(), 0, 0, paint);
        canvas->restore();
      });
 }
@@ -478,19 +486,13 @@ void SkSection::paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextSty
 
     iterateThroughRuns(text,
        [canvas, shadow, paint](const SkRun* run, int32_t pos, size_t size, SkRect rect) {
-         SkTextBlobBuilder builder;
-         const auto& blobBuffer = builder.allocRunPos(run->fFont, size);
-         sk_careful_memcpy(blobBuffer.glyphs,
-                           run->fGlyphs.data() + pos,
-                           size * sizeof(SkGlyphID));
-         sk_careful_memcpy(blobBuffer.points(),
-                           run->fPositions.data() + pos,
-                           size * sizeof(SkPoint));
 
-         auto blob = builder.make();
+         SkTextBlobBuilder builder;
+         run->copyTo(builder, pos, size);
+
          canvas->save();
          canvas->clipRect(rect.makeOffset(shadow.fOffset.x(), shadow.fOffset.y()));
-         canvas->drawTextBlob(blob, shadow.fOffset.x(), shadow.fOffset.y(), paint);
+         canvas->drawTextBlob(builder.make(), shadow.fOffset.x(), shadow.fOffset.y(), paint);
          canvas->restore();
        });
   }
@@ -575,13 +577,13 @@ void SkSection::paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTe
      SkScalar position;
      switch (textStyle.getDecoration()) {
        case SkTextDecoration::kUnderline:
-         position = - run->fInfo.fAscent + thickness;
+         position = - run->ascent() + thickness;
          break;
        case SkTextDecoration::kOverline:
          position = thickness;
          break;
        case SkTextDecoration::kLineThrough: {
-         position = (- run->fInfo.fAscent - thickness) / 2;
+         position = (- run->ascent() - thickness) / 2;
          break;
        }
        default:
@@ -626,34 +628,38 @@ void SkSection::paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTe
   });
 }
 
-// TODO: Is it correct to paint ALL the section in this sequence?
-// TODO: Optimize drawing
+// TODO: Optimize drawing?
 void SkSection::paintEachLineByStyles(SkCanvas* textCanvas) {
 
   for (auto& line : fLines) {
 
-    if (line.text().empty()) {
+    if (line.empty()) {
       continue;
     }
 
+    auto lineOffset = line.offset();
     textCanvas->save();
-    textCanvas->translate(line.fShift + line.fOffset.fX, line.fOffset.fY);
+    textCanvas->translate(lineOffset.fX, lineOffset.fY);
 
-    iterateThroughStyles( line.text(), SkStyleType::Background,
-        [this, textCanvas](SkSpan<const char> text, SkTextStyle style) { this->paintBackground(textCanvas, text, style); } );
+    iterateThroughStyles( line, SkStyleType::Background,
+        [this, textCanvas](SkSpan<const char> text, SkTextStyle style) {
+          this->paintBackground(textCanvas, text, style);
+    });
 
-    iterateThroughStyles( line.text(),SkStyleType::Shadow,
-        [this, textCanvas](SkSpan<const char> text, SkTextStyle style) { this->paintShadow(textCanvas, text, style); } );
+    iterateThroughStyles( line, SkStyleType::Shadow,
+        [this, textCanvas](SkSpan<const char> text, SkTextStyle style) {
+          this->paintShadow(textCanvas, text, style);
+    });
 
-    iterateThroughStyles(
-        line.text(),
-        SkStyleType::Foreground,
+    iterateThroughStyles(line, SkStyleType::Foreground,
         [this, textCanvas](SkSpan<const char> text, SkTextStyle style) {
           this->paintText(textCanvas, text, style);
         });
 
-    iterateThroughStyles( line.text(),SkStyleType::Decorations,
-        [this, textCanvas](SkSpan<const char> text, SkTextStyle style) { this->paintDecorations(textCanvas, text, style); } );
+    iterateThroughStyles( line, SkStyleType::Decorations,
+        [this, textCanvas](SkSpan<const char> text, SkTextStyle style) {
+          this->paintDecorations(textCanvas, text, style);
+    });
 
     textCanvas->restore();
   }

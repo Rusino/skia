@@ -42,3 +42,22 @@ SkScalar SkRun::calculateHeight() {
   return fInfo.fDescent - fInfo.fAscent + fInfo.fLeading;
 }
 
+SkScalar SkRun::calculateWidth(size_t start, size_t end) {
+  SkASSERT(start <= end);
+  if (end == size()) {
+    return fInfo.fAdvance.fX - fPositions[start].fX + fPositions[0].fX;
+  } else {
+   return fPositions[end].fX - fPositions[start].fX;
+  }
+}
+
+void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size) const {
+
+  const auto& blobBuffer = builder.allocRunPos(fFont, SkToInt(size));
+  sk_careful_memcpy(blobBuffer.glyphs,
+                    fGlyphs.data() + pos,
+                    size * sizeof(SkGlyphID));
+  sk_careful_memcpy(blobBuffer.points(),
+                    fPositions.data() + pos,
+                    size * sizeof(SkPoint));
+}

@@ -20,6 +20,8 @@ class SkLine : public SkBlock {
   SkLine(SkVector offset, SkVector advance, SkArraySpan<SkWords> words);
 
   inline SkVector advance() const { return fAdvance; }
+  inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
+  inline bool empty() const { return fText.empty(); }
 
   void formatByWords(SkTextAlign align, SkScalar maxWidth);
 
@@ -31,8 +33,6 @@ class SkLine : public SkBlock {
 
  private:
 
-  friend class SkSection;
-
   void justify(SkScalar delta);
 
   SkScalar fShift;    // Shift to left - right - center
@@ -40,5 +40,4 @@ class SkLine : public SkBlock {
   SkVector fOffset;
 
   SkArraySpan<SkWords> fUnbreakableWords; // For flutter and for justification
-  SkTArray<SkStyle> fStyledBlocks;
 };
