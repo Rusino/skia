@@ -15,6 +15,7 @@
 #include "SkParagraph.h"
 #include "SkPicture.h"
 #include "SkBlock.h"
+#include "SkTHash.h"
 
 class SkCanvas;
 class SkParagraphImpl final: public SkParagraph {
@@ -90,16 +91,17 @@ class SkParagraphImpl final: public SkParagraph {
       std::function<void(const SkRun* run, size_t pos, size_t size, SkRect clip)> apply) const;
   void iterateThroughClusters(std::function<void(SkCluster& cluster, bool last)> apply);
 
-  size_t findCluster(const char* ch) const;
+  SkCluster* findCluster(const char* ch) const;
   SkVector measureText(SkSpan<const char> text) const;
 
   // Input
   SkTArray<SkBlock> fTextStyles;
 
   // Internal structures
+  SkTHashMap<const char*, size_t> fIndexes;
+  SkTArray<SkCluster> fClusters;
   SkTArray<SkRun, true> fRuns;
   SkTArray<SkLine, true> fLines;
-  SkTArray<SkCluster, true> fClusters;
 
   // Painting
   sk_sp<SkPicture> fPicture;
