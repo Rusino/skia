@@ -19,10 +19,19 @@
 #include "SkTextBlobPriv.h"
 #include "SkTHash.h"
 #include "SkArraySpan.h"
+#include <unicode/brkiter.h>
 
+class SkRun;
 struct SkCluster {
 
-  SkCluster() : fRunIndex(0) { }
+  enum BreakType {
+    None,
+    WordBreak,
+    SoftLineBreak,
+    HardLineBreak
+  };
+
+  SkCluster() : fRun(nullptr), fWhiteSpaces(false), fIgnore(false), fBreakType(None) { }
 
   SkScalar sizeToChar(const char* ch) const {
 
@@ -34,7 +43,6 @@ struct SkCluster {
 
     return fWidth * ratio;
   }
-
   SkScalar sizeFromChar(const char* ch) const {
 
     if (ch < fText.begin() || ch >= fText.end()) {
@@ -45,28 +53,52 @@ struct SkCluster {
 
     return fWidth * (1 - ratio);
   }
+  inline void setBreakType(BreakType type) { fBreakType = type; }
+  inline BreakType getBreakType() const { return fBreakType; }
+  inline void setIsWhiteSpaces(bool ws) { fWhiteSpaces = ws; }
+  inline bool isWhitespaces() const { return fWhiteSpaces; }
+  inline bool isIgnored() const { return fIgnore; }
+  void ignore() { fIgnore = true; }
+  bool canBreakLineAfter() { return fBreakType == SoftLineBreak ||
+                                    fBreakType == HardLineBreak; }
+
+  void setIsWhiteSpaces() {
+    auto pos = fText.end();
+    while (--pos >= fText.begin()) {
+      auto ch = *pos;
+      if (!u_isspace(ch) &&
+          u_charType(ch) != U_CONTROL_CHAR &&
+          u_charType(ch) != U_NON_SPACING_MARK) {
+        return;
+      }
+    }
+    fWhiteSpaces = true;
+  }
 
   SkSpan<const char> fText;
 
-  size_t fRunIndex;
+  SkRun* fRun;
   size_t fStart;
   size_t fEnd;
 
   SkScalar fWidth;
   SkScalar fHeight;
+
+  bool fWhiteSpaces;
+  bool fIgnore;
+
+  BreakType fBreakType;
 };
 
-// The smallest part of the text that is painted separately
 class SkRun {
  public:
 
   SkRun() {}
-  SkRun(
-      size_t index,
-      const SkFont& font,
-      const SkShaper::RunHandler::RunInfo& info,
-      int glyphCount,
-      SkSpan<const char> text);
+  SkRun(size_t index,
+        const SkFont& font,
+        const SkShaper::RunHandler::RunInfo& info,
+        int glyphCount,
+        SkSpan<const char> text);
 
   SkShaper::RunHandler::Buffer newRunBuffer();
 
@@ -83,7 +115,14 @@ class SkRun {
 
   inline SkSpan<const char> text() const { return fText; }
   inline size_t cluster(size_t pos) const { return fClusters[pos]; }
-  inline SkPoint position(size_t pos) const { return fPositions[pos]; }
+  inline SkPoint position(size_t pos) const {
+    if (pos < size()) {
+      return fPositions[pos];
+    }
+    return SkVector::Make(
+        fInfo.fAdvance.fX - (fPositions[size() - 1].fX - fPositions[0].fX),
+        fInfo.fAdvance.fY);
+  }
 
   SkScalar calculateHeight();
   SkScalar calculateWidth(size_t start, size_t end);

@@ -15,18 +15,11 @@ SkLine::SkLine() {
   fOffset.set(0, 0);
 }
 
-SkLine::SkLine(SkVector offset, SkVector advance, SkArraySpan<SkWords> words)
-    : fAdvance(advance)
-    , fOffset(offset)
-    , fUnbreakableWords(words) {
-
-  fText = words.empty()
-      ? SkSpan<const char>()
-      : SkSpan<const char>(
-        words.begin()->full().begin(),
-        words.back()->full().end() - words.begin()->full().begin()
-        );
-}
+SkLine::SkLine(SkVector offset, SkVector advance, SkSpan<const char> text)
+    : fText(text)
+    , fShift(0)
+    , fAdvance(advance)
+    , fOffset(offset) { }
 
 void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
   SkScalar delta = maxWidth - fAdvance.fX;
@@ -65,9 +58,9 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
   }
 }
 
-// TODO: we need to propagate shifts down to runs
+// TODO: implement
 void SkLine::justify(SkScalar delta) {
-
+/*
   auto softLineBreaks = fUnbreakableWords.size() - 1;
   if (softLineBreaks == 0) {
     // Expand one group of words
@@ -92,4 +85,5 @@ void SkLine::justify(SkScalar delta) {
     last = word;
     word->shift(shift);
   }
+  */
 }

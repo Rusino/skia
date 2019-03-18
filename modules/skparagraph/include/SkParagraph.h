@@ -10,6 +10,8 @@
 #include <vector>
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
+#include "SkLine.h"
+#include "SkRun.h"
 
 class SkCanvas;
 class SkSection;
@@ -77,11 +79,19 @@ class SkParagraph {
 
   friend class SkParagraphBuilder;
 
-  void recordPicture();
-
-  void breakTextIntoSectionsAndWords();
-
   void resetContext();
+  void buildClusterTable();
+  void shapeTextIntoEndlessLine();
+  void markClustersWithLineBreaks();
+  void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
+  void breakShapedTextIntoLinesByClusters(SkScalar maxWidth,
+                                          size_t maxLines);
+  void formatLinesByWords(SkScalar maxWidth);
+  void paintText(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
+  void paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
+  void paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
+  void paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
+  void computeDecorationPaint(SkPaint& paint, SkRect clip, SkTextStyle style, SkPath& path) const;
 
   size_t linesLeft() { return fParagraphStyle.unlimited_lines()
                                 ? fParagraphStyle.getMaxLines()
@@ -92,7 +102,19 @@ class SkParagraph {
     return fLinesNumber < fParagraphStyle.getMaxLines();
   }
 
-  void updateStats(const SkSection& section);
+  void iterateThroughStyles(
+      SkSpan<const char> text,
+      SkStyleType styleType,
+      std::function<void(SkSpan<const char> text, SkTextStyle style)> apply) const;
+  void iterateThroughRuns(
+      SkSpan<const char> text,
+      std::function<void(const SkRun* run, size_t pos, size_t size, SkRect clip)> apply) const;
+  void iterateThroughClusters(std::function<void(SkCluster& cluster, bool last)> apply);
+
+  size_t findCluster(const char* ch) const;
+  SkVector measureText(SkSpan<const char> text) const;
+  void measureWords(SkWords& words) const;
+  SkScalar findOffset(const char* ch) const;
 
   // Things for Flutter
   SkScalar fAlphabeticBaseline;
@@ -106,11 +128,15 @@ class SkParagraph {
 
   // Input
   SkParagraphStyle fParagraphStyle;
-  std::vector<Block> fTextStyles;
+  SkTArray<SkBlock> fTextStyles;
   SkSpan<const char> fUtf8;
+  // TODO: later
+  //SkTArray<SkWords, true> fUnbreakableWords;
 
-  // Shaping (list of sections separated by hard line breaks)
-  SkTArray<std::unique_ptr<SkSection>> fSections;
+  // Internal structures
+  SkTArray<SkRun, true> fRuns;
+  SkTArray<SkLine, true> fLines;
+  SkTArray<SkCluster, true> fClusters;
 
   // Painting
   sk_sp<SkPicture> fPicture;

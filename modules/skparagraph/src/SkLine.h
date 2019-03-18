@@ -11,14 +11,15 @@
 #include "SkCanvas.h"
 #include "SkBlock.h"
 
-class SkLine : public SkBlock {
+class SkLine {
 
  public:
 
   SkLine();
 
-  SkLine(SkVector offset, SkVector advance, SkArraySpan<SkWords> words);
+  SkLine(SkVector offset, SkVector advance, SkSpan<const char> text);
 
+  inline SkSpan<const char> text() const { return fText; }
   inline SkVector advance() const { return fAdvance; }
   inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
   inline bool empty() const { return fText.empty(); }
@@ -35,9 +36,8 @@ class SkLine : public SkBlock {
 
   void justify(SkScalar delta);
 
+  SkSpan<const char> fText;
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size
   SkVector fOffset;
-
-  SkArraySpan<SkWords> fUnbreakableWords; // For flutter and for justification
 };

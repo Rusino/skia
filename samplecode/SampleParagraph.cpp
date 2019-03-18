@@ -643,14 +643,13 @@ class ParagraphView2 : public Sample {
     SkScalar height = this->height();
     drawText(canvas, width, height, long_word, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
     canvas->translate(width, 0);
-    drawText(canvas, width, height, cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
+    drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
     canvas->translate(width, 0);
     drawText(canvas, width, height, text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 100, u"\u2026");
     canvas->translate(width, 0);
     drawCode(canvas, width, height);
     canvas->translate(width, 0);
-    drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
-
+    drawText(canvas, width, height, cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
   }
 
  private:

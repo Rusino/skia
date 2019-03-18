@@ -20,7 +20,6 @@ skparagraph_public = [
 skparagraph_sources = [
             "$_src/SkLine.h",
             "$_src/SkRun.h",
-            "$_src/SkSection.h",
             "$_src/SkBlock.h",
             "$_src/SkFontCollection.cpp",
             "$_src/SkLine.cpp",
@@ -28,7 +27,6 @@ skparagraph_sources = [
             "$_src/SkParagraphBuilder.cpp",
             "$_src/SkParagraphStyle.cpp",
             "$_src/SkRun.cpp",
-            "$_src/SkSection.cpp",
             "$_src/SkTextShadow.cpp",
             "$_src/SkTextStyle.cpp",
             "$_src/SkBlock.cpp",

@@ -47,8 +47,6 @@ class SkFontCollection : public SkRefCnt {
 
     std::vector<sk_sp<SkFontMgr>> getFontManagerOrder() const;
 
-    friend class ParagraphTester;
-
     struct FamilyKey {
         FamilyKey(const std::string& family,
             const std::string& loc,

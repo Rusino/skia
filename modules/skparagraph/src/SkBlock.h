@@ -37,15 +37,16 @@ class SkBlock {
  public:
 
   SkBlock() : fText(), fTextStyle() {}
-  SkBlock(SkSpan<const char> text, SkTextStyle* style)
-      : fText(text), fTextStyle(style) {}
+  SkBlock(SkSpan<const char> text, const SkTextStyle& style)
+      : fText(text), fTextStyle(style) {
+  }
 
   inline SkSpan<const char> text() const { return fText; }
-  inline SkTextStyle style() const { return *fTextStyle; }
+  inline SkTextStyle style() const { return fTextStyle; }
 
  protected:
   SkSpan<const char> fText;
-  SkTextStyle* fTextStyle;
+   SkTextStyle fTextStyle;
 };
 
 // A set of "unbreakable" words - they do not break glyph clusters
