@@ -6,8 +6,7 @@
  */
 
 #include "SkBlock.h"
-#include "SkRun.h"
-#include "SkTHash.h"
+
 
 
 

@@ -7,11 +7,14 @@
 
 #include <algorithm>
 #include <unicode/brkiter.h>
+#include <SkBlurTypes.h>
 #include "SkSpan.h"
-#include "SkParagraph.h"
+#include "SkParagraphImpl.h"
 #include "SkPictureRecorder.h"
 #include "SkDashPathEffect.h"
 #include "SkDiscretePathEffect.h"
+#include "SkCanvas.h"
+#include "SkMaskFilter.h"
 
 std::string toString(SkSpan<const char> text) {
   icu::UnicodeString utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
@@ -20,41 +23,9 @@ std::string toString(SkSpan<const char> text) {
   return str;
 }
 
-SkParagraph::SkParagraph(const std::string& text,
-                         SkParagraphStyle style,
-                         std::vector<Block> blocks)
-    : fParagraphStyle(style)
-    , fUtf8(text.data(), text.size()),
-      fPicture(nullptr) {
-  fTextStyles.reserve(blocks.size());
-  for (auto& block : blocks) {
-    fTextStyles.emplace_back(SkSpan<const char>(fUtf8.begin() + block.fStart, block.fEnd - block.fStart),
-                             block.fStyle);
-  }
-}
+SkParagraphImpl::~SkParagraphImpl() = default;
 
-SkParagraph::SkParagraph(const std::u16string& utf16text,
-                         SkParagraphStyle style,
-                         std::vector<Block> blocks)
-    : fParagraphStyle(style)
-    , fPicture(nullptr) {
-
-  icu::UnicodeString
-      unicode((UChar*) utf16text.data(), SkToS32(utf16text.size()));
-  std::string str;
-  unicode.toUTF8String(str);
-  fUtf8 = SkSpan<const char>(str.data(), str.size());
-
-  fTextStyles.reserve(blocks.size());
-  for (auto& block : blocks) {
-    fTextStyles.emplace_back(SkSpan<const char>(fUtf8.begin() + block.fStart, block.fEnd - block.fStart),
-                             block.fStyle);
-  }
-}
-
-SkParagraph::~SkParagraph() = default;
-
-void SkParagraph::resetContext() {
+void SkParagraphImpl::resetContext() {
   
   fAlphabeticBaseline = 0;
   fHeight = 0;
@@ -71,7 +42,7 @@ void SkParagraph::resetContext() {
   fClusters.reset();
 }
 
-bool SkParagraph::layout(double doubleWidth) {
+bool SkParagraphImpl::layout(double doubleWidth) {
   
   this->resetContext();
 
@@ -88,7 +59,7 @@ bool SkParagraph::layout(double doubleWidth) {
   return true;
 }
 
-void SkParagraph::paint(SkCanvas* canvas, double x, double y) {
+void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
 
   if (nullptr == fPicture) {
     // Build the picture lazily not until we actually have to paint (or never)
@@ -139,7 +110,7 @@ void SkParagraph::paint(SkCanvas* canvas, double x, double y) {
   canvas->drawPicture(fPicture, &matrix, nullptr);
 }
 
-void SkParagraph::paintText(
+void SkParagraphImpl::paintText(
     SkCanvas* canvas,
     SkSpan<const char> text,
     SkTextStyle style) const {
@@ -160,15 +131,14 @@ void SkParagraph::paintText(
 
                        SkTextBlobBuilder builder;
                        run->copyTo(builder, pos, size);
-
                        canvas->save();
-                       //canvas->clipRect(rect);
+                       canvas->clipRect(rect);
                        canvas->drawTextBlob(builder.make(), 0, 0, paint);
                        canvas->restore();
                      });
 }
 
-void SkParagraph::paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const {
+void SkParagraphImpl::paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const {
 
   if (!style.hasBackground()) {
     return;
@@ -181,7 +151,7 @@ void SkParagraph::paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkT
       });
 }
 
-void SkParagraph::paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const {
+void SkParagraphImpl::paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const {
 
   if (style.getShadowNumber() == 0) {
     return;
@@ -214,7 +184,7 @@ void SkParagraph::paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextS
   }
 }
 
-void SkParagraph::computeDecorationPaint(SkPaint& paint, SkRect clip, SkTextStyle textStyle, SkPath& path) const {
+void SkParagraphImpl::computeDecorationPaint(SkPaint& paint, SkRect clip, SkTextStyle textStyle, SkPath& path) const {
 
   paint.setStyle(SkPaint::kStroke_Style);
   if (textStyle.getDecorationColor() == SK_ColorTRANSPARENT) {
@@ -280,7 +250,7 @@ void SkParagraph::computeDecorationPaint(SkPaint& paint, SkRect clip, SkTextStyl
 }
 
 // TODO: Make the thickness reasonable
-void SkParagraph::paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle textStyle) const {
+void SkParagraphImpl::paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle textStyle) const {
 
   if (textStyle.getDecoration() == SkTextDecoration::kNone) {
     return;
@@ -344,7 +314,7 @@ void SkParagraph::paintDecorations(SkCanvas* canvas, SkSpan<const char> text, Sk
                      });
 }
 
-void SkParagraph::buildClusterTable() {
+void SkParagraphImpl::buildClusterTable() {
 
   // Extrace all the information from SkShaper
   for (auto& run : fRuns) {
@@ -378,7 +348,7 @@ void SkParagraph::buildClusterTable() {
   }
 }
 
-void SkParagraph::shapeTextIntoEndlessLine() {
+void SkParagraphImpl::shapeTextIntoEndlessLine() {
 
   class MultipleFontRunIterator final : public FontRunIterator {
    public:
@@ -454,7 +424,7 @@ void SkParagraph::shapeTextIntoEndlessLine() {
   class ShapeHandler final : public SkShaper::RunHandler {
 
    public:
-    explicit ShapeHandler(SkParagraph& paragraph)
+    explicit ShapeHandler(SkParagraphImpl& paragraph)
         : fParagraph(&paragraph)
         , fAdvance(SkVector::Make(0, 0)) {}
 
@@ -487,7 +457,7 @@ void SkParagraph::shapeTextIntoEndlessLine() {
 
     void commitLine() override { }
 
-    SkParagraph* fParagraph;
+    SkParagraphImpl* fParagraph;
     SkVector fAdvance;
   };
 
@@ -506,7 +476,7 @@ void SkParagraph::shapeTextIntoEndlessLine() {
   fMaxIntrinsicWidth = handler.advance().fX;
 }
 
-void SkParagraph::markClustersWithLineBreaks() {
+void SkParagraphImpl::markClustersWithLineBreaks() {
 
   class SkTextBreaker {
 
@@ -591,7 +561,7 @@ void SkParagraph::markClustersWithLineBreaks() {
      });
 }
 
-void SkParagraph::breakShapedTextIntoLinesByClusters(SkScalar maxWidth, size_t maxLines) {
+void SkParagraphImpl::breakShapedTextIntoLinesByClusters(SkScalar maxWidth, size_t maxLines) {
 
   // Add ICU breaker information to the clusters
   SkVector lineAdvance = SkVector::Make(0, 0);
@@ -676,7 +646,7 @@ void SkParagraph::breakShapedTextIntoLinesByClusters(SkScalar maxWidth, size_t m
   });
 }
 
-void SkParagraph::shapeIntoLines(SkScalar maxWidth, size_t maxLines) {
+void SkParagraphImpl::shapeIntoLines(SkScalar maxWidth, size_t maxLines) {
 
   resetContext();
 
@@ -689,7 +659,7 @@ void SkParagraph::shapeIntoLines(SkScalar maxWidth, size_t maxLines) {
   breakShapedTextIntoLinesByClusters(maxWidth, maxLines);
 }
 
-void SkParagraph::formatLinesByWords(SkScalar maxWidth) {
+void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
 
   auto effectiveAlign = fParagraphStyle.effective_align();
   for (auto& line : fLines) {
@@ -704,7 +674,7 @@ void SkParagraph::formatLinesByWords(SkScalar maxWidth) {
 }
 
 // TODO: implement
-std::vector<SkTextBox> SkParagraph::getRectsForRange(
+std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     unsigned start,
     unsigned end,
     RectHeightStyle rectHeightStyle,
@@ -723,7 +693,7 @@ std::vector<SkTextBox> SkParagraph::getRectsForRange(
 }
 
 // TODO: Optimize the search
-size_t SkParagraph::findCluster(const char* ch) const {
+size_t SkParagraphImpl::findCluster(const char* ch) const {
   for (size_t i = 0; i < fClusters.size(); ++i) {
     auto& cluster = fClusters[i];
     if (cluster.fText.end() > ch) {
@@ -734,18 +704,7 @@ size_t SkParagraph::findCluster(const char* ch) const {
   return fClusters.size();
 }
 
-SkScalar SkParagraph::findOffset(const char* ch) const {
-
-  size_t index = findCluster(ch);
-  SkASSERT(index < fClusters.size());
-
-  auto cluster = fClusters[index];
-  SkASSERT(cluster.fText.begin() == ch);
-
-  return cluster.fRun->position(cluster.fStart).fX;
-}
-
-SkVector SkParagraph::measureText(SkSpan<const char> text) const {
+SkVector SkParagraphImpl::measureText(SkSpan<const char> text) const {
 
   SkVector size = SkVector::Make(0, 0);
   if (text.empty()) {
@@ -773,15 +732,7 @@ SkVector SkParagraph::measureText(SkSpan<const char> text) const {
   return size;
 }
 
-void SkParagraph::measureWords(SkWords& words) const {
-
-  auto full = measureText(words.full());
-  auto trimmed = measureText(words.trimmed());
-
-  words.setSizes(full, trimmed.fX);
-}
-
-void SkParagraph::iterateThroughStyles(
+void SkParagraphImpl::iterateThroughStyles(
     const SkSpan<const char> text,
     SkStyleType styleType,
     std::function<void(SkSpan<const char> text, SkTextStyle style)> apply) const {
@@ -821,7 +772,7 @@ void SkParagraph::iterateThroughStyles(
 }
 
 // TODO: Optimize the search
-void SkParagraph::iterateThroughRuns(
+void SkParagraphImpl::iterateThroughRuns(
     SkSpan<const char> text,
     std::function<void(const SkRun* run, size_t pos, size_t size, SkRect clip)> apply) const {
 
@@ -866,7 +817,7 @@ void SkParagraph::iterateThroughRuns(
   apply(run, pos, size, clip);
 }
 
-void SkParagraph::iterateThroughClusters(
+void SkParagraphImpl::iterateThroughClusters(
     std::function<void(SkCluster& cluster, bool last)> apply) {
 
   size_t index = 0;
@@ -882,12 +833,12 @@ void SkParagraph::iterateThroughClusters(
   }
 }
 
-SkPositionWithAffinity SkParagraph::getGlyphPositionAtCoordinate(double dx, double dy) const {
+SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, double dy) const {
   // TODO: implement
   return {0, Affinity::UPSTREAM};
 }
 
-SkRange<size_t> SkParagraph::getWordBoundary(unsigned offset) {
+SkRange<size_t> SkParagraphImpl::getWordBoundary(unsigned offset) {
   // TODO: implement
   SkRange<size_t> result;
   return result;

@@ -8,8 +8,7 @@
 #pragma once
 
 #include "SkDartTypes.h"
-#include "SkCanvas.h"
-#include "SkBlock.h"
+#include "SkSpan.h"
 
 class SkLine {
 
@@ -25,12 +24,6 @@ class SkLine {
   inline bool empty() const { return fText.empty(); }
 
   void formatByWords(SkTextAlign align, SkScalar maxWidth);
-
-  void getRectsForRange(
-      SkTextDirection textDirection,
-      const char* start,
-      const char* end,
-      std::vector<SkTextBox>& result);
 
  private:
 

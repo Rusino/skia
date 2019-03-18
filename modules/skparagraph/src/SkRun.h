@@ -7,19 +7,10 @@
 
 #pragma once
 
-#include <vector>
-#include "uchar.h"
-#include "SkColor.h"
-#include "SkCanvas.h"
-#include "SkFontMetrics.h"
-#include "SkShaper.h"
-#include "SkSpan.h"
-#include "SkTextStyle.h"
-#include "SkParagraphStyle.h"
-#include "SkTextBlobPriv.h"
-#include "SkTHash.h"
-#include "SkArraySpan.h"
 #include <unicode/brkiter.h>
+#include "uchar.h"
+#include "SkSpan.h"
+#include "SkShaper.h"
 
 class SkRun;
 struct SkCluster {

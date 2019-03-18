@@ -20,6 +20,7 @@
 #include "SkParagraphStyle.h"
 #include "SkPaint.h"
 #include "SkSpan.h"
+#include "SkParagraphImpl.h"
 
 SkParagraphBuilder::SkParagraphBuilder(
     SkParagraphStyle style,
@@ -122,6 +123,6 @@ std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
 
     this->endRunIfNeeded();
 
-    return std::make_unique<SkParagraph>(fUtf8, fParagraphStyle, fStyledBlocks);
+    return std::make_unique<SkParagraphImpl>(fUtf8, fParagraphStyle, fStyledBlocks);
 }
 

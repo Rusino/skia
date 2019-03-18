@@ -10,15 +10,11 @@
 #include <vector>
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
-#include "SkLine.h"
-#include "SkRun.h"
 
 class SkCanvas;
-class SkSection;
-class SkPicture;
 
 class SkParagraph {
- private:
+ protected:
   struct Block {
     Block(size_t start, size_t end, SkTextStyle style)
         : fStart(start), fEnd(end), fStyle(style) {}
@@ -28,17 +24,24 @@ class SkParagraph {
   };
 
  public:
-  SkParagraph(
-      const std::u16string& utf16text,
-      SkParagraphStyle style,
-      std::vector<Block> blocks);
+  SkParagraph(const std::string& text,
+              SkParagraphStyle style,
+              std::vector<Block> blocks)
+      : fParagraphStyle(style)
+      , fUtf8(text.data(), text.size()) { }
 
-  SkParagraph(
-      const std::string& utf8text,
-      SkParagraphStyle style,
-      std::vector<Block> blocks);
+  SkParagraph(const std::u16string& utf16text,
+              SkParagraphStyle style,
+              std::vector<Block> blocks)
+      : fParagraphStyle(style) {
+    icu::UnicodeString
+        unicode((UChar*) utf16text.data(), SkToS32(utf16text.size()));
+    std::string str;
+    unicode.toUTF8String(str);
+    fUtf8 = SkSpan<const char>(str.data(), str.size());
+  }
 
-  ~SkParagraph();
+  virtual ~SkParagraph() = default;
 
   double getMaxWidth() { return SkScalarToDouble(fWidth); }
 
@@ -48,73 +51,36 @@ class SkParagraph {
 
   double getMaxIntrinsicWidth() { return SkScalarToDouble(fMaxIntrinsicWidth); }
 
-  double
-  getAlphabeticBaseline() { return SkScalarToDouble(fAlphabeticBaseline); }
+  double getAlphabeticBaseline() { return SkScalarToDouble(fAlphabeticBaseline); }
 
-  double
-  getIdeographicBaseline() { return SkScalarToDouble(fIdeographicBaseline); }
+  double getIdeographicBaseline() { return SkScalarToDouble(fIdeographicBaseline); }
 
   bool didExceedMaxLines() {
-
     return !fParagraphStyle.unlimited_lines()
         && fLinesNumber > fParagraphStyle.getMaxLines();
   }
 
-  bool layout(double width);
+  virtual bool layout(double width) = 0;
 
-  void paint(SkCanvas* canvas, double x, double y);
+  virtual void paint(SkCanvas* canvas, double x, double y) = 0;
 
-  std::vector<SkTextBox> getRectsForRange(
+  virtual std::vector<SkTextBox> getRectsForRange(
       unsigned start,
       unsigned end,
       RectHeightStyle rectHeightStyle,
-      RectWidthStyle rectWidthStyle);
+      RectWidthStyle rectWidthStyle) = 0;
 
-  SkPositionWithAffinity
-  getGlyphPositionAtCoordinate(double dx, double dy) const;
+  virtual SkPositionWithAffinity
+  getGlyphPositionAtCoordinate(double dx, double dy) const = 0;
 
-  SkRange<size_t> getWordBoundary(unsigned offset);
+  virtual SkRange<size_t> getWordBoundary(unsigned offset) = 0;
 
- private:
+ protected:
 
   friend class SkParagraphBuilder;
 
-  void resetContext();
-  void buildClusterTable();
-  void shapeTextIntoEndlessLine();
-  void markClustersWithLineBreaks();
-  void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
-  void breakShapedTextIntoLinesByClusters(SkScalar maxWidth,
-                                          size_t maxLines);
-  void formatLinesByWords(SkScalar maxWidth);
-  void paintText(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void computeDecorationPaint(SkPaint& paint, SkRect clip, SkTextStyle style, SkPath& path) const;
-
-  size_t linesLeft() { return fParagraphStyle.unlimited_lines()
-                                ? fParagraphStyle.getMaxLines()
-                                : fParagraphStyle.getMaxLines()  - fLinesNumber; }
-
-  bool addLines(size_t increment) {
-    fLinesNumber += increment;
-    return fLinesNumber < fParagraphStyle.getMaxLines();
-  }
-
-  void iterateThroughStyles(
-      SkSpan<const char> text,
-      SkStyleType styleType,
-      std::function<void(SkSpan<const char> text, SkTextStyle style)> apply) const;
-  void iterateThroughRuns(
-      SkSpan<const char> text,
-      std::function<void(const SkRun* run, size_t pos, size_t size, SkRect clip)> apply) const;
-  void iterateThroughClusters(std::function<void(SkCluster& cluster, bool last)> apply);
-
-  size_t findCluster(const char* ch) const;
-  SkVector measureText(SkSpan<const char> text) const;
-  void measureWords(SkWords& words) const;
-  SkScalar findOffset(const char* ch) const;
+  SkParagraphStyle fParagraphStyle;
+  SkSpan<const char> fUtf8;
 
   // Things for Flutter
   SkScalar fAlphabeticBaseline;
@@ -125,19 +91,4 @@ class SkParagraph {
   SkScalar fMinIntrinsicWidth;
   SkScalar fMaxLineWidth;
   size_t fLinesNumber;
-
-  // Input
-  SkParagraphStyle fParagraphStyle;
-  SkTArray<SkBlock> fTextStyles;
-  SkSpan<const char> fUtf8;
-  // TODO: later
-  //SkTArray<SkWords, true> fUnbreakableWords;
-
-  // Internal structures
-  SkTArray<SkRun, true> fRuns;
-  SkTArray<SkLine, true> fLines;
-  SkTArray<SkCluster, true> fClusters;
-
-  // Painting
-  sk_sp<SkPicture> fPicture;
 };
