@@ -8,18 +8,7 @@
 #include <unicode/brkiter.h>
 #include <algorithm>
 #include "SkLine.h"
-
-SkLine::SkLine() {
-  fShift = 0;
-  fAdvance.set(0, 0);
-  fOffset.set(0, 0);
-}
-
-SkLine::SkLine(SkVector offset, SkVector advance, SkSpan<const char> text)
-    : fText(text)
-    , fShift(0)
-    , fAdvance(advance)
-    , fOffset(offset) { }
+#include "SkParagraphImpl.h"
 
 void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
   SkScalar delta = maxWidth - fAdvance.fX;
@@ -58,13 +47,12 @@ void SkLine::formatByWords(SkTextAlign effectiveAlign, SkScalar maxWidth) {
   }
 }
 
-// TODO: implement
 void SkLine::justify(SkScalar delta) {
-/*
-  auto softLineBreaks = fUnbreakableWords.size() - 1;
+
+  auto softLineBreaks = fWords.size() - 1;
   if (softLineBreaks == 0) {
     // Expand one group of words
-    for (auto word = fUnbreakableWords.begin(); word != fUnbreakableWords.end(); ++word) {
+    for (auto word = fWords.begin(); word != fWords.end(); ++word) {
       word->expand(delta);
     }
     return;
@@ -73,8 +61,8 @@ void SkLine::justify(SkScalar delta) {
   SkScalar step = delta / softLineBreaks;
   SkScalar shift = 0;
 
-  SkWords* last = nullptr;
-  for (auto word = fUnbreakableWords.begin(); word != fUnbreakableWords.end(); ++word) {
+  SkWord* last = nullptr;
+  for (auto word = fWords.begin(); word != fWords.end(); ++word) {
 
     if (last != nullptr) {
       --softLineBreaks;
@@ -85,5 +73,23 @@ void SkLine::justify(SkScalar delta) {
     last = word;
     word->shift(shift);
   }
-  */
+}
+
+void SkLine::breakLineByWords(std::function<void(SkWord& word)> apply) {
+
+  SkTextBreaker breaker;
+  if (!breaker.initialize(fText, UBRK_WORD)) {
+    return;
+  }
+
+  size_t currentPos = 0;
+  while (!breaker.eof()) {
+    auto start = currentPos;
+    currentPos = breaker.next(currentPos);
+
+    SkSpan<const char> text(fText.begin() + start, currentPos - start);
+    fWords.emplace_back(text);
+
+    apply(fWords.back());
+  }
 }

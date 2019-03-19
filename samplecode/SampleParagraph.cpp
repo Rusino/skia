@@ -730,7 +730,6 @@ class ParagraphView3 : public Sample {
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
     paraStyle.setMaxLines(lineLimit);
-
     paraStyle.setEllipsis(ellipsis);
     paraStyle.getTextStyle().setFontSize(20);
     fontCollection->setTestFontManager(testFontProvider);
@@ -756,7 +755,9 @@ class ParagraphView3 : public Sample {
 
   void drawLine(SkCanvas* canvas, SkScalar w, SkScalar h,
                 const std::string& text,
-                SkTextAlign align) {
+                SkTextAlign align,
+                size_t lineLimit = std::numeric_limits<size_t>::max(),
+                const std::u16string& ellipsis = u"\u2026") {
     SkAutoCanvasRestore acr(canvas, true);
 
     canvas->clipRect(SkRect::MakeWH(w, h));
@@ -776,6 +777,8 @@ class ParagraphView3 : public Sample {
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
     paraStyle.setTextAlign(align);
+    paraStyle.setMaxLines(lineLimit);
+    paraStyle.setEllipsis(ellipsis);
 
     SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
     builder.addText(text);
@@ -801,14 +804,13 @@ class ParagraphView3 : public Sample {
     SkScalar height = this->height();
 
     const std::string line = "Hesitation is always easy rarely useful.";
-    drawLine(canvas, width, height, options, SkTextAlign::left);
+    drawLine(canvas, width, height, options, SkTextAlign::left, 10);
     canvas->translate(width, 0);
-    drawLine(canvas, width, height, options, SkTextAlign::right);
+    drawLine(canvas, width, height, options, SkTextAlign::right, 11);
     canvas->translate(width, 0);
-    drawLine(canvas, width, height, options, SkTextAlign::center);
+    drawLine(canvas, width, height, options, SkTextAlign::center, 12);
     canvas->translate(width, 0);
-    drawLine(canvas, width, height, options, SkTextAlign::justify);
-    //drawLine(canvas, width, height, options, SkTextAlign::justify);
+    drawLine(canvas, width, height, options, SkTextAlign::justify, 13);
   }
 
  private:

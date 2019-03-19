@@ -55,10 +55,7 @@ class SkParagraph {
 
   double getIdeographicBaseline() { return SkScalarToDouble(fIdeographicBaseline); }
 
-  bool didExceedMaxLines() {
-    return !fParagraphStyle.unlimited_lines()
-        && fLinesNumber > fParagraphStyle.getMaxLines();
-  }
+  virtual bool didExceedMaxLines() = 0;
 
   virtual bool layout(double width) = 0;
 
@@ -90,5 +87,4 @@ class SkParagraph {
   SkScalar fMaxIntrinsicWidth;
   SkScalar fMinIntrinsicWidth;
   SkScalar fMaxLineWidth;
-  size_t fLinesNumber;
 };

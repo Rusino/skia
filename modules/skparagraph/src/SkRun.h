@@ -85,8 +85,7 @@ class SkRun {
  public:
 
   SkRun() {}
-  SkRun(size_t index,
-        const SkFont& font,
+  SkRun(const SkFont& font,
         const SkShaper::RunHandler::RunInfo& info,
         int glyphCount,
         SkSpan<const char> text);
@@ -95,6 +94,8 @@ class SkRun {
 
   inline size_t size() const { return fGlyphs.size(); }
   void setWidth(SkScalar width) { fInfo.fAdvance.fX = width; }
+  void setHeight(SkScalar height) { fInfo.fAdvance.fY = height; }
+  void shift(SkScalar shift) { fInfo.fOffset.fX += shift; }
   SkVector advance() const {
     return SkVector::Make(fInfo.fAdvance.fX,
                           fInfo.fDescent + fInfo.fLeading - fInfo.fAscent);
@@ -103,6 +104,7 @@ class SkRun {
   inline SkScalar ascent() const { return fInfo.fAscent; }
   inline SkScalar descent() const { return fInfo.fDescent; }
   inline SkScalar leading() const { return fInfo.fLeading; }
+  inline SkFont font() const { return fFont; }
 
   inline SkSpan<const char> text() const { return fText; }
   inline size_t cluster(size_t pos) const { return fClusters[pos]; }
@@ -114,18 +116,18 @@ class SkRun {
         fInfo.fAdvance.fX - (fPositions[size() - 1].fX - fPositions[0].fX),
         fInfo.fAdvance.fY);
   }
+  SkRect clip() {
+    return SkRect::MakeXYWH(fInfo.fOffset.fX, fInfo.fOffset.fY, fInfo.fAdvance.fX, fInfo.fAdvance.fY);
+  }
 
   SkScalar calculateHeight();
   SkScalar calculateWidth(size_t start, size_t end);
-  void setText(size_t start, size_t end) {
-    fText = SkSpan<const char>(fText.begin() + start, end - start);
-  }
+  void setText(SkSpan<const char> text) { fText = text; }
 
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size) const;
 
  private:
 
-  size_t fIndex;
   SkFont fFont;
   SkShaper::RunHandler::RunInfo fInfo;
   SkSTArray<128, SkGlyphID, true> fGlyphs;

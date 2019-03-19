@@ -9,13 +9,11 @@
 #include "SkSpan.h"
 
 SkRun::SkRun(
-    size_t index,
     const SkFont& font,
     const SkShaper::RunHandler::RunInfo& info,
     int glyphCount,
     SkSpan<const char> text)
-    : fIndex(index)
-    , fFont(font)
+    : fFont(font)
     , fInfo(info)
     , fGlyphs(glyphCount)
     , fPositions(glyphCount)

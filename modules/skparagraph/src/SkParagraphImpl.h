@@ -17,6 +17,56 @@
 #include "SkBlock.h"
 #include "SkTHash.h"
 
+class SkTextBreaker {
+
+ public:
+  SkTextBreaker() : fPos(-1) {
+  }
+
+  bool initialize(SkSpan<const char> text, UBreakIteratorType type) {
+    UErrorCode status = U_ZERO_ERROR;
+
+    UText utf8UText = UTEXT_INITIALIZER;
+    utext_openUTF8(&utf8UText, text.begin(), text.size(), &status);
+    fAutoClose =
+        std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>>(&utf8UText);
+    if (U_FAILURE(status)) {
+      SkDebugf("Could not create utf8UText: %s", u_errorName(status));
+      return false;
+    }
+    fIterator = ubrk_open(type, "th", nullptr, 0, &status);
+    if (U_FAILURE(status)) {
+      SkDebugf("Could not create line break iterator: %s",
+               u_errorName(status));
+      SK_ABORT("");
+    }
+
+    ubrk_setUText(fIterator, &utf8UText, &status);
+    if (U_FAILURE(status)) {
+      SkDebugf("Could not setText on break iterator: %s",
+               u_errorName(status));
+      return false;
+    }
+    return true;
+  }
+
+  size_t next(size_t pos) {
+    fPos = ubrk_following(fIterator, SkToS32(pos));
+    return fPos;
+  }
+
+  int32_t status() { return ubrk_getRuleStatus(fIterator); }
+
+  bool eof() { return fPos == icu::BreakIterator::DONE; }
+
+  ~SkTextBreaker() = default;
+
+ private:
+  std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> fAutoClose;
+  UBreakIterator* fIterator;
+  int32_t fPos;
+};
+
 class SkCanvas;
 class SkParagraphImpl final: public SkParagraph {
  public:
@@ -60,39 +110,55 @@ class SkParagraphImpl final: public SkParagraph {
 
   SkRange<size_t> getWordBoundary(unsigned offset) override;
 
+  SkVector measureText(SkSpan<const char> text) const;
+
  private:
 
   friend class SkParagraphBuilder;
 
   void resetContext();
   void buildClusterTable();
-  void shapeTextIntoEndlessLine();
+  void shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles);
+  SkRun* shapeEllipsis(SkRun* run);
   void markClustersWithLineBreaks();
-  void shapeIntoLines(SkScalar maxWidth, size_t maxLines);
-  void breakShapedTextIntoLinesByClusters(SkScalar maxWidth,
-                                          size_t maxLines);
+  void breakShapedTextIntoLines(SkScalar maxWidth, size_t maxLines);
+  void formatLinesByText(SkScalar maxWidth);
   void formatLinesByWords(SkScalar maxWidth);
-  void paintText(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void paintBackground(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void paintShadow(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void paintDecorations(SkCanvas* canvas, SkSpan<const char> text, SkTextStyle style) const;
-  void computeDecorationPaint(SkPaint& paint, SkRect clip, SkTextStyle style, SkPath& path) const;
-
-  size_t linesLeft() { return fParagraphStyle.unlimited_lines()
-                              ? fParagraphStyle.getMaxLines()
-                              : fParagraphStyle.getMaxLines()  - fLinesNumber; }
+  void paintText(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
+  void paintBackground(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
+  void paintShadow(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
+  void paintDecorations(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
+  void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
 
   void iterateThroughStyles(
-      SkSpan<const char> text,
+      const SkLine& line,
       SkStyleType styleType,
-      std::function<void(SkSpan<const char> text, SkTextStyle style)> apply) const;
+      std::function<bool(SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis)> apply) const;
   void iterateThroughRuns(
       SkSpan<const char> text,
-      std::function<void(const SkRun* run, size_t pos, size_t size, SkRect clip)> apply) const;
-  void iterateThroughClusters(std::function<void(SkCluster& cluster, bool last)> apply);
+      SkRun* ellipsis,
+      std::function<bool(const SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
+  void iterateThroughClusters(std::function<bool(SkCluster& cluster, bool last)> apply);
 
   SkCluster* findCluster(const char* ch) const;
-  SkVector measureText(SkSpan<const char> text) const;
+
+  SkRun* getEllipsis(SkRun* run);
+
+  void addLine(SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis) {
+    fLines.emplace_back(offset, advance, text, ellipsis);
+    fWidth =  SkMaxScalar(fWidth, advance.fX);
+    fHeight += advance.fY;
+  }
+
+  bool reachesLinesLimit() {
+    return !fParagraphStyle.unlimited_lines() &&
+                fLines.size() >= fParagraphStyle.getMaxLines();
+  }
+
+  bool didExceedMaxLines() override {
+    return !fParagraphStyle.unlimited_lines()
+        && fLines.size() > fParagraphStyle.getMaxLines();
+  }
 
   // Input
   SkTArray<SkBlock> fTextStyles;
@@ -102,6 +168,7 @@ class SkParagraphImpl final: public SkParagraph {
   SkTArray<SkCluster> fClusters;
   SkTArray<SkRun, true> fRuns;
   SkTArray<SkLine, true> fLines;
+  SkTHashMap<SkFont, SkRun> fEllipsis; // All found so far shapes of ellipsis
 
   // Painting
   sk_sp<SkPicture> fPicture;

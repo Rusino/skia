@@ -58,10 +58,10 @@ enum class SkTextDirection {
 };
 
 struct SkPositionWithAffinity {
-    const size_t position;
-    const Affinity affinity;
+    int32_t position;
+    Affinity affinity;
 
-    SkPositionWithAffinity(size_t p, Affinity a) : position(p), affinity(a) {}
+    SkPositionWithAffinity(int32_t p, Affinity a) : position(p), affinity(a) {}
 };
 
 struct SkTextBox {
