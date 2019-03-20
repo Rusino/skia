@@ -700,14 +700,89 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
   auto effectiveAlign = fParagraphStyle.effective_align();
   for (auto& line : fLines) {
 
-    SkScalar shift = 0;
-    line.breakLineByWords([this, &shift](SkWord& word) {
-      word.fAdvance = this->measureText(word.text());
-      word.fShift = shift;
-      shift += word.fAdvance.fX;
-    });
-    line.formatByWords(effectiveAlign, maxWidth);
+    SkScalar delta = maxWidth - line.fAdvance.fX;
+    if (delta <= 0) {
+      // Delta can be < 0 if there are extra whitespaces at the end of the line;
+      // This is a limitation of a current version
+      continue;
+    }
+    switch (effectiveAlign) {
+      case SkTextAlign::left:
+
+        line.fShift = 0;
+        break;
+      case SkTextAlign::right:
+
+        line.fAdvance.fX = maxWidth;
+        line.fShift = delta;
+        break;
+      case SkTextAlign::center: {
+
+        line.fAdvance.fX = maxWidth;
+        line.fShift = delta / 2;
+        break;
+      }
+      case SkTextAlign::justify: {
+
+        if (&line != &fLines.back()) {
+          justifyLine(line, maxWidth);
+        } else {
+          line.fShift = 0;
+        }
+
+        break;
+      }
+      default:
+        break;
+    }
   }
+}
+
+void SkParagraphImpl::justifyLine(SkLine& line, SkScalar maxWidth) {
+
+  SkScalar len = 0;
+  line.breakLineByWords(UBRK_LINE, [this, &len](SkWord& word) {
+    word.fAdvance = this->measureText(word.text());
+    word.fShift = len;
+    len += word.fAdvance.fX;
+  });
+
+  auto delta = maxWidth - len;
+  auto softLineBreaks = line.fWords.size() - 1;
+  if (softLineBreaks == 0) {
+    // Expand one group of words
+    for (auto& word : line.fWords) {
+      word.expand(delta);
+    }
+    return;
+  }
+
+  SkScalar step = delta / softLineBreaks;
+  SkScalar shift = 0;
+
+  SkWord* last = nullptr;
+  for (auto& word : line.fWords) {
+
+    if (last != nullptr) {
+      --softLineBreaks;
+      last->expand(step);
+      shift += step;
+    }
+
+    last = &word;
+    word.shift(shift);
+    // Correct all runs and position for all the glyphs in the word
+    this->iterateThroughRuns(word.text(), nullptr,
+       [shift](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar) {
+      for (auto i = pos; i < pos + size; ++i) {
+        run->fPositions[i].fX += shift;
+      }
+      return true;
+    });
+  }
+
+  line.fShift = 0;
+  line.fAdvance.fX = maxWidth;
 }
 
 SkCluster* SkParagraphImpl::findCluster(const char* ch) const {
@@ -815,7 +890,7 @@ void SkParagraphImpl::iterateThroughStyles(
 void SkParagraphImpl::iterateThroughRuns(
     SkSpan<const char> text,
     SkRun* ellipsis,
-    std::function<bool(const SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const {
+    std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const {
 
   auto start = findCluster(text.begin());
   auto end = findCluster(text.end() - 1);
@@ -847,7 +922,7 @@ void SkParagraphImpl::iterateThroughRuns(
     if (cluster == end) {
       clip.fRight += cluster->sizeFromChar(text.end() - 1);
     } else {
-      clip.fRight += cluster->fWidth;
+      clip.fRight += cluster->fRun->position(cluster->fEnd).fX;//cluster->fWidth;
     }
     clip.fBottom = SkTMax(clip.fBottom, cluster->fHeight);
   }

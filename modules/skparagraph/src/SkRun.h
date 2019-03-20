@@ -128,6 +128,8 @@ class SkRun {
 
  private:
 
+  friend class SkParagraphImpl;
+
   SkFont fFont;
   SkShaper::RunHandler::RunInfo fInfo;
   SkSTArray<128, SkGlyphID, true> fGlyphs;

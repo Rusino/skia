@@ -26,6 +26,7 @@ class SkTextBreaker {
   bool initialize(SkSpan<const char> text, UBreakIteratorType type) {
     UErrorCode status = U_ZERO_ERROR;
 
+    fSize = text.size();
     UText utf8UText = UTEXT_INITIALIZER;
     utext_openUTF8(&utf8UText, text.begin(), text.size(), &status);
     fAutoClose =
@@ -47,12 +48,14 @@ class SkTextBreaker {
                u_errorName(status));
       return false;
     }
+
+    fPos = 0;
     return true;
   }
 
   size_t next(size_t pos) {
     fPos = ubrk_following(fIterator, SkToS32(pos));
-    return fPos;
+    return eof() ?  fSize : fPos;
   }
 
   int32_t status() { return ubrk_getRuleStatus(fIterator); }
@@ -65,6 +68,7 @@ class SkTextBreaker {
   std::unique_ptr<UText, SkFunctionWrapper<UText*, UText, utext_close>> fAutoClose;
   UBreakIterator* fIterator;
   int32_t fPos;
+  size_t fSize;
 };
 
 class SkCanvas;
@@ -124,6 +128,7 @@ class SkParagraphImpl final: public SkParagraph {
   void breakShapedTextIntoLines(SkScalar maxWidth, size_t maxLines);
   void formatLinesByText(SkScalar maxWidth);
   void formatLinesByWords(SkScalar maxWidth);
+  void justifyLine(SkLine& line, SkScalar maxWidth);
   void paintText(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
   void paintBackground(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
   void paintShadow(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
@@ -137,7 +142,7 @@ class SkParagraphImpl final: public SkParagraph {
   void iterateThroughRuns(
       SkSpan<const char> text,
       SkRun* ellipsis,
-      std::function<bool(const SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
+      std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
   void iterateThroughClusters(std::function<bool(SkCluster& cluster, bool last)> apply);
 
   SkCluster* findCluster(const char* ch) const;

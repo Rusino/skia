@@ -21,7 +21,9 @@ class SkWord {
   SkWord(SkSpan<const char> text)
       : fText(text)
       , fShift(0)
-      , fAdvance(SkVector::Make(0, 0)) { }
+      , fAdvance(SkVector::Make(0, 0)) {
+    setIsWhiteSpaces();
+  }
 
   inline SkSpan<const char> text() const { return fText; }
   inline SkVector advance() const { return fAdvance; }
@@ -29,14 +31,30 @@ class SkWord {
   inline void shift(SkScalar shift) { fShift += shift; }
   inline void expand(SkScalar step) { fAdvance.fX += step; }
   inline bool empty() const { return fText.empty(); }
+  inline bool isWhiteSpace() const { return fWhiteSpaces; }
 
  private:
 
   friend class SkParagraphImpl;
 
+  void setIsWhiteSpaces() {
+    fWhiteSpaces = false;
+    auto pos = fText.end();
+    while (--pos >= fText.begin()) {
+      auto ch = *pos;
+      if (!u_isspace(ch) &&
+          u_charType(ch) != U_CONTROL_CHAR &&
+          u_charType(ch) != U_NON_SPACING_MARK) {
+        return;
+      }
+    }
+    fWhiteSpaces = true;
+  }
+
   SkSpan<const char> fText;
   SkScalar fShift;    // For justification
   SkVector fAdvance;  // Size
+  bool fWhiteSpaces;
 };
 
 class SkLine {
@@ -56,15 +74,11 @@ class SkLine {
   inline SkVector advance() const { return fAdvance; }
   inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
   inline bool empty() const { return fText.empty(); }
-
-  void formatByWords(SkTextAlign align, SkScalar maxWidth);
-  void breakLineByWords(std::function<void(SkWord& word)> apply);
+  void breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply);
 
  private:
 
   friend class SkParagraphImpl;
-
-  void justify(SkScalar delta);
 
   SkSpan<const char> fText;
   SkScalar fShift;    // Shift to left - right - center
