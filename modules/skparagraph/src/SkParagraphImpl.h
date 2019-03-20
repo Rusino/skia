@@ -125,7 +125,7 @@ class SkParagraphImpl final: public SkParagraph {
   void shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles);
   SkRun* shapeEllipsis(SkRun* run);
   void markClustersWithLineBreaks();
-  void breakShapedTextIntoLines(SkScalar maxWidth, size_t maxLines);
+  void breakShapedTextIntoLines(SkScalar maxWidth);
   void formatLinesByText(SkScalar maxWidth);
   void formatLinesByWords(SkScalar maxWidth);
   void justifyLine(SkLine& line, SkScalar maxWidth);
@@ -155,9 +155,9 @@ class SkParagraphImpl final: public SkParagraph {
     fHeight += advance.fY;
   }
 
-  bool reachesLinesLimit() {
+  bool linesLeft(size_t delta) {
     return !fParagraphStyle.unlimited_lines() &&
-                fLines.size() >= fParagraphStyle.getMaxLines();
+                fLines.size() ==  fParagraphStyle.getMaxLines() - delta;
   }
 
   bool didExceedMaxLines() override {

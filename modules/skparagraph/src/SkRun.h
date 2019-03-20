@@ -52,6 +52,7 @@ struct SkCluster {
   void ignore() { fIgnore = true; }
   bool canBreakLineAfter() { return fBreakType == SoftLineBreak ||
                                     fBreakType == HardLineBreak; }
+  bool isHardBreak() { return fBreakType == HardLineBreak; }
 
   void setIsWhiteSpaces() {
     auto pos = fText.end();
