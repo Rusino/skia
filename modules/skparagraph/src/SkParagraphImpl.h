@@ -143,7 +143,6 @@ class SkParagraphImpl final: public SkParagraph {
       SkSpan<const char> text,
       SkRun* ellipsis,
       std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
-  void iterateThroughClusters(std::function<bool(SkCluster& cluster, bool last)> apply);
 
   SkCluster* findCluster(const char* ch) const;
 

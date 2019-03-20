@@ -530,266 +530,56 @@ void SkParagraphImpl::markClustersWithLineBreaks() {
   if (!breaker.initialize(fUtf8, UBRK_LINE)) {
     return;
   }
-  SkCluster* previous = nullptr;
+
   size_t currentPos = 0;
-  iterateThroughClusters(
-     [&breaker, this, &currentPos, &previous](SkCluster& cluster, bool last) {
-        if (cluster.fText.end() < fUtf8.begin() + currentPos) {
-          // Skip it until we get closer
-          SkDebugf("  %d-%d: %f '%s'\n",
-              cluster.fStart, cluster.fEnd, cluster.fWidth,  toString(cluster.fText).c_str());
-          return true;
-        } else  if (cluster.fText.end() > fUtf8.begin() + currentPos) {
-          currentPos = breaker.next(currentPos);
-        }
-        if (cluster.fText.end() == fUtf8.begin() + currentPos || last) {
-         // Make sure every line break is also a cluster break
-          cluster.fBreakType =
-               breaker.status() == UBRK_LINE_HARD || breaker.eof()
-               ? SkCluster::BreakType::HardLineBreak
-               : SkCluster::BreakType::SoftLineBreak;
-         cluster.setIsWhiteSpaces();
-        }
-       previous = &cluster;
-       SkDebugf("%s%s%d-%d: %f '%s'\n",
-           (cluster.canBreakLineAfter() ? "#" : " "),
-           (cluster.isWhitespaces() ? "@" : " "),
-           cluster.fStart, cluster.fEnd, cluster.fWidth,  toString(cluster.fText).c_str());
-       return true;
-     });
-}
-/*
-void SkParagraphImpl::breakShapedTextIntoLines1(SkScalar maxWidth, size_t maxLines) {
-
-  class Formatting {
-   public:
-    Formatting(SkParagraphImpl* paragraph, const char* start, SkScalar maxWidth) {
-      fLineAdvance = SkVector::Make(0, 0);
-      fTailAdvance = SkVector::Make(0, 0);
-      fLineOffset = SkVector::Make(0, 0);
-      fBestLineBreak = nullptr;
-      fLineStart = start;
-      this->maxWidth = maxWidth;
-      this->fMasterParagraph = paragraph;
+  for (auto& cluster : fClusters) {
+    auto last = &cluster == &fClusters.back();
+    if (cluster.fText.end() < fUtf8.begin() + currentPos) {
+      // Skip it until we get closer
+      SkDebugf("  %d-%d: %f '%s'\n",
+               cluster.fStart,
+               cluster.fEnd,
+               cluster.fWidth,
+               toString(cluster.fText).c_str());
+      continue;
+    } else if (cluster.fText.end() > fUtf8.begin() + currentPos) {
+      currentPos = breaker.next(currentPos);
     }
-
-    void addLine(SkCluster* cluster, bool toTheEnd, bool endOfText) {
-
-      auto lineEnd = toTheEnd ? cluster->fText.end() : cluster->fText.begin();
-      // Trim the trailing spaces
-      if (toTheEnd && cluster->isWhitespaces()) {
-        if (fLineAdvance.fX == cluster->fWidth && cluster->fBreakType != SkCluster::BreakType::HardLineBreak) {
-          // Do not draw spaces
-          fLineAdvance = SkVector::Make(0, 0);
-          fBestLineBreak = nullptr;
-        }
-        fLineAdvance.fX -= cluster->fWidth;`
-        lineEnd = cluster->fText.begin();
-      }
-
-      // Deal with ellipsis
-      SkRun* ellipsisRun = nullptr;
-      if (fMasterParagraph->reachesLinesLimit() && !endOfText) {
-        // Calculate the ellipsis sizes for a given font
-        ellipsisRun = fMasterParagraph->getEllipsis(cluster->fRun);
-        if (ellipsisRun->advance().fX <= maxWidth) {
-          // Replace (few) clusters with the ellipsis
-          auto len = ellipsisRun->advance().fX - (maxWidth - fLineAdvance.fX);
-          while (len > 0 && !cluster->canBreakLineAfter()) {
-            --cluster;
-            fLineAdvance.fX -= cluster->fWidth;
-            lineEnd = cluster->fText.begin();
-            len -= cluster->fWidth;
-            SkASSERT(cluster->fText.begin() >= fLineStart);
-          }
-          ellipsisRun->shift(-fLineOffset.fX + fLineAdvance.fX);
-          ellipsisRun->setHeight(fLineAdvance.fY);
-          fLineAdvance.fX += ellipsisRun->advance().fX;
-        } else {
-          ellipsisRun = nullptr;
-        }
-      }
-
-      fMasterParagraph->addLine(
-          fLineOffset,
-          fLineAdvance,
-          SkSpan<const char>(fLineStart, lineEnd - fLineStart),
-          ellipsisRun);
-
-      fLineStart = toTheEnd ? cluster->fText.end() : cluster->fText.begin();
-      fLineOffset.fY += fLineAdvance.fY;
-      // Shift the rest of the line horizontally to the left
-      // to compensate for the run positions since we broke the line
-      fLineOffset.fX = - cluster->fRun->position(toTheEnd ? cluster->fEnd : cluster->fStart).fX;
-      fLineAdvance = SkVector::Make(0, 0);
-      fBestLineBreak = nullptr;
+    if (cluster.fText.end() == fUtf8.begin() + currentPos || last) {
+      // Make sure every line break is also a cluster break
+      cluster.fBreakType =
+          breaker.status() == UBRK_LINE_HARD || breaker.eof()
+          ? SkCluster::BreakType::HardLineBreak
+          : SkCluster::BreakType::SoftLineBreak;
+      cluster.setIsWhiteSpaces();
     }
-
-    void addCluster(SkCluster& cluster, bool last) {
-
-        auto clusterTrimmedWidth = cluster.isWhitespaces() ? 0 : cluster.fWidth;
-
-        if (fLineAdvance.fX + fTailAdvance.fX + clusterTrimmedWidth > maxWidth) {
-          // The current cluster does not fit the line (break it if there was anything at all)
-          if (fBestLineBreak != nullptr) {
-            addLine(fBestLineBreak, true, false);
-          }
-        }
-
-        if (fTailAdvance.fX + clusterTrimmedWidth > maxWidth) {
-          // We cannot break this text properly by soft line breaks
-          SkASSERT(fLineAdvance.fX == 0);
-          fLineAdvance = fTailAdvance;
-          addLine(&cluster, false, false);
-          fTailAdvance = SkVector::Make(0, 0);
-        }
-
-        if (clusterTrimmedWidth > maxWidth) {
-          // We cannot break this text even by clusters; clipping for now?...
-          SkASSERT(fLineAdvance.fX == 0 && fTailAdvance.fX == 0);
-          fLineAdvance = SkVector::Make(maxWidth, cluster.fHeight);
-          return addLine(&cluster, true, last);
-        }
-
-        // The cluster fits
-        fTailAdvance.fX += cluster.fWidth;
-        fTailAdvance.fY = SkTMax(fLineAdvance.fY, cluster.fHeight);
-
-        if (cluster.canBreakLineAfter() || last) {
-          fBestLineBreak = &cluster;
-          fLineAdvance.fX += fTailAdvance.fX;
-          fLineAdvance.fY = SkTMax(fLineAdvance.fY, fTailAdvance.fY);
-          fTailAdvance = SkVector::Make(0, 0);
-        }
-
-        // Hard line break or the last line
-        if (last || cluster.fBreakType == SkCluster::BreakType::HardLineBreak) {
-          addLine(fBestLineBreak, true, false);
-        }
-    }
-
-   private:
-    SkParagraphImpl* fMasterParagraph;
-    SkVector fLineAdvance;
-    SkVector fTailAdvance;
-    SkVector fLineOffset;
-    SkCluster* fBestLineBreak;
-    const char* fLineStart;
-    SkScalar maxWidth;
-  };
-
-  // Format all clusters
-  Formatting formatting(this, fUtf8.begin(), maxWidth);
-  iterateThroughClusters(
-      [this, &formatting] (SkCluster& cluster, bool last) {
-        formatting.addCluster(cluster, last);
-        return !didExceedMaxLines();
-  });
-}
-*/
-/*
-void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
-
-  SkVector advance = SkVector::Make(0, 0);
-  SkVector offset = SkVector::Make(0, 0);
-
-  SkCluster* lineStart = fClusters.begin();
-
-  auto addLine = [this, lineStart, &offset, &advance, maxWidth](SkCluster* lineEnd) {
-
-    SkRun* ellipsis = nullptr;
-    if (linesLeft(1) && lineEnd > lineStart) {
-      ellipsis = getEllipsis(lineEnd->fRun);
-      // Remove some clusters to find the ellipsis
-      while (advance.fX + ellipsis->advance().fX > maxWidth) {
-        // TODO: while we skip clusters the line height can decrease. Recalculate?..
-        advance.fX -= lineEnd->fWidth;
-        --lineEnd;
-      }
-    }
-
-    // Remove trailing spaces
-    while (lineEnd > lineStart && lineEnd->isWhitespaces()) {
-      advance.fX -= lineEnd->fWidth;
-      --lineEnd;
-    }
-
-    this->addLine(
-        offset,
-        advance,
-        SkSpan<const char>(lineStart->fText.begin(), lineEnd->fText.end() - lineStart->fText.begin()),
-        ellipsis);
-
-    offset.fX = - lineStart->fRun->position(lineStart->fStart).fX;
-    offset.fY += advance.fY;
-    advance = SkVector::Make(0, 0);
-
-    return true;
-  };
-
-  SkScalar whitespacesLen = 0;
-  for (auto& current : fClusters) {
-
-    auto hardBreakAtCurrent = current.isHardBreak() || &current == &fClusters.back();
-
-    if (current.isWhitespaces()) {
-      whitespacesLen += current.fWidth;
-    } else {
-      if (advance.fX + whitespacesLen + current.fWidth <= maxWidth) {
-        advance.fX += whitespacesLen + current.fWidth;
-        advance.fY = SkTMax(advance.fY, current.fHeight);
-      } else {
-        SkCluster* closest = &current - 1;
-        SkVector advance = SkVector::Make(0, 0);
-        while (closest >= lineStart && !closest->canBreakLineAfter()) {
-          ++closest;
-        }
-        if (closest < lineStart) {
-          // No soft line breaks
-          if (lineStart == &current) {
-            // Only one cluster; we have to clip it
-            advance.fX = maxWidth;
-            advance.fY = current.fHeight;
-          } else {
-            // The last cluster before the current
-            closest = &current - 1;
-          }
-        }
-        addLine(closest);
-        lineStart = closest + 1;
-      }
-      whitespacesLen = 0;
-    }
-
-    if (hardBreakAtCurrent) {
-      // if it's a hard line break generate the rest of it
-      if (!addLine(&current)) {
-        break;
-      }
-      lineStart = &current + 1;
-      advance = SkVector::Make(0, 0);
-      whitespacesLen = 0;
-    }
+    SkDebugf("%s%s%d-%d: %f '%s'\n",
+             (cluster.canBreakLineAfter() ? "#" : " "),
+             (cluster.isWhitespaces() ? "@" : " "),
+             cluster.fStart,
+             cluster.fEnd,
+             cluster.fWidth,
+             toString(cluster.fText).c_str());
   }
-};
-*/
+}
+
 void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
 
   SkVector advance = SkVector::Make(0, 0); // Up until the closest soft line break
   SkVector tail = SkVector::Make(0, 0); // After the closest soft line break to the current cluster
   SkVector offset = SkVector::Make(0, 0);
-  SkCluster* fBestLineBreak = nullptr;
-  const char* fLineStart = fUtf8.begin();
+  SkCluster* bestLineBreak = nullptr;
+  const char* lineStart = fUtf8.begin();
 
-  auto addLine = [&](SkCluster* cluster, bool toTheEnd, bool endOfText) {
+  auto addLine = [&](SkCluster* cluster, bool includeCluster, bool endOfText) {
 
-    auto lineEnd = toTheEnd ? cluster->fText.end() : cluster->fText.begin();
+    auto lineEnd = includeCluster ? cluster->fText.end() : cluster->fText.begin();
+
     // Trim the trailing spaces
-    if (toTheEnd && cluster->isWhitespaces()) {
-      if (advance.fX == cluster->fWidth && cluster->fBreakType != SkCluster::BreakType::HardLineBreak) {
-        // Do not draw spaces
+    if (includeCluster && cluster->isWhitespaces()) {
+      if (advance.fX == cluster->fWidth && !cluster->isHardBreak()) {
         advance = SkVector::Make(0, 0);
-        fBestLineBreak = nullptr;
+        bestLineBreak = nullptr;
       }
       advance.fX -= cluster->fWidth;
       lineEnd = cluster->fText.begin();
@@ -803,45 +593,44 @@ void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
       if (ellipsisRun->advance().fX <= maxWidth) {
         // Replace (few) clusters with the ellipsis
         auto len = ellipsisRun->advance().fX - (maxWidth - advance.fX);
-        while (len > 0 && !cluster->canBreakLineAfter()) {
+        while (len > 0) {
           --cluster;
           advance.fX -= cluster->fWidth;
           lineEnd = cluster->fText.begin();
           len -= cluster->fWidth;
-          SkASSERT(cluster->fText.begin() >= fLineStart);
+          SkASSERT(cluster->fText.begin() >= lineStart);
         }
         ellipsisRun->shift(-offset.fX + advance.fX);
         ellipsisRun->setHeight(advance.fY);
         advance.fX += ellipsisRun->advance().fX;
+
+        if (advance.fX > maxWidth) {
+          SkDebugf("??");
+        }
       } else {
         ellipsisRun = nullptr;
       }
     }
-    // Add the line
-    this->addLine(
-        offset,
-        advance,
-        SkSpan<const char>(fLineStart, lineEnd - fLineStart),
-        ellipsisRun);
-    fLineStart = toTheEnd ? cluster->fText.end() : cluster->fText.begin();
+
+    this->addLine(offset, advance, SkSpan<const char>(lineStart, lineEnd - lineStart), ellipsisRun);
+    lineStart = includeCluster ? cluster->fText.end() : cluster->fText.begin();
     offset.fY += advance.fY;
     // Shift the rest of the line horizontally to the left
     // to compensate for the run positions since we broke the line
-    offset.fX = - cluster->fRun->position(toTheEnd ? cluster->fEnd : cluster->fStart).fX;
+    offset.fX = - cluster->fRun->position(includeCluster ? cluster->fEnd : cluster->fStart).fX;
     advance = SkVector::Make(0, 0);
-    fBestLineBreak = nullptr;
+    bestLineBreak = nullptr;
   };
 
-  // Format all clusters
   for (auto& cluster : fClusters) {
-    auto last = &cluster == &fClusters.back();
+    auto endOfText = &cluster == &fClusters.back();
 
     auto clusterTrimmedWidth = cluster.isWhitespaces() ? 0 : cluster.fWidth;
 
     if (advance.fX + tail.fX + clusterTrimmedWidth > maxWidth) {
       // The current cluster does not fit the line (break it if there was anything at all)
-      if (fBestLineBreak != nullptr) {
-        addLine(fBestLineBreak, true, false);
+      if (bestLineBreak != nullptr) {
+        addLine(bestLineBreak, true, false);
       }
     }
 
@@ -857,23 +646,24 @@ void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
       // We cannot break this text even by clusters; clipping for now?...
       SkASSERT(advance.fX == 0 && tail.fX == 0);
       advance = SkVector::Make(maxWidth, cluster.fHeight);
-      addLine(&cluster, true, last);
+      addLine(&cluster, true, endOfText);
+      continue;
     }
 
     // The cluster fits
     tail.fX += cluster.fWidth;
     tail.fY = SkTMax(advance.fY, cluster.fHeight);
 
-    if (cluster.canBreakLineAfter() || last) {
-      fBestLineBreak = &cluster;
+    if (cluster.canBreakLineAfter() || endOfText) {
+      bestLineBreak = &cluster;
       advance.fX += tail.fX;
       advance.fY = SkTMax(advance.fY, tail.fY);
       tail = SkVector::Make(0, 0);
     }
 
     // Hard line break or the last line
-    if (last || cluster.isHardBreak()) {
-      addLine(fBestLineBreak, true, false);
+    if (endOfText || cluster.isHardBreak()) {
+      addLine(bestLineBreak, true, false);
     }
 
     if (didExceedMaxLines()) {
@@ -945,10 +735,12 @@ void SkParagraphImpl::justifyLine(SkLine& line, SkScalar maxWidth) {
   auto delta = maxWidth - len;
   auto softLineBreaks = line.fWords.size() - 1;
   if (softLineBreaks == 0) {
-    // Expand one group of words
-    for (auto& word : line.fWords) {
-      word.expand(delta);
-    }
+    auto word = line.fWords.begin();
+    word->expand(delta);
+    // TODO: for one word justification cannot calculate the size of the line correctly
+    // TODO: (since we do not correct positions)
+    line.fShift = 0;
+    line.fAdvance.fX = maxWidth;
     return;
   }
 
@@ -1117,7 +909,8 @@ void SkParagraphImpl::iterateThroughRuns(
     if (cluster == end) {
       clip.fRight += cluster->sizeFromChar(text.end() - 1);
     } else {
-      clip.fRight += cluster->fRun->position(cluster->fEnd).fX;//cluster->fWidth;
+      //clip.fRight += cluster->fWidth; (because of justification)
+      clip.fRight += cluster->fRun->calculateWidth(cluster->fStart, cluster->fEnd);
     }
     clip.fBottom = SkTMax(clip.fBottom, cluster->fHeight);
   }
@@ -1129,15 +922,6 @@ void SkParagraphImpl::iterateThroughRuns(
   }
 }
 
-void SkParagraphImpl::iterateThroughClusters(
-    std::function<bool(SkCluster& cluster, bool last)> apply) {
-
-  for (auto& cluster : fClusters){
-    if (!apply(cluster, &cluster == &fClusters.back())) {
-      break;
-    }
-  }
-}
 
 // TODO: Height & Width styles
 std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
