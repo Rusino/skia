@@ -4092,7 +4092,7 @@ Additionally transform draw using clip, <a href='SkMatrix_Reference#SkMatrix'>Sk
 
 If <a href='SkPaint_Reference#SkPaint'>SkPaint</a> <a href='#SkCanvas_drawImageRect_4_paint'>paint</a> is supplied, apply <a href='undocumented#SkColorFilter'>SkColorFilter</a>, <a href='SkColor_Reference#Alpha'>alpha</a>, <a href='undocumented#SkImageFilter'>SkImageFilter</a>,
 <a href='SkBlendMode_Reference#SkBlendMode'>SkBlendMode</a>, and <a href='undocumented#SkDrawLooper'>SkDrawLooper</a>. If <a href='#SkCanvas_drawImageRect_4_image'>image</a> is <a href='SkImageInfo_Reference#kAlpha_8_SkColorType'>kAlpha_8_SkColorType</a>, apply <a href='undocumented#SkShader'>SkShader</a>.
-If <a href='#SkCanvas_drawImageRect_4_paint'>paint</a> contains <a href='undocumented#SkMaskFilter'>SkMaskFilter</a>, generate mask from <a href='#SkCanvas_drawImageRect_4_image'>image</a> bounds.
+If <a href='#SkCanvas_drawImageRect_4_paint'>paint</a> contains <a href='undocumented#SkMaskFilter'>SkMaskFilter</a>, addUntil mask from <a href='#SkCanvas_drawImageRect_4_image'>image</a> bounds.
 
 If generated mask extends beyond <a href='#SkCanvas_drawImageRect_4_image'>image</a> bounds, replicate <a href='#SkCanvas_drawImageRect_4_image'>image</a> edge colors, just
 as <a href='undocumented#SkShader'>SkShader</a> made from <a href='SkImage_Reference#SkImage'>SkImage</a>::<a href='#SkImage_makeShader'>makeShader</a> with <a href='undocumented#SkShader'>SkShader</a>::<a href='#SkShader_kClamp_TileMode'>kClamp_TileMode</a> set

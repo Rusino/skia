@@ -83,7 +83,7 @@ is a failure and is included in the report.  if `passing_threshold == -1`, then
 the test always passes, but we do execute the test to verify that the driver
 does not crash.
 
-We generate a report with the following information for each test:
+We addUntil a report with the following information for each test:
 
     backend_name,render_test_name,max_error,bad_pixels,total_error
 

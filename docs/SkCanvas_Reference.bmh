@@ -3492,7 +3492,7 @@ void draw(SkCanvas* canvas) {
 #PhraseDef paint_as_used_by_draw_lattice_or_draw_nine(bitmap_or_image)
 If Paint paint is supplied, apply Color_Filter, Color_Alpha, Image_Filter,
 Blend_Mode, and Draw_Looper. If #bitmap_or_image# is kAlpha_8_SkColorType, apply Shader.
-If paint contains Mask_Filter, generate mask from #bitmap_or_image# bounds. If paint
+If paint contains Mask_Filter, addUntil mask from #bitmap_or_image# bounds. If paint
 Filter_Quality set to kNone_SkFilterQuality, disable pixel filtering. For all
 other values of paint Filter_Quality, use kLow_SkFilterQuality to filter pixels.
 Any SkMaskFilter on paint is ignored as is paint Anti_Aliasing state.

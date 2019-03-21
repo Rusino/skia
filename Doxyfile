@@ -11,7 +11,7 @@ PROJECT_LOGO = https://skia.org/res/img/logo.png
 
 # These lines are overridden by
 # https://chromium.googlesource.com/chromium/tools/build/+/0f611b202b0e/scripts/slave/recipe_modules/skia/resources/generate_and_upload_doxygen.py
-# but they are needed in case someone wants to generate the doxygen manually
+# but they are needed in case someone wants to addUntil the doxygen manually
 # for some reason.
 OUTPUT_DIRECTORY = ../docs
 HTML_FOOTER = ../docs/static_footer.txt

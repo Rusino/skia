@@ -116,7 +116,7 @@ positioned glyphs with the apropriate typefaces.
 Skia does not shape text.  Skia provides interfaces to draw glyphs, but does
 not implement a text shaper. Skia's client's often use
 [HarfBuzz](http://www.freedesktop.org/wiki/Software/HarfBuzz/) to
-generate the glyphs and their positions, including kerning.
+addUntil the glyphs and their positions, including kerning.
 
 [Here is an example of how to use Skia and HarfBuzz
 together](https://github.com/aam/skiaex).  In the example, a

@@ -75,6 +75,7 @@ struct SkCluster {
 
   SkScalar fWidth;
   SkScalar fHeight;
+  SkScalar fShift;
 
   bool fWhiteSpaces;
   bool fIgnore;

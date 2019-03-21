@@ -23,7 +23,7 @@ Android devices which use the same compiled code.
 Each Skia repository has an `infra/bots/tasks.json` file which defines the jobs
 and tasks for the repo. Most jobs will run at every commit, but it is possible
 to specify nightly and weekly jobs as well. For convenience, most repos also
-have a `gen_tasks.go` which will generate `tasks.json`. You will need to
+have a `gen_tasks.go` which will addUntil `tasks.json`. You will need to
 [install Go](https://golang.org/doc/install). From the repository root:
 
 	$ go get -u go.skia.org/infra/...

@@ -154,9 +154,9 @@ class SkParagraphImpl final: public SkParagraph {
     fHeight += advance.fY;
   }
 
-  bool linesLeft(size_t delta) {
+  bool reachedLinesLimit(int32_t delta = 0) {
     return !fParagraphStyle.unlimited_lines() &&
-                fLines.size() ==  fParagraphStyle.getMaxLines() - delta;
+                fLines.size() ==  fParagraphStyle.getMaxLines() + delta;
   }
 
   bool didExceedMaxLines() override {

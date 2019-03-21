@@ -260,7 +260,7 @@ will take you to the source <a href='undocumented#Line'>line</a> in question.
 $ ./out/dir/bookmaker -e fiddle.json -b docs
 </pre>
 
-Once complete, run fiddlecli to generate the example hashes.
+Once complete, run fiddlecli to addUntil the example hashes.
 Errors are contained by the output but aren't reported yet.
 
 <pre style="padding: 1em 1em 1em 1em;width: 62.5em; background-color: #f0f0f0">

@@ -11,7 +11,7 @@ package skia
 
 // This file is used to generate 'types.go'
 // from the corresponding type definitions in the C API.
-// Any C struct for which we would like to generate a
+// Any C struct for which we would like to addUntil a
 // Go struct with the same memory layout should defined defined here.
 // Any enum that is used in Go should also be listed here, together
 // with the enum values that we want to use.

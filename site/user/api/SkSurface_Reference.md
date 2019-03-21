@@ -610,7 +610,7 @@ its <a href='undocumented#Pixel'>pixel</a> configuration agrees with <a href='#S
 and <a href='#SkSurface_MakeFromBackendTextureAsRenderTarget_colorSpace'>colorSpace</a> must be present. Further, <a href='#SkSurface_MakeFromBackendTextureAsRenderTarget_backendTexture'>backendTexture</a> width and height must
 not exceed <a href='#SkSurface_MakeFromBackendTextureAsRenderTarget_context'>context</a> capabilities.
 
-Returned <a href='SkSurface_Reference#SkSurface'>SkSurface</a> is available only for drawing into, and cannot generate an
+Returned <a href='SkSurface_Reference#SkSurface'>SkSurface</a> is available only for drawing into, and cannot addUntil an
 <a href='SkImage_Reference#SkImage'>SkImage</a>.
 
 If SK_SUPPORT_GPU is defined as zero, has no effect and returns nullptr.

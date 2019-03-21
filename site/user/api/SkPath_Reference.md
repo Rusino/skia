@@ -5109,7 +5109,7 @@ open <a href='SkPath_Overview#Contour'>contour</a>. <a href='#SkPath_Iter_setPat
     <td><a href='SkPath_Reference#SkPath'>SkPath</a> to iterate</td>
   </tr>
   <tr>    <td><a name='SkPath_Iter_setPath_forceClose'><code><strong>forceClose</strong></code></a></td>
-    <td>true if open <a href='SkPath_Overview#Contour'>contours</a> generate <a href='#SkPath_kClose_Verb'>kClose_Verb</a></td>
+    <td>true if open <a href='SkPath_Overview#Contour'>contours</a> addUntil <a href='#SkPath_kClose_Verb'>kClose_Verb</a></td>
   </tr>
 </table>
 

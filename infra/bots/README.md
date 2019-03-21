@@ -21,7 +21,7 @@ the repo. Note that tasks.json is NEVER edited by hand but generated via
 gen_task.go and the input files enumerated below. The
 [Task Scheduler](https://skia.googlesource.com/buildbot/+/master/task_scheduler/README.md)
 reads the tasks.json file at each commit to determine which jobs to run. For
-convenience, gen_tasks.go is provided to generate tasks.json and also to test it
+convenience, gen_tasks.go is provided to addUntil tasks.json and also to test it
 for correct syntax and detecting cycles and orphaned tasks. Always edit
 gen_tasks.go or one of the following input JSON files, rather than tasks.json
 itself:

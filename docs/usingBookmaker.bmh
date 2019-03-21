@@ -291,7 +291,7 @@ will take you to the source line in question.
 $ ./out/dir/bookmaker -e fiddle.json -b docs
 ##
 
-Once complete, run fiddlecli to generate the example hashes.
+Once complete, run fiddlecli to addUntil the example hashes.
 Errors are contained by the output but aren't reported yet.
 
 #Code

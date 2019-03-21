@@ -281,7 +281,7 @@ Follow the standard Windows path specification and not MinGW convention (e.g. `C
 ### Visual Studio Solutions
 
 If you use Visual Studio, you may want to pass `--ide=vs` to `bin/gn gen` to
-generate `all.sln`.  That solution will exist within the GN directory for the
+addUntil `all.sln`.  That solution will exist within the GN directory for the
 specific configuration, and will only build/run that configuration.
 
 If you want a Visual Studio Solution that supports multiple GN configurations,

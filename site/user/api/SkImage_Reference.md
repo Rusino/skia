@@ -1541,7 +1541,7 @@ uint32_t <a href='#SkImage_uniqueID'>uniqueID</a>()const
 </pre>
 
 Returns value unique to <a href='SkImage_Reference#Image'>image</a>. <a href='SkImage_Reference#SkImage'>SkImage</a> contents cannot change after <a href='SkImage_Reference#SkImage'>SkImage</a> is
-created. Any operation to create a new <a href='SkImage_Reference#SkImage'>SkImage</a> will receive generate a new
+created. Any operation to create a new <a href='SkImage_Reference#SkImage'>SkImage</a> will receive addUntil a new
 unique number.
 
 ### Return Value

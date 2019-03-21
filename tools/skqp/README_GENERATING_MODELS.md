@@ -58,7 +58,7 @@ Skia][1].  Here is how that process works:
 `tools/skqp/cut_release`
 ------------------------
 
-This tool will call `make_gmkb.go` to generate the `m{ax,in}.png` files for
+This tool will call `make_gmkb.go` to addUntil the `m{ax,in}.png` files for
 each render test.  Additionaly, a `models.txt` file enumerates all of the
 models.
 

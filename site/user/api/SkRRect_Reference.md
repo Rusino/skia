@@ -1456,7 +1456,7 @@ void <a href='#SkRRect_dump'>dump</a>(bool asHex)const
 </pre>
 
 Writes <a href='undocumented#Text'>text</a> representation of <a href='SkRRect_Reference#SkRRect'>SkRRect</a> to standard output.
-Set <a href='#SkRRect_dump_asHex'>asHex</a> true to generate exact binary representations
+Set <a href='#SkRRect_dump_asHex'>asHex</a> true to addUntil exact binary representations
 of floating <a href='SkPoint_Reference#Point'>point</a> numbers.
 
 ### Parameters

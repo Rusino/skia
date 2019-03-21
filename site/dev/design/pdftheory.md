@@ -416,7 +416,7 @@ function defined by a resticted postscript language. The generated
 functions clamp at the edges so if the desired tiling mode is tile or
 mirror, we hav to add a bit more postscript code to map any input
 parameter into the 0-1 range appropriately. The code to generate the
-postscript code is somewhat obtuse, since it is trying to generate
+postscript code is somewhat obtuse, since it is trying to addUntil
 optimized (for space) postscript code, but there is a significant
 number of comments to explain the intent.
 

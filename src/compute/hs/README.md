@@ -169,7 +169,7 @@ The following architectures are supported:
 Vendor | Architecture                            | 32‑bit             | 64‑bit             | 32+32‑bit | Notes
 -------|-----------------------------------------|:------------------:|:------------------:|:---------:|------
 Intel  | GEN8+                                   | :white_check_mark: | :white_check_mark: | :x:       | Due to a fragile compiler, the assumed best kernels are not being generated at this time
-Intel  | APL/GLK using a 2x9 or 1x12 thread pool | :x:                | :x:                | :x:       | Need to generate properly shaped kernels
+Intel  | APL/GLK using a 2x9 or 1x12 thread pool | :x:                | :x:                | :x:       | Need to addUntil properly shaped kernels
 
 Add an arch-specific HotSort target to your project by including a
 `.c` source and `.h` header file:
