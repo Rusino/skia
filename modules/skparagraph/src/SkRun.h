@@ -50,9 +50,9 @@ struct SkCluster {
   inline bool isWhitespaces() const { return fWhiteSpaces; }
   inline bool isIgnored() const { return fIgnore; }
   void ignore() { fIgnore = true; }
-  bool canBreakLineAfter() { return fBreakType == SoftLineBreak ||
-                                    fBreakType == HardLineBreak; }
-  bool isHardBreak() { return fBreakType == HardLineBreak; }
+  bool canBreakLineAfter() const { return fBreakType == SoftLineBreak ||
+                                          fBreakType == HardLineBreak; }
+  bool isHardBreak() const { return fBreakType == HardLineBreak; }
 
   void setIsWhiteSpaces() {
     auto pos = fText.end();
