@@ -97,10 +97,10 @@ class SkTextWrapper {
   Position fClosestBreak;
   Position fAfterBreak;
   SkVector fCurrentLineOffset;
-  SkVector fCurrentLineAdvance;
   SkScalar fWidth;
   SkScalar fHeight;
 
   // TODO: make a static cache
   SkTHashMap<SkFont, SkRun> fEllipsisCache; // All found so far shapes of ellipsis
+  SkTHashMap<SkFont, SkRun> fHyphenCache;   // All used so far shapes of hyphens ('-')
 };

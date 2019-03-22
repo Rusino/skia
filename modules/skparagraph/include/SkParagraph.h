@@ -61,15 +61,21 @@ class SkParagraph {
 
   virtual void paint(SkCanvas* canvas, double x, double y) = 0;
 
+  // Returns a vector of bounding boxes that enclose all text between
+  // start and end glyph indexes, including start and excluding end
   virtual std::vector<SkTextBox> getRectsForRange(
       unsigned start,
       unsigned end,
       RectHeightStyle rectHeightStyle,
       RectWidthStyle rectWidthStyle) = 0;
 
+  // Returns the index of the glyph that corresponds to the provided coordinate,
+  // with the top left corner as the origin, and +y direction as down
   virtual SkPositionWithAffinity
-  getGlyphPositionAtCoordinate(double dx, double dy) const = 0;
+  getGlyphPositionAtCoordinate(double dx, double dy) = 0;
 
+  // Finds the first and last glyphs that define a word containing
+  // the glyph at index offset
   virtual SkRange<size_t> getWordBoundary(unsigned offset) = 0;
 
  protected:

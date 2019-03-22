@@ -12,11 +12,12 @@
 
 void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply) {
 
+  // TODO: do not create more breakers that we have to
   SkTextBreaker breaker;
-  if (!breaker.initialize(fText, UBRK_LINE)) {
+  if (!breaker.initialize(fText, type)) {
     return;
   }
-
+  fWords.reset();
   size_t currentPos = 0;
   while (true) {
     auto start = currentPos;
@@ -26,10 +27,6 @@ void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord
     }
     SkSpan<const char> text(fText.begin() + start, currentPos - start);
     fWords.emplace_back(text);
-    //if (fWords.back().isWhiteSpace() && fWords.size() > 1) {
-    //  std::advance(fWords, -2)
-    //}
-
     apply(fWords.back());
   }
 }

@@ -108,7 +108,7 @@ class SkParagraphImpl final: public SkParagraph {
       RectHeightStyle rectHeightStyle,
       RectWidthStyle rectWidthStyle) override;
   SkPositionWithAffinity
-  getGlyphPositionAtCoordinate(double dx, double dy) const override;
+  getGlyphPositionAtCoordinate(double dx, double dy) override;
   SkRange<size_t> getWordBoundary(unsigned offset) override;
   bool didExceedMaxLines() override {
     return !fParagraphStyle.unlimited_lines()

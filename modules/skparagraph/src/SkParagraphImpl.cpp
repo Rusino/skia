@@ -24,6 +24,12 @@ namespace {
     utf16.toUTF8String(str);
     return str;
   }
+
+  SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
+    auto begin = SkTMax(a.begin(), b.begin());
+    auto end = SkTMin(a.end(), b.end());
+    return SkSpan<const char>(begin, end - begin);
+  }
 }
 
 SkParagraphImpl::~SkParagraphImpl() = default;
@@ -59,6 +65,8 @@ bool SkParagraphImpl::layout(double doubleWidth) {
 
   this->breakShapedTextIntoLines(width);
 
+  // The next call does not do the formatting (it's postponed until the actual painting)
+  // but does correct the paragraph width in case of SkTextAlign::justify
   this->formatLinesByText(width);
 
   return true;
@@ -130,7 +138,7 @@ void SkParagraphImpl::paintText(
   this->iterateThroughRuns(text, ellipsis,
    [paint, canvas](const SkRun* run, int32_t pos, size_t size, SkRect rect, SkScalar shift) {
      SkTextBlobBuilder builder;
-     run->copyTo(builder, pos, size);
+     run->copyTo(builder, SkToU32(pos), size);
      canvas->save();
      canvas->clipRect(rect);
      canvas->translate(shift, 0);
@@ -170,7 +178,7 @@ void SkParagraphImpl::paintShadow(
     SkPaint paint;
     paint.setColor(shadow.fColor);
     if (shadow.fBlurRadius != 0.0) {
-      auto filter = SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, shadow.fBlurRadius, false);
+      auto filter = SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, SkDoubleToScalar(shadow.fBlurRadius), false);
       paint.setMaskFilter(filter);
     }
 
@@ -593,6 +601,7 @@ void SkParagraphImpl::justifyLine(SkLine& line, SkScalar maxWidth) {
     word.fAdvance = this->measureText(word.text());
     word.fShift = len;
     len += word.fAdvance.fX;
+    return true;
   });
 
   // TODO: find all whitespace clusters in the line and use them instead of words
@@ -781,37 +790,42 @@ void SkParagraphImpl::iterateThroughRuns(
 }
 
 
-// TODO: Height & Width styles
+// Returns a vector of bounding boxes that enclose all text between
+// start and end glyph indexes, including start and excluding end
+// TODO: Take care of trimmed out whitespaces
+// TODO: Take care of styles
 std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     unsigned start,
     unsigned end,
     RectHeightStyle rectHeightStyle,
     RectWidthStyle rectWidthStyle) {
 
+  std::vector<SkTextBox> results;
+  // Add empty rectangles representing any newline characters within the range
   SkSpan<const char> text(fUtf8.begin() + start, end - start);
-  std::vector<SkTextBox> result;
   for (auto& line : fTextWrapper.getLines()) {
-    if (line.fText && text) {
-      auto begin = SkTMax(line.fText.begin(), text.begin());
-      auto end = SkTMin(line.fText.end(), text.end());
-      auto intersect = SkSpan<const char>(begin, end - begin);
+    auto intersect = line.fText * text;
+    if (intersect.size() == 0) continue;
 
-      auto size = measureText(intersect);
-      SkRect rect = SkRect::MakeXYWH(0, 0, size.fX, size.fY);
-      rect.offset(line.fShift, 0);
-      rect.offset(line.fOffset);
-      result.emplace_back(rect, fParagraphStyle.getTextDirection());
-    }
+    iterateThroughRuns(
+      intersect,
+      nullptr,
+      [&results, line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
+        clip.offset(line.fShift, 0);
+        clip.offset(line.fOffset);
+        results.emplace_back(clip, run->fInfo.fLtr ? SkTextDirection::ltr : SkTextDirection::rtl);
+        return true;
+      });
   }
-  return result;
+
+  return results;
 }
 
-// TODO: Text direction
-SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, double dy) const {
-
-  SkPositionWithAffinity result(-1, Affinity::UPSTREAM);
-  for (auto& line : fTextWrapper.getConstLines()) {
+SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, double dy) {
+  SkPositionWithAffinity result(0, Affinity::DOWNSTREAM);
+  for (auto& line : fTextWrapper.getLines()) {
     if (line.fOffset.fY <= dy && dy < line.fOffset.fY + line.fAdvance.fY) {
+      // Find the line
       this->iterateThroughRuns(
           line.fText,
           nullptr,
@@ -819,12 +833,27 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, 
             auto offset = run->offset();
             auto advance = run->advance();
             if (offset.fX <= dx && dx < offset.fX + advance.fX) {
-              for (size_t i = 0; i <= run->size(); ++i) {
+              // Find the run
+              size_t pos = 0;
+              for (size_t i = 0; i < run->size(); ++i) {
                 if (run->position(i).fX < dx) {
-                  result.position = i;
-                  return false;
+                  // Find the position
+                  pos = i;
                 }
               }
+              if (pos == 0) {
+                result = { SkToS32(run->fClusters[0]), DOWNSTREAM };
+              } else if (pos == run->size() - 1) {
+                result = { SkToS32(run->fClusters.back()), UPSTREAM };
+              } else {
+                auto center = (run->position(pos + 1).fX + run->position(pos).fX) / 2;
+                if ((dx <= center) == run->fInfo.fLtr) {
+                  result = { SkToS32(run->fClusters[pos]), DOWNSTREAM };
+                } else {
+                  result = { SkToS32(run->fClusters[pos + 1]), UPSTREAM };
+                }
+              }
+              return false;
             }
             return true;
       });
@@ -833,17 +862,26 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, 
   return result;
 }
 
+// Finds the first and last glyphs that define a word containing
+// the glyph at index offset.
+// By "glyph" they mean a character index - indicated by Minikin's code
 SkRange<size_t> SkParagraphImpl::getWordBoundary(unsigned offset) {
 
-  SkSpan<const char> text(fUtf8.begin() + offset, 1);
-  for (auto& line : fTextWrapper.getLines()) {
-    if (line.fText && text) {
-      for (auto& word : line.fWords) {
-        if (word.fText && text) {
-          return SkRange<size_t>(word.fText.begin() - fUtf8.begin(), word.fText.end() - fUtf8.begin());
-        }
-      }
+  SkTextBreaker breaker;
+  if (!breaker.initialize(fUtf8, UBRK_WORD)) {
+    return {0, 0};
+  }
+
+  size_t currentPos = 0;
+  while (true) {
+    auto start = currentPos;
+    currentPos = breaker.next(currentPos);
+    if (breaker.eof()) {
+      break;
+    }
+    if (start <= offset && currentPos > offset) {
+      return {start, currentPos};
     }
   }
-  return SkRange<size_t>();
+  return {0, 0};
 }

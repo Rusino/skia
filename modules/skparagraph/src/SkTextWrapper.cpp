@@ -72,7 +72,6 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
   fClosestBreak.clean(fLineStart);
   fAfterBreak.clean(fLineStart);
   fCurrentLineOffset = SkVector::Make(0, 0);
-  fCurrentLineAdvance = SkVector::Make(0, 0);
   fWidth = 0;
   fHeight = 0;
 
@@ -85,7 +84,12 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
         if (!addLine(fClosestBreak))  return;
       }
       if (fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
-        // Cluster still does not yet: add the line with the rest of clusters
+        // Cluster does not fit yet: try to break the text by hyphen
+        // TODO: This is the place where we add the hypenation logic
+      }
+
+      if (fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
+        // Cluster does not fit yet: add the line with the rest of clusters
         SkASSERT(fClosestBreak.width() == 0);
         fClosestBreak.add(fAfterBreak);
         if (!addLine(fClosestBreak))  return;

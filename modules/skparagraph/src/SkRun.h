@@ -17,9 +17,11 @@ struct SkCluster {
 
   enum BreakType {
     None,
-    WordBreak,
-    SoftLineBreak,
-    HardLineBreak
+    WordBoundary,             // calculated for all clusters (UBRK_WORD)
+    WordBreakWithoutHyphen,   // calculated only for hyphenated words
+    WordBreakWithHyphen,
+    SoftLineBreak,            // calculated for all clusters (UBRK_LINE)
+    HardLineBreak,            // calculated for all clusters (UBRK_LINE)
   };
 
   SkCluster() : fRun(nullptr), fWhiteSpaces(false), fIgnore(false), fBreakType(None) { }

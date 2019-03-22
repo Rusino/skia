@@ -51,6 +51,7 @@ public:
         virtual ~RunHandler() = default;
 
         struct RunInfo {
+            bool fLtr;
             SkVector fAdvance;
             SkVector fOffset;
             SkScalar fAscent,

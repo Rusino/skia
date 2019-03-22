@@ -81,10 +81,10 @@ class SkLine {
   friend class SkParagraphImpl;
 
   SkSpan<const char> fText;
+  SkTArray<SkWord, true> fWords; // Text broken into words by ICU word breaker
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size
-  SkVector fOffset;
-  SkTArray<SkWord, true> fWords;
+  SkVector fOffset;   // Text position on the screen
   SkRun* fEllipsis;   // In case the line ends with the ellipsis
 };
 

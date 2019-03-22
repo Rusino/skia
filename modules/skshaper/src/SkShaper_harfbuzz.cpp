@@ -44,6 +44,7 @@
 
 #if defined(SK_USING_THIRD_PARTY_ICU)
 #include "SkLoadICU.h"
+#include "../../skparagraph/include/SkDartTypes.h"
 #endif
 
 namespace skstd {
@@ -533,6 +534,7 @@ static void emit(const ShapedLine& line, SkShaper::RunHandler* handler,
 
     const auto& run = line.runs[logicalIndex];
     const SkShaper::RunHandler::RunInfo info = {
+        true,
         run.fAdvance,
         (SkVector)currentPoint,
         maxAscent,
@@ -1093,6 +1095,7 @@ SkPoint SkShaper::Impl::shapeOk(RunHandler* handler,
 
         const auto& run = runs[logicalIndex];
         const RunHandler::RunInfo info = {
+            true,
             run.fAdvance,
             (SkVector)currentPoint,
             maxAscent,
