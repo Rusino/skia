@@ -39,10 +39,10 @@ void SkParagraphImpl::resetContext() {
   fMaxLineWidth = 0;
 
   fPicture = nullptr;
-  fLines.reset();
   fRuns.reset();
   fClusters.reset();
   fIndexes.reset();
+  fTextWrapper.reset();
 }
 
 bool SkParagraphImpl::layout(double doubleWidth) {
@@ -71,7 +71,7 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
     this->formatLinesByWords(fWidth);
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
-    for (auto& line : fLines) {
+    for (auto& line : fTextWrapper.getLines()) {
 
       if (line.empty()) continue;
 
@@ -484,47 +484,6 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
   fMaxIntrinsicWidth = handler.advance().fX;
 }
 
-SkRun* SkParagraphImpl::shapeEllipsis(SkRun* run) {
-
-  class ShapeHandler final : public SkShaper::RunHandler {
-
-   public:
-    ShapeHandler(SkParagraphImpl* master) : fMaster(master), fRun(nullptr) { }
-    SkRun* run() { return fRun; }
-
-   private:
-    // SkShaper::RunHandler interface
-    SkShaper::RunHandler::Buffer newRunBuffer(
-        const RunInfo& info,
-        const SkFont& font,
-        int glyphCount,
-        SkSpan<const char> utf8) override {
-      // Runs always go to the end of the list even if we insert words in the middle
-      fRun = fMaster->fEllipsis.set(font, SkRun(font, info, glyphCount, utf8));
-      return fRun->newRunBuffer();
-    }
-
-    void commitRun() override { }
-    void commitLine() override { }
-
-    SkParagraphImpl* fMaster;
-    SkRun* fRun;
-  };
-
-  auto ellipsis = fParagraphStyle.getEllipsis();
-  ShapeHandler handler(this);
-  SkShaper shaper(nullptr);
-  shaper.shape(&handler,
-               run->font(),
-               ellipsis.data(),
-               ellipsis.size(),
-               true,
-               {0, 0},
-               std::numeric_limits<SkScalar>::max());
-
-  return handler.run();
-}
-
 void SkParagraphImpl::markClustersWithLineBreaks() {
 
   // Find all clusters with line breaks
@@ -567,162 +526,13 @@ void SkParagraphImpl::markClustersWithLineBreaks() {
 
 void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
 
-  class TextWrapper {
-   public:
-    class Position {
-     public:
-      Position(const SkCluster* start) {
-        clean(start);
-      }
-      inline SkScalar width() const { return fWidth + fWhitespaces; }
-      inline SkScalar trimmedWidth() const { return fWidth; }
-      inline SkScalar height() const { return fHeight; }
-      inline const SkCluster* trimmed() { return fTrimmedEnd; }
-      inline const SkCluster* end() { return fEnd; }
-      inline SkVector trimmedAdvance() { return SkVector::Make(fWidth, fHeight); }
-      void clean(const SkCluster* start) {
-        fEnd = start;
-        fTrimmedEnd = start;
-        fWidth = 0;
-        fHeight = 0;
-        fWhitespaces = 0;
-      }
-      void add(Position& other) {
-        this->fWidth += this->fWhitespaces + other.fWidth;
-        this->fHeight = SkTMax(this->fHeight, other.fHeight);
-        this->fTrimmedEnd = other.fTrimmedEnd;
-        this->fEnd = other.fEnd;
-        this->fWhitespaces = other.fWhitespaces;
-        other.clean(other.fEnd);
-      }
-      void add(const SkCluster& cluster) {
-        if (cluster.isWhitespaces()) {
-          fWhitespaces += cluster.fWidth;
-        } else {
-          fTrimmedEnd = &cluster;
-          fWidth += cluster.fWidth + fWhitespaces;
-          fWhitespaces = 0;
-        }
-        fEnd = &cluster;
-        fHeight = SkTMax(fHeight, cluster.fHeight);
-      }
-      void extend(SkScalar w) { fWidth += w; }
-      SkSpan<const char> trimmedText(const SkCluster* start) {
-        return SkSpan<const char>(start->fText.begin(), fTrimmedEnd->fText.end() - start->fText.begin());
-      }
-     private:
-      SkScalar fWidth;
-      SkScalar fHeight;
-      SkScalar fWhitespaces;
-      const SkCluster* fEnd;
-      const SkCluster* fTrimmedEnd;
-    };
-    TextWrapper(SkParagraphImpl* master, SkScalar maxWidth)
-      : fMaster(master)
-      , fMaxWidth(maxWidth)
-      , fLineStart(master->fClusters.begin())
-      , fClosestBreak(master->fClusters.begin())
-      , fAfterBreak(master->fClusters.begin())
-      , fOffset(SkVector::Make(0, 0))
-      , fAdvance(SkVector::Make(0, 0)) { }
-
-    SkRun* createEllipsis(Position& pos) {
-      if (!fMaster->reachedLinesLimit(-1) || pos.end() == &fMaster->fClusters.back()) {
-        // We must be on the last line and not at the end of the text
-        return nullptr;
-      }
-      // Replace some clusters with the ellipsis
-      auto lineEnd = pos.trimmed();
-      while (lineEnd >= fLineStart) {
-        // Calculate the ellipsis sizes for a given font
-        SkRun* ellipsis = fMaster->getEllipsis(lineEnd->fRun);
-        if (pos.trimmedWidth() + ellipsis->advance().fX <= fMaxWidth) {
-          // Ellipsis fit; place and size it correctly
-          ellipsis->shift(-fOffset.fX + pos.trimmedWidth());
-          ellipsis->setHeight(pos.height());
-          pos.extend(ellipsis->advance().fX);
-          return ellipsis;
-        }
-        // It is possible that the ellipsis is wider than the line itself for a given font;
-        // we still need to continue because we can find a smaller font and it will fit
-        pos.extend(-lineEnd->fWidth);
-        --lineEnd;
-      }
-      return nullptr;
-    }
-    bool endOfText() const { return fLineStart == fMaster->fClusters.end(); }
-    bool addLine(Position& pos) {
-      if (pos.trimmedWidth() == 0 && !pos.end()->isHardBreak()) {
-        // Ignore an empty line if it's not generated by hard line break
-        pos.clean(pos.end());
-        return true;
-      }
-      auto ellipsis = createEllipsis(pos);
-      fMaster->addLine(fOffset, pos.trimmedAdvance(), pos.trimmedText(fLineStart), ellipsis);
-      fLineStart = pos.end() + 1;
-      if (!pos.end()->isHardBreak()) {
-        while (fLineStart < fMaster->fClusters.end() &&
-            fLineStart->isWhitespaces()) { ++fLineStart; }
-      }
-      fOffset.fY += pos.height();
-      if (fLineStart < fMaster->fClusters.end()) {
-        // Shift the rest of the line horizontally to the left
-        // to compensate for the run positions since we broke the line
-        fOffset.fX = - fLineStart->fRun->position(fLineStart->fStart).fX;
-      }
-      pos.clean(fLineStart);
-      return !fMaster->reachedLinesLimit();
-    }
-    void formatText() {
-      // Iterate through all the clusters in the text
-      for (auto& cluster : fMaster->fClusters) {
-
-        if (!cluster.isWhitespaces()) {
-          if (fClosestBreak.width() + fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
-            // Cluster does not fit: add the line until the closest break
-            if (!addLine(fClosestBreak))  break;
-          }
-          if (fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
-            // Cluster still does not yet: add the line with the rest of clusters
-            SkASSERT(fClosestBreak.width() == 0);
-            fClosestBreak.add(fAfterBreak);
-            if (!addLine(fClosestBreak))  break;
-          }
-          if (cluster.fWidth > fMaxWidth) {
-            //  Cluster still does not fit: it's too long; let's clip it
-            fClosestBreak.add(cluster);
-            if (!addLine(fClosestBreak))  break;
-            continue;
-          }
-        }
-        // The cluster fits the line
-        fAfterBreak.add(cluster);
-        if (cluster.canBreakLineAfter()) {
-          fClosestBreak.add(fAfterBreak);
-        }
-        if (cluster.isHardBreak()) {
-          // Hard line break
-          if (!addLine(fClosestBreak))  break;
-        }
-      }
-      // Make sure nothing left
-      if (!endOfText()) {
-        fClosestBreak.add(fAfterBreak);
-        addLine(fClosestBreak);
-      }
-    }
-
-   private:
-    SkParagraphImpl* fMaster;
-    SkScalar fMaxWidth;
-    const SkCluster* fLineStart;
-    Position fClosestBreak;
-    Position fAfterBreak;
-    SkVector fOffset;
-    SkVector fAdvance;
-  };
-
-  TextWrapper(this, maxWidth).formatText();
+  fTextWrapper.formatText(
+      SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
+      maxWidth,
+      fParagraphStyle.getMaxLines(),
+      fParagraphStyle.getEllipsis());
+  fHeight = fTextWrapper.height();
+  fWidth = fTextWrapper.width();
 }
 
 void SkParagraphImpl::formatLinesByText(SkScalar maxWidth) {
@@ -736,7 +546,7 @@ void SkParagraphImpl::formatLinesByText(SkScalar maxWidth) {
 void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
 
   auto effectiveAlign = fParagraphStyle.effective_align();
-  for (auto& line : fLines) {
+  for (auto& line : fTextWrapper.getLines()) {
 
     SkScalar delta = maxWidth - line.fAdvance.fX;
     if (delta <= 0) {
@@ -762,7 +572,7 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
       }
       case SkTextAlign::justify: {
 
-        if (&line != &fLines.back()) {
+        if (&line != fTextWrapper.getLastLine()) {
           justifyLine(line, maxWidth);
         } else {
           line.fShift = 0;
@@ -844,17 +654,6 @@ SkCluster* SkParagraphImpl::findCluster(const char* ch) const {
     --start;
   }
   return nullptr;
-}
-
-SkRun* SkParagraphImpl::getEllipsis(SkRun* run) {
-
-  SkRun* found = fEllipsis.find(run->font());
-  if (found != nullptr) {
-    return found;
-  }
-
-  found = shapeEllipsis(run);
-  return found;
 }
 
 SkVector SkParagraphImpl::measureText(SkSpan<const char> text) const {
@@ -991,7 +790,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
 
   SkSpan<const char> text(fUtf8.begin() + start, end - start);
   std::vector<SkTextBox> result;
-  for (auto& line : fLines) {
+  for (auto& line : fTextWrapper.getLines()) {
     if (line.fText && text) {
       auto begin = SkTMax(line.fText.begin(), text.begin());
       auto end = SkTMin(line.fText.end(), text.end());
@@ -1011,7 +810,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
 SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, double dy) const {
 
   SkPositionWithAffinity result(-1, Affinity::UPSTREAM);
-  for (auto& line : fLines) {
+  for (auto& line : fTextWrapper.getConstLines()) {
     if (line.fOffset.fY <= dy && dy < line.fOffset.fY + line.fAdvance.fY) {
       this->iterateThroughRuns(
           line.fText,
@@ -1037,7 +836,7 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, 
 SkRange<size_t> SkParagraphImpl::getWordBoundary(unsigned offset) {
 
   SkSpan<const char> text(fUtf8.begin() + offset, 1);
-  for (auto& line : fLines) {
+  for (auto& line : fTextWrapper.getLines()) {
     if (line.fText && text) {
       for (auto& word : line.fWords) {
         if (word.fText && text) {

@@ -18,17 +18,19 @@ skparagraph_public = [
          ]
 
 skparagraph_sources = [
-            "$_src/SkLine.h",
-            "$_src/SkRun.h",
             "$_src/SkBlock.h",
+            "$_src/SkBlock.cpp",
             "$_src/SkFontCollection.cpp",
+            "$_src/SkLine.h",
             "$_src/SkLine.cpp",
             "$_src/SkParagraphBuilder.cpp",
             "$_src/SkParagraphImpl.h",
             "$_src/SkParagraphImpl.cpp",
             "$_src/SkParagraphStyle.cpp",
+            "$_src/SkRun.h",
             "$_src/SkRun.cpp",
             "$_src/SkTextShadow.cpp",
             "$_src/SkTextStyle.cpp",
-            "$_src/SkBlock.cpp",
+            "$_src/SkTextWrapper.h",
+            "$_src/SkTextWrapper.cpp"
           ]

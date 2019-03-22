@@ -16,6 +16,7 @@
 #include "SkPicture.h"
 #include "SkBlock.h"
 #include "SkTHash.h"
+#include "SkTextWrapper.h"
 
 class SkTextBreaker {
 
@@ -100,19 +101,19 @@ class SkParagraphImpl final: public SkParagraph {
   ~SkParagraphImpl() override;
 
   bool layout(double width) override;
-
   void paint(SkCanvas* canvas, double x, double y) override;
-
   std::vector<SkTextBox> getRectsForRange(
       unsigned start,
       unsigned end,
       RectHeightStyle rectHeightStyle,
       RectWidthStyle rectWidthStyle) override;
-
   SkPositionWithAffinity
   getGlyphPositionAtCoordinate(double dx, double dy) const override;
-
   SkRange<size_t> getWordBoundary(unsigned offset) override;
+  bool didExceedMaxLines() override {
+    return !fParagraphStyle.unlimited_lines()
+        && fTextWrapper.getLines().size() > fParagraphStyle.getMaxLines();
+  }
 
   SkVector measureText(SkSpan<const char> text) const;
 
@@ -123,7 +124,6 @@ class SkParagraphImpl final: public SkParagraph {
   void resetContext();
   void buildClusterTable();
   void shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles);
-  SkRun* shapeEllipsis(SkRun* run);
   void markClustersWithLineBreaks();
   void breakShapedTextIntoLines(SkScalar maxWidth);
   void formatLinesByText(SkScalar maxWidth);
@@ -135,6 +135,8 @@ class SkParagraphImpl final: public SkParagraph {
   void paintDecorations(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
   void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
 
+  SkCluster* findCluster(const char* ch) const;
+
   void iterateThroughStyles(
       const SkLine& line,
       SkStyleType styleType,
@@ -144,26 +146,6 @@ class SkParagraphImpl final: public SkParagraph {
       SkRun* ellipsis,
       std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
 
-  SkCluster* findCluster(const char* ch) const;
-
-  SkRun* getEllipsis(SkRun* run);
-
-  void addLine(SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis) {
-    fLines.emplace_back(offset, advance, text, ellipsis);
-    fWidth =  SkMaxScalar(fWidth, advance.fX);
-    fHeight += advance.fY;
-  }
-
-  bool reachedLinesLimit(int32_t delta = 0) {
-    return !fParagraphStyle.unlimited_lines() &&
-                fLines.size() ==  fParagraphStyle.getMaxLines() + delta;
-  }
-
-  bool didExceedMaxLines() override {
-    return !fParagraphStyle.unlimited_lines()
-        && fLines.size() > fParagraphStyle.getMaxLines();
-  }
-
   // Input
   SkTArray<SkBlock> fTextStyles;
 
@@ -171,8 +153,7 @@ class SkParagraphImpl final: public SkParagraph {
   SkTHashMap<const char*, size_t> fIndexes;
   SkTArray<SkCluster> fClusters;
   SkTArray<SkRun, true> fRuns;
-  SkTArray<SkLine, true> fLines;
-  SkTHashMap<SkFont, SkRun> fEllipsis; // All found so far shapes of ellipsis
+  SkTextWrapper fTextWrapper; // constains all the lines
 
   // Painting
   sk_sp<SkPicture> fPicture;
