@@ -796,8 +796,7 @@ void SkParagraphImpl::iterateThroughRuns(
 
 // Returns a vector of bounding boxes that enclose all text between
 // start and end glyph indexes, including start and excluding end
-// TODO: Take care of trimmed out whitespaces
-// TODO: Take care of styles
+// TODO: Should the first/last lines be different?
 std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     unsigned start,
     unsigned end,
@@ -812,36 +811,54 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     if (intersect.size() == 0) continue;
 
     auto firstBox = results.size();
-    SkScalar maxHeight = 0;
+    SkRect maxClip = SkRect::MakeXYWH(0, 0, 0, 0);
     iterateThroughRuns(
       intersect,
       nullptr,
-      [&results, &maxHeight, line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
+      [&results, &maxClip, rectHeightStyle, line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
         clip.offset(line.fShift, 0);
         clip.offset(line.fOffset);
+
+        if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingMiddle) {
+          // clip is default
+        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingTop) {
+          clip.fBottom -= run->leading() / 2;
+        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingBottom) {
+          clip.fTop += run->leading() / 2;
+        } else {
+          // For both kMax and kTight we do not count leading space
+          clip.fBottom -= run->leading() / 2;
+          clip.fTop += run->leading() / 2;
+        }
         results.emplace_back(clip, run->fInfo.fLtr ? SkTextDirection::ltr : SkTextDirection::rtl);
-        maxHeight = SkTMax(maxHeight, clip.height());
+        maxClip.fBottom = SkTMax(maxClip.fBottom, clip.bottom());
+        maxClip.fTop = SkTMin(maxClip.fTop, clip.top());
+        maxClip.fLeft = SkTMin(maxClip.fLeft, clip.left());
+        maxClip.fRight = SkTMax(maxClip.fRight, clip.right());
         return true;
       });
 
-    switch (rectHeightStyle) {
-      case RectHeightStyle::kMax:
-        // The height of the boxes will be the maximum height of all runs in the line
-        for (auto i = firstBox; i < results.size(); ++i) {
-          results[i].rect.fBottom = maxHeight;
+    if (rectHeightStyle == RectHeightStyle::kMax) {
+      // Align all the rectangles
+      for (auto i = firstBox; i < results.size(); ++i) {
+        results[i].rect.fTop = maxClip.fTop;
+        results[i].rect.fBottom = maxClip.fBottom;
+      }
+    }
+
+    if (rectWidthStyle == RectWidthStyle::kMax) {
+      for (auto i = firstBox; i < results.size(); ++i) {
+        auto clip = results[i].rect;
+        auto dir = results[i].direction;
+        if (clip.fLeft > maxClip.fLeft) {
+          SkRect left = SkRect::MakeXYWH(0, clip.fTop, clip.fLeft - maxClip.fLeft, clip.fBottom);
+          results.emplace_back(left, dir);
         }
-        break;
-      case RectHeightStyle::kTight:
-        // Default case - all boxes can have different height
-        break;
-      case RectHeightStyle::kIncludeLineSpacingTop:
-        //Extends the top edge of the bounds to fully cover any line spacing.
-        for (auto i = firstBox; i < results.size(); ++i) {
-          results[i].rect.fBottom = maxHeight;
+        if (clip.fRight < maxClip.fRight) {
+          SkRect right = SkRect::MakeXYWH(0, clip.fTop, maxClip.fRight - clip.fRight, clip.fBottom);
+          results.emplace_back(right, dir);
         }
-        break;
-      default:
-        break;
+      }
     }
   }
 
