@@ -129,10 +129,26 @@ class SkParagraphImpl final: public SkParagraph {
   void formatLinesByText(SkScalar maxWidth);
   void formatLinesByWords(SkScalar maxWidth);
   void justifyLine(SkLine& line, SkScalar maxWidth);
-  void paintText(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
-  void paintBackground(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
-  void paintShadow(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
-  void paintDecorations(SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis) const;
+  void paintText(
+      SkCanvas* canvas,
+      SkSpan<const char> text,
+      const SkTextStyle& style,
+      SkRun* ellipsis) const;
+  void paintBackground(
+      SkCanvas* canvas,
+      SkSpan<const char> text,
+      const SkTextStyle& style,
+      SkRun* ellipsis) const;
+  void paintShadow(
+      SkCanvas* canvas,
+      SkSpan<const char> text,
+      const SkTextStyle& style,
+      SkRun* ellipsis) const;
+  void paintDecorations(
+      SkCanvas* canvas,
+      SkSpan<const char> text,
+      const SkTextStyle& style,
+      SkRun* ellipsis) const;
   void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
 
   SkCluster* findCluster(const char* ch) const;

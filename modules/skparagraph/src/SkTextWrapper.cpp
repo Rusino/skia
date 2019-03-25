@@ -22,7 +22,8 @@ SkRun* SkTextWrapper::createEllipsis(Position& pos) {
     SkRun* ellipsis = getEllipsis(lineEnd->fRun);
     if (pos.trimmedWidth() + ellipsis->advance().fX <= fMaxWidth) {
       // Ellipsis fit; place and size it correctly
-      ellipsis->shift(-fCurrentLineOffset.fX + pos.trimmedWidth());
+      ellipsis->shift(-fCurrentLineOffset.fX + pos.trimmedWidth(),
+                      lineEnd->fRun->sizes().diff(lineEnd->fRun->maxSizes()));
       ellipsis->setHeight(pos.height());
       pos.extend(ellipsis->advance().fX);
       return ellipsis;
@@ -42,9 +43,16 @@ bool SkTextWrapper::addLine(Position& pos) {
     return true;
   }
   auto ellipsis = createEllipsis(pos);
-  fLines.emplace_back(fCurrentLineOffset, pos.trimmedAdvance(), pos.trimmedText(fLineStart), ellipsis);
-  fWidth =  SkMaxScalar(fWidth, pos.trimmedAdvance().fX);
-  fHeight += pos.trimmedAdvance().fY;
+  fLines.emplace_back(
+      fCurrentLineOffset,
+      SkVector::Make(pos.trimmedWidth(), pos.height()),
+      pos.trimmedText(fLineStart),
+      ellipsis,
+      pos.sizes());
+
+  SkDebugf("addLine: %f*%f @%f\n", pos.trimmedWidth(), pos.height(), fCurrentLineOffset.fY);
+  fWidth =  SkMaxScalar(fWidth, pos.trimmedWidth());
+  fHeight += pos.height();
   fLineStart = pos.end() + 1;
   if (!pos.end()->isHardBreak()) {
     while (fLineStart < fClusters.end() &&
@@ -103,6 +111,7 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
     }
     // The cluster fits the line
     fAfterBreak.add(cluster);
+
     if (cluster.canBreakLineAfter()) {
       fClosestBreak.add(fAfterBreak);
     }

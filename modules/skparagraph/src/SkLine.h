@@ -63,16 +63,18 @@ class SkLine {
 
   SkLine() { }
 
-  SkLine(SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis)
+  SkLine(SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis, SkFontSizes sizes)
       : fText(text)
       , fShift(0)
       , fAdvance(advance)
       , fOffset(offset)
-      , fEllipsis(ellipsis) { }
+      , fEllipsis(ellipsis)
+      , fSizes(sizes) { }
 
   inline SkSpan<const char> text() const { return fText; }
   inline SkVector advance() const { return fAdvance; }
   inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
+  inline SkFontSizes sizes() const { return fSizes; }
   inline bool empty() const { return fText.empty(); }
   void breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply);
 
@@ -86,5 +88,6 @@ class SkLine {
   SkVector fAdvance;  // Text on the line size
   SkVector fOffset;   // Text position on the screen
   SkRun* fEllipsis;   // In case the line ends with the ellipsis
+  SkFontSizes fSizes;
 };
 

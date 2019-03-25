@@ -5,6 +5,7 @@
  * found in the LICENSE file.
  */
 
+#include <SkFontMetrics.h>
 #include "SkRun.h"
 #include "SkSpan.h"
 
@@ -25,6 +26,7 @@ SkRun::SkRun(
     fGlyphs.push_back_n(glyphCount);
     fPositions.push_back_n(glyphCount);
     fClusters.push_back_n(glyphCount);
+    fFont.getMetrics(&fFontMetrics);
 }
 
 SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
@@ -37,7 +39,8 @@ SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
 }
 
 SkScalar SkRun::calculateHeight() {
-  return fInfo.fDescent - fInfo.fAscent + fInfo.fLeading;
+  // The height of the run, not the height of the entire text (fInfo)
+  return fFontMetrics.fDescent - fFontMetrics.fAscent + fFontMetrics.fLeading;
 }
 
 SkScalar SkRun::calculateWidth(size_t start, size_t end) {

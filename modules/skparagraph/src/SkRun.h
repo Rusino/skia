@@ -11,8 +11,47 @@
 #include "uchar.h"
 #include "SkSpan.h"
 #include "SkShaper.h"
+#include "SkFontMetrics.h"
 
 class SkRun;
+
+class SkFontSizes {
+  SkScalar fAscent;
+  SkScalar fDescent;
+  SkScalar fLeading;
+
+ public:
+  SkFontSizes() {
+    clean();
+  }
+  SkFontSizes(SkScalar a, SkScalar d, SkScalar l) {
+    fAscent = SkTMin(fAscent, a);
+    fDescent = SkTMax(fDescent, d);
+    fLeading = SkTMax(fLeading, l);
+  }
+  void add(SkScalar a, SkScalar d, SkScalar l) {
+    fAscent = SkTMin(fAscent, a);
+    fDescent = SkTMax(fDescent, d);
+    fLeading = SkTMax(fLeading, l);
+  }
+  void add (SkFontSizes other) {
+    add(other.fAscent, other.fDescent, other.fLeading);
+  }
+  void clean() {
+    fAscent = 0;
+    fDescent = 0;
+    fLeading = 0;
+  }
+  SkScalar diff(SkFontSizes maxSizes) const {
+    return ascent() - maxSizes.ascent() - leading() / 2;
+  }
+  SkScalar height() const {
+    return fDescent - fAscent + fLeading;
+  }
+  SkScalar leading() const { return fLeading; }
+  SkScalar ascent() const { return fAscent; }
+};
+
 struct SkCluster {
 
   enum BreakType {
@@ -99,15 +138,19 @@ class SkRun {
   inline size_t size() const { return fGlyphs.size(); }
   void setWidth(SkScalar width) { fInfo.fAdvance.fX = width; }
   void setHeight(SkScalar height) { fInfo.fAdvance.fY = height; }
-  void shift(SkScalar shift) { fInfo.fOffset.fX += shift; }
+  void shift(SkScalar shiftX, SkScalar shiftY) {
+    fInfo.fOffset.fX += shiftX;
+    fInfo.fOffset.fY += shiftY;
+  }
   SkVector advance() const {
     return SkVector::Make(fInfo.fAdvance.fX,
-                          fInfo.fDescent + fInfo.fLeading - fInfo.fAscent);
+                          fFontMetrics.fDescent + fFontMetrics.fLeading - fFontMetrics.fAscent);
   }
   inline SkVector offset() const { return fInfo.fOffset; }
-  inline SkScalar ascent() const { return fInfo.fAscent; }
-  inline SkScalar descent() const { return fInfo.fDescent; }
-  inline SkScalar leading() const { return fInfo.fLeading; }
+  inline SkScalar ascent() const { return fFontMetrics.fAscent; }
+  inline SkScalar descent() const { return fFontMetrics.fDescent; }
+  inline SkScalar leading() const { return fFontMetrics.fLeading; }
+  inline SkScalar maxAscent() const { return fInfo.fAscent; }
   inline SkFont font() const { return fFont; }
 
   inline SkSpan<const char> text() const { return fText; }
@@ -128,12 +171,16 @@ class SkRun {
   SkScalar calculateWidth(size_t start, size_t end);
   void setText(SkSpan<const char> text) { fText = text; }
 
+  SkFontSizes maxSizes() const { return SkFontSizes(fInfo.fAscent, fInfo.fDescent, fInfo.fLeading); }
+  SkFontSizes sizes() const { return SkFontSizes(fFontMetrics.fAscent, fFontMetrics.fDescent, fFontMetrics.fLeading); }
+
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size) const;
 
  private:
 
   friend class SkParagraphImpl;
 
+  SkFontMetrics fFontMetrics;
   SkFont fFont;
   SkShaper::RunHandler::RunInfo fInfo;
   SkSTArray<128, SkGlyphID, true> fGlyphs;
