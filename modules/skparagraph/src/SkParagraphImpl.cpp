@@ -815,21 +815,10 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     iterateThroughRuns(
       intersect,
       nullptr,
-      [&results, &maxClip, rectHeightStyle, line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
+      [&results, &maxClip, line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
         clip.offset(line.fShift, 0);
         clip.offset(line.fOffset);
 
-        if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingMiddle) {
-          // clip is default
-        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingTop) {
-          clip.fBottom -= run->leading() / 2;
-        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingBottom) {
-          clip.fTop += run->leading() / 2;
-        } else {
-          // For both kMax and kTight we do not count leading space
-          clip.fBottom -= run->leading() / 2;
-          clip.fTop += run->leading() / 2;
-        }
         results.emplace_back(clip, run->fInfo.fLtr ? SkTextDirection::ltr : SkTextDirection::rtl);
         maxClip.fBottom = SkTMax(maxClip.fBottom, clip.bottom());
         maxClip.fTop = SkTMin(maxClip.fTop, clip.top());
@@ -838,11 +827,23 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
         return true;
       });
 
-    if (rectHeightStyle == RectHeightStyle::kMax) {
+    if (rectHeightStyle != RectHeightStyle::kTight) {
       // Align all the rectangles
       for (auto i = firstBox; i < results.size(); ++i) {
-        results[i].rect.fTop = maxClip.fTop;
-        results[i].rect.fBottom = maxClip.fBottom;
+        if (rectHeightStyle == RectHeightStyle::kMax) {
+
+        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingTop) {
+          results[i].rect.fTop = line.offset().fY;
+        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingMiddle) {
+          results[i].rect.fTop = line.offset().fY;
+        }
+
+        if (rectHeightStyle == RectHeightStyle::kMax) {
+        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingBottom) {
+          results[i].rect.fBottom = line.offset().fY + line.advance().fY;
+        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingMiddle) {
+          results[i].rect.fBottom = line.offset().fY + line.advance().fY;
+        }
       }
     }
 
