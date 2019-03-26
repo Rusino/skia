@@ -820,31 +820,31 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
         clip.offset(line.fOffset);
 
         results.emplace_back(clip, run->fInfo.fLtr ? SkTextDirection::ltr : SkTextDirection::rtl);
-        maxClip.fBottom = SkTMax(maxClip.fBottom, clip.bottom());
-        maxClip.fTop = SkTMin(maxClip.fTop, clip.top());
-        maxClip.fLeft = SkTMin(maxClip.fLeft, clip.left());
-        maxClip.fRight = SkTMax(maxClip.fRight, clip.right());
+        maxClip.join(clip);
         return true;
       });
 
     if (rectHeightStyle != RectHeightStyle::kTight) {
       // Align all the rectangles
       for (auto i = firstBox; i < results.size(); ++i) {
+        auto& rect = results[i].rect;
         if (rectHeightStyle == RectHeightStyle::kMax) {
+          rect.fTop = maxClip.top();
+          rect.fBottom = maxClip.bottom();
 
         } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingTop) {
-          results[i].rect.fTop = line.offset().fY;
-        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingMiddle) {
-          results[i].rect.fTop = line.offset().fY;
-        }
+          rect.fTop = line.offset().fY;
 
-        if (rectHeightStyle == RectHeightStyle::kMax) {
-        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingBottom) {
-          results[i].rect.fBottom = line.offset().fY + line.advance().fY;
         } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingMiddle) {
-          results[i].rect.fBottom = line.offset().fY + line.advance().fY;
+          rect.fTop = line.offset().fY;
+          rect.fBottom = line.offset().fY + line.advance().fY;
+
+        } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingBottom) {
+          rect.fBottom = line.offset().fY + line.advance().fY;
         }
       }
+    } else {
+      // Just leave the boxes the way they are
     }
 
     if (rectWidthStyle == RectWidthStyle::kMax) {
