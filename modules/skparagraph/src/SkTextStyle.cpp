@@ -24,7 +24,7 @@
 SkTextStyle::SkTextStyle()
     : fFontStyle() {
 
-    fFontFamily = DEFAULT_FONT_FAMILY;
+    fFontFamilies.emplace_back(DEFAULT_FONT_FAMILY);
     fColor = SK_ColorWHITE;
     fDecoration = SkTextDecoration::kNone;
     // Does not make sense to draw a transparent object, so we use it as a default
@@ -62,7 +62,7 @@ bool SkTextStyle::equals(const SkTextStyle& other) const {
     if (!(fFontStyle == other.fFontStyle)) {
         return false;
     }
-    if (fFontFamily != other.fFontFamily) {
+    if (fFontFamilies != other.fFontFamilies) {
         return false;
     }
     if (fLetterSpacing != other.fLetterSpacing) {

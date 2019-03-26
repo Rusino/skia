@@ -24,6 +24,7 @@
 #include "SkColor.h"
 #include "SkPaint.h"
 #include "SkFont.h"
+#include "SkDartTypes.h"
 #include "../../../src/core/SkSpan.h"
 
 // Multiple decorations can be applied at once. Ex: Underline and overline is
@@ -70,9 +71,17 @@ class SkTextStyle {
     fHasForeground = true;
     fForeground = paint;
   }
-  void setBackgroundColor(SkColor color) {
+  void clearForegroundColor() {
+    fHasForeground = false;
+  }
+
+  void setBackgroundColor(SkPaint paint) {
     fHasBackground = true;
-    fBackground.setColor(color);
+    fBackground = paint;
+  }
+
+  void clearBackgroundColor() {
+    fHasBackground = false;
   }
 
   // Decorations
@@ -113,8 +122,10 @@ class SkTextStyle {
   inline SkScalar getFontSize() const { return fFontSize; }
   inline void setFontSize(SkScalar size) { fFontSize = size; }
 
-  inline std::string getFontFamily() const { return fFontFamily; };
-  inline void setFontFamily(const std::string& family) { fFontFamily = family; }
+  inline std::string getFirstFontFamily() const { return fFontFamilies.front(); };
+  inline void setFontFamily(const std::string& family) { fFontFamilies = { family }; }
+  //inline std::vector<std::string>& getFontFamilies() { return fFontFamilies; }
+  inline void setFontFamilies(const std::vector<std::string> families) { fFontFamilies = families; }
 
   inline void setHeight(SkScalar height) { fFontHeight = height; }
   inline void setLetterSpacing(SkScalar letterSpacing) {
@@ -127,6 +138,12 @@ class SkTextStyle {
   inline sk_sp<SkTypeface> getTypeface() const { return fTypeface; }
   inline void setTypeface(sk_sp<SkTypeface> typeface) { fTypeface = typeface; }
 
+  inline std::string getLocale() { return fLocale; }
+  inline void setLocale(const std::string& locale) { fLocale = locale; }
+
+  inline SkTextBaseline getTextBaseline() { return fTextBaseline; }
+  inline void setTextBaseline(SkTextBaseline baseline) { fTextBaseline = baseline; }
+
  private:
   SkTextDecoration fDecoration;
   SkColor fDecorationColor;
@@ -135,13 +152,16 @@ class SkTextStyle {
 
   SkFontStyle fFontStyle;
 
-  std::string fFontFamily;
+  std::vector<std::string> fFontFamilies;
+  //std::string fFontFamily;
   SkScalar fFontSize;
 
   SkScalar fFontHeight;
   std::string fLocale;
   SkScalar fLetterSpacing;
   SkScalar fWordSpacing;
+
+  SkTextBaseline fTextBaseline;
 
   SkColor fColor;
   bool fHasBackground;

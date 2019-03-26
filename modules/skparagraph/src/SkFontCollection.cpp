@@ -95,7 +95,7 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
 
     // Look inside the font collections cache first
     FamilyKey
-        familyKey(textStyle.getFontFamily(), "en", textStyle.getFontStyle());
+        familyKey(textStyle.getFirstFontFamily(), "en", textStyle.getFontStyle());
     auto found = fTypefaces.find(familyKey);
     if (found) {
         textStyle.setTypeface(*found);
@@ -107,7 +107,7 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
     for (auto manager : this->getFontManagerOrder()) {
         ++n;
         SkFontStyleSet
-            * set = manager->matchFamily(textStyle.getFontFamily().c_str());
+            * set = manager->matchFamily(textStyle.getFirstFontFamily().c_str());
         if (nullptr == set || set->count() == 0) {
             continue;
         }

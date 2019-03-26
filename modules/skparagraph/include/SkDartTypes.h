@@ -90,3 +90,7 @@ struct SkRange {
     }
 };
 
+enum class SkTextBaseline {
+  kAlphabetic,
+  kIdeographic,
+};

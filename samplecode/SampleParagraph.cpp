@@ -230,8 +230,14 @@ class ParagraphView1 : public Sample {
     paint.setAntiAlias(true);
     paint.setColor(fg);
 
+    SkPaint blue;
+    blue.setColor(SK_ColorBLUE);
+
+    SkPaint background;
+    background.setColor(bg);
+
     SkTextStyle style;
-    style.setBackgroundColor(SK_ColorBLUE);
+    style.setBackgroundColor(blue);
     style.setForegroundColor(paint);
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
@@ -242,7 +248,7 @@ class ParagraphView1 : public Sample {
       builder.addText("Paragraph:");
       for (auto para : gParagraph) {
         SkTextStyle style;
-        style.setBackgroundColor(bg);
+        style.setBackgroundColor(background);
         style.setForegroundColor(paint);
         style.setFontFamily(std::get<0>(para));
         SkFontStyle fontStyle(
@@ -253,7 +259,9 @@ class ParagraphView1 : public Sample {
                               : SkFontStyle::Slant::kUpright_Slant);
         style.setFontStyle(fontStyle);
         style.setFontSize(std::get<3>(para) * i);
-        style.setBackgroundColor(std::get<4>(para));
+        SkPaint background;
+        background.setColor(std::get<4>(para));
+        style.setBackgroundColor(background);
         SkPaint foreground;
         foreground.setColor(std::get<5>(para));
         style.setForegroundColor(foreground);
@@ -318,8 +326,14 @@ class ParagraphView1 : public Sample {
     paint.setAntiAlias(true);
     paint.setColor(fg);
 
+    SkPaint background;
+    background.setColor(bg);
+
+    SkPaint blue;
+    blue.setColor(SK_ColorBLUE);
+
     SkTextStyle style;
-    style.setBackgroundColor(SK_ColorBLUE);
+    style.setBackgroundColor(blue);
     style.setForegroundColor(paint);
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
@@ -327,12 +341,12 @@ class ParagraphView1 : public Sample {
     paraStyle.getTextStyle().setFontSize(10);
     SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
 
-    style.setBackgroundColor(bg);
+    style.setBackgroundColor(background);
     style.setForegroundColor(paint);
     style.setFontFamily(ff);
     style.setFontStyle(SkFontStyle());
     style.setFontSize(fs);
-    style.setBackgroundColor(bg);
+    style.setBackgroundColor(background);
     SkPaint foreground;
     foreground.setColor(fg);
     style.setForegroundColor(foreground);
@@ -442,8 +456,11 @@ class ParagraphView2 : public Sample {
     SkPaint name;
     name.setColor(SK_ColorRED);
 
+    SkPaint white;
+    white.setColor(SK_ColorWHITE);
+
     SkTextStyle defaultStyle;
-    defaultStyle.setBackgroundColor(SK_ColorWHITE);
+    defaultStyle.setBackgroundColor(white);
     defaultStyle.setForegroundColor(code);
     defaultStyle.setFontFamily("monospace");
     defaultStyle.setFontSize(30);
@@ -510,8 +527,14 @@ class ParagraphView2 : public Sample {
     paint.setAntiAlias(true);
     paint.setColor(fg);
 
+    SkPaint blue;
+    blue.setColor(SK_ColorBLUE);
+
+    SkPaint background;
+    background.setColor(bg);
+
     SkTextStyle style;
-    style.setBackgroundColor(SK_ColorBLUE);
+    style.setBackgroundColor(blue);
     style.setForegroundColor(paint);
     style.setFontFamily(ff);
     style.setFontSize(fs);
@@ -527,7 +550,7 @@ class ParagraphView2 : public Sample {
     SkPaint foreground;
     foreground.setColor(fg);
     style.setForegroundColor(foreground);
-    style.setBackgroundColor(bg);
+    style.setBackgroundColor(background);
 
     for (auto& part : text) {
       builder.pushStyle(style);
@@ -556,8 +579,11 @@ class ParagraphView2 : public Sample {
     paint.setAntiAlias(true);
     paint.setColor(SK_ColorBLUE);
 
+    SkPaint gray;
+    gray.setColor(SK_ColorLTGRAY);
+
     SkTextStyle style;
-    style.setBackgroundColor(SK_ColorLTGRAY);
+    style.setBackgroundColor(gray);
     style.setForegroundColor(paint);
     style.setFontFamily("Arial");
     style.setFontSize(30);
@@ -722,8 +748,11 @@ class ParagraphView3 : public Sample {
     paint.setAntiAlias(true);
     paint.setColor(fg);
 
+    SkPaint blue;
+    blue.setColor(SK_ColorBLUE);
+
     SkTextStyle style;
-    style.setBackgroundColor(SK_ColorBLUE);
+    style.setBackgroundColor(blue);
     style.setForegroundColor(paint);
     style.setFontFamily(ff);
     style.setFontSize(fs);
@@ -735,10 +764,13 @@ class ParagraphView3 : public Sample {
     fontCollection->setTestFontManager(testFontProvider);
     SkParagraphBuilder builder(paraStyle, fontCollection);
 
+    SkPaint background;
+    background.setColor(bg);
+
     SkPaint foreground;
     foreground.setColor(fg);
     style.setForegroundColor(foreground);
-    style.setBackgroundColor(bg);
+    style.setBackgroundColor(background);
 
     for (auto& part : text) {
       builder.pushStyle(style);
@@ -769,8 +801,11 @@ class ParagraphView3 : public Sample {
     paint.setAntiAlias(true);
     paint.setColor(SK_ColorBLACK);
 
+    SkPaint gray;
+    gray.setColor(SK_ColorLTGRAY);
+
     SkTextStyle style;
-    style.setBackgroundColor(SK_ColorLTGRAY);
+    style.setBackgroundColor(gray);
     style.setForegroundColor(paint);
     style.setFontFamily("Arial");
     style.setFontSize(30);
@@ -891,6 +926,12 @@ class ParagraphView4 : public Sample {
     green.setAntiAlias(true);
     green.setColor(SK_ColorGREEN);
 
+    SkPaint gray;
+    gray.setColor(SK_ColorLTGRAY);
+
+    SkPaint yellow;
+    yellow.setColor(SK_ColorYELLOW);
+
     SkPaint magenta;
     magenta.setAntiAlias(true);
     magenta.setColor(SK_ColorMAGENTA);
@@ -901,7 +942,7 @@ class ParagraphView4 : public Sample {
 
     SkTextStyle style0;
     style0.setForegroundColor(black);
-    style0.setBackgroundColor(SK_ColorLTGRAY);
+    style0.setBackgroundColor(gray);
     style0.setFontFamily(ff);
     style0.setFontSize(fs);
     //style0.addShadow(SkTextShadow(SK_ColorBLACK, SkPoint::Make(5, 5), 2));
@@ -915,7 +956,7 @@ class ParagraphView4 : public Sample {
 
     SkTextStyle style1;
     style1.setForegroundColor(blue);
-    style1.setBackgroundColor(SK_ColorYELLOW);
+    style1.setBackgroundColor(yellow);
     style1.setFontFamily(ff);
     style1.setFontSize(fs);
     //style1.addShadow(SkTextShadow(SK_ColorGREEN, SkPoint::Make(5, 5), 2));
