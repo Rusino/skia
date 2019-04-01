@@ -128,20 +128,25 @@ class SkTextStyle {
   inline void setFontFamilies(const std::vector<std::string> families) { fFontFamilies = families; }
 
   inline void setHeight(SkScalar height) { fFontHeight = height; }
+  inline SkScalar getHeight() const { return fFontHeight; }
+
   inline void setLetterSpacing(SkScalar letterSpacing) {
     fLetterSpacing = letterSpacing;
   }
+  inline SkScalar getLetterSpacing() const { return fLetterSpacing; }
+
   inline void setWordSpacing(SkScalar wordSpacing) {
     fWordSpacing = wordSpacing;
   }
+  inline SkScalar getWordSpacing() const { return fWordSpacing; }
 
   inline sk_sp<SkTypeface> getTypeface() const { return fTypeface; }
   inline void setTypeface(sk_sp<SkTypeface> typeface) { fTypeface = typeface; }
 
-  inline std::string getLocale() { return fLocale; }
+  inline std::string getLocale() const { return fLocale; }
   inline void setLocale(const std::string& locale) { fLocale = locale; }
 
-  inline SkTextBaseline getTextBaseline() { return fTextBaseline; }
+  inline SkTextBaseline getTextBaseline() const { return fTextBaseline; }
   inline void setTextBaseline(SkTextBaseline baseline) { fTextBaseline = baseline; }
 
  private:
