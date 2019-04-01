@@ -51,7 +51,6 @@ bool SkTextWrapper::addLine(Position& pos) {
       pos.sizes());
 
   //SkDebugf("addLine: %f*%f @%f\n", pos.trimmedWidth(), pos.height(), fCurrentLineOffset.fY);
-  fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, pos.trimmedWidth());
   fWidth =  SkMaxScalar(fWidth, pos.trimmedWidth());
   fHeight += pos.height();
   fLineStart = pos.end() + 1;
@@ -83,14 +82,17 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
   fCurrentLineOffset = SkVector::Make(0, 0);
   fWidth = 0;
   fHeight = 0;
+  fMinIntrinsicWidth = 0;
 
   // Iterate through all the clusters in the text
+  SkScalar wordLength = 0;
   for (auto& cluster : fClusters) {
 
     if (!cluster.isWhitespaces()) {
+      wordLength += cluster.fWidth;
       if (fClosestBreak.width() + fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
         // Cluster does not fit: add the line until the closest break
-        if (!addLine(fClosestBreak))  return;
+        if (!addLine(fClosestBreak))  break;
       }
       if (fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
         // Cluster does not fit yet: try to break the text by hyphen
@@ -101,14 +103,17 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
         // Cluster does not fit yet: add the line with the rest of clusters
         SkASSERT(fClosestBreak.width() == 0);
         fClosestBreak.add(fAfterBreak);
-        if (!addLine(fClosestBreak))  return;
+        if (!addLine(fClosestBreak))  break;
       }
       if (cluster.fWidth > fMaxWidth) {
         //  Cluster still does not fit: it's too long; let's clip it
         fClosestBreak.add(cluster);
-        if (!addLine(fClosestBreak))  return;
+        if (!addLine(fClosestBreak))  break;
         continue;
       }
+    } else {
+      fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordLength);
+      wordLength = 0;
     }
     // The cluster fits the line
     fAfterBreak.add(cluster);
@@ -118,14 +123,17 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
     }
     if (cluster.isHardBreak()) {
       // Hard line break
-      if (!addLine(fClosestBreak))  return;
+      if (!addLine(fClosestBreak))  break;
     }
   }
   // Make sure nothing left
-  if (!endOfText()) {
+  if (!endOfText() && !reachedLinesLimit(0)) {
+    fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordLength);
     fClosestBreak.add(fAfterBreak);
     addLine(fClosestBreak);
   }
+  SkDebugf("MinIntrinsicWidth: %f\n", fMinIntrinsicWidth);
+  SkDebugf("Width: %f\n", fWidth);
 }
 
 SkRun* SkTextWrapper::getEllipsis(SkRun* run) {

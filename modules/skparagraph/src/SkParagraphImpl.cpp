@@ -80,6 +80,7 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
     this->formatLinesByWords(fWidth);
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
+
     SkFontSizes maxSizes = fRuns.begin()->maxSizes();
     for (auto& line : fTextWrapper.getLines()) {
 
@@ -87,6 +88,7 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
 
       auto lineOffset = line.offset();
       lineOffset.fY -= line.sizes().diff(maxSizes);
+
       textCanvas->save();
       textCanvas->translate(lineOffset.fX, lineOffset.fY);
       this->iterateThroughStyles(line, SkStyleType::Background,
@@ -140,6 +142,7 @@ void SkParagraphImpl::paintText(
   // Build the blob from all the runs
   this->iterateThroughRuns(text, ellipsis,
    [paint, canvas](const SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
+
      SkTextBlobBuilder builder;
      run->copyTo(builder, SkToU32(pos), size);
      canvas->save();
@@ -508,12 +511,6 @@ void SkParagraphImpl::markClustersWithLineBreaks() {
   for (auto& cluster : fClusters) {
     auto last = &cluster == &fClusters.back();
     if (cluster.fText.end() < fUtf8.begin() + currentPos) {
-      // Skip it until we get closer
-      //SkDebugf("  %d-%d: %f '%s'\n",
-      //         cluster.fStart,
-      //         cluster.fEnd,
-      //         cluster.fWidth,
-      //         toString(cluster.fText).c_str());
       continue;
     } else if (cluster.fText.end() > fUtf8.begin() + currentPos) {
       currentPos = breaker.next(currentPos);
@@ -526,13 +523,6 @@ void SkParagraphImpl::markClustersWithLineBreaks() {
           : SkCluster::BreakType::SoftLineBreak;
       cluster.setIsWhiteSpaces();
     }
-    //SkDebugf("%s%s%d-%d: %f '%s'\n",
-    //         (cluster.canBreakLineAfter() ? "#" : " "),
-    //         (cluster.isWhitespaces() ? "@" : " "),
-    //         cluster.fStart,
-    //         cluster.fEnd,
-    //         cluster.fWidth,
-    //         toString(cluster.fText).c_str());
   }
 }
 

@@ -43,14 +43,17 @@ class SkTextWrapper {
       fSizes.clean();
     }
 
-    void add(Position& other) {
+    SkScalar add(Position& other) {
 
+      auto result = other.fWidth;
       this->fWidth += this->fWhitespaces.fX + other.fWidth;
       this->fTrimmedEnd = other.fTrimmedEnd;
       this->fEnd = other.fEnd;
       this->fWhitespaces = other.fWhitespaces;
       this->fSizes.add(other.fSizes);
       other.clean(other.fEnd);
+
+      return result;
     }
 
     void add(const SkCluster& cluster) {
@@ -82,7 +85,7 @@ class SkTextWrapper {
 
  public:
 
-  SkTextWrapper() : fClosestBreak(nullptr), fAfterBreak(nullptr) { }
+  SkTextWrapper() : fClosestBreak(nullptr), fAfterBreak(nullptr), fMinIntrinsicWidth(0) { }
   void formatText(SkSpan<SkCluster> clusters,
                   SkScalar maxWidth,
                   size_t maxLines,

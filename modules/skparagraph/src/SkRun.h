@@ -25,9 +25,9 @@ class SkFontSizes {
     clean();
   }
   SkFontSizes(SkScalar a, SkScalar d, SkScalar l) {
-    fAscent = SkTMin(fAscent, a);
-    fDescent = SkTMax(fDescent, d);
-    fLeading = SkTMax(fLeading, l);
+    fAscent = a;
+    fDescent = a;
+    fLeading = l;
   }
   void add(SkScalar a, SkScalar d, SkScalar l) {
     fAscent = SkTMin(fAscent, a);
@@ -50,6 +50,7 @@ class SkFontSizes {
   }
   SkScalar leading() const { return fLeading; }
   SkScalar ascent() const { return fAscent; }
+  SkScalar descent() const { return fDescent; }
 };
 
 struct SkCluster {
