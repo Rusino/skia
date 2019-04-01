@@ -50,7 +50,8 @@ bool SkTextWrapper::addLine(Position& pos) {
       ellipsis,
       pos.sizes());
 
-  SkDebugf("addLine: %f*%f @%f\n", pos.trimmedWidth(), pos.height(), fCurrentLineOffset.fY);
+  //SkDebugf("addLine: %f*%f @%f\n", pos.trimmedWidth(), pos.height(), fCurrentLineOffset.fY);
+  fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, pos.trimmedWidth());
   fWidth =  SkMaxScalar(fWidth, pos.trimmedWidth());
   fHeight += pos.height();
   fLineStart = pos.end() + 1;

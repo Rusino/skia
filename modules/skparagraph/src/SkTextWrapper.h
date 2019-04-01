@@ -93,6 +93,7 @@ class SkTextWrapper {
 
   inline SkScalar height() const { return fHeight; }
   inline SkScalar width() const { return fWidth; }
+  inline SkScalar intrinsicWidth() const { return fMinIntrinsicWidth; }
 
   void reset() { fLines.reset(); }
 
@@ -118,6 +119,7 @@ class SkTextWrapper {
   SkVector fCurrentLineOffset;
   SkScalar fWidth;
   SkScalar fHeight;
+  SkScalar fMinIntrinsicWidth;
 
   // TODO: make a static cache
   SkTHashMap<SkFont, SkRun> fEllipsisCache; // All found so far shapes of ellipsis

@@ -545,6 +545,7 @@ void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
       fParagraphStyle.getEllipsis());
   fHeight = fTextWrapper.height();
   fWidth = fTextWrapper.width();
+  fMinIntrinsicWidth = fTextWrapper.intrinsicWidth();
 }
 
 void SkParagraphImpl::formatLinesByText(SkScalar maxWidth) {

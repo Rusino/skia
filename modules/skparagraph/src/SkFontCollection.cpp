@@ -98,6 +98,10 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
         familyKey(textStyle.getFirstFontFamily(), "en", textStyle.getFontStyle());
     auto found = fTypefaces.find(familyKey);
     if (found) {
+        SkDebugf("=findTypeface: %s\n", textStyle.getFirstFontFamily().c_str());
+        SkString name;
+        found->get()->getFamilyName(&name);
+        SkDebugf("='%s'\n", name.c_str());
         textStyle.setTypeface(*found);
         return SkRef(found->get());
     }
@@ -106,8 +110,7 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
     int n = 0;
     for (auto manager : this->getFontManagerOrder()) {
         ++n;
-        SkFontStyleSet
-            * set = manager->matchFamily(textStyle.getFirstFontFamily().c_str());
+        SkFontStyleSet* set = manager->matchFamily(textStyle.getFirstFontFamily().c_str());
         if (nullptr == set || set->count() == 0) {
             continue;
         }
@@ -124,9 +127,11 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
     }
 
     if (nullptr == typeface) {
+        SkDebugf("-findTypeface: %s\n", textStyle.getFirstFontFamily().c_str());
         typeface.reset(fDefaultFontManager->matchFamilyStyle(DEFAULT_FONT_FAMILY,
                                                              SkFontStyle()));
     } else {
+        SkDebugf("+findTypeface: %s\n", textStyle.getFirstFontFamily().c_str());
         fTypefaces.set(familyKey, typeface);
     }
 
