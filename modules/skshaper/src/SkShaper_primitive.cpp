@@ -17,6 +17,14 @@ class SkShaperPrimitive : public SkShaper {
 public:
     SkShaperPrimitive() {}
 private:
+
+  BiDiRunIterator*
+    MakeBidiRunIterator(const char* utf8, size_t utf8Bytes, bool leftToRightl) override;
+  ScriptRunIterator*
+    MakeScriptRunIterator(const char* utf8, size_t utf8Bytes) override;
+  LanguageRunIterator*
+    MakeLanguageRunIterator(const char* utf8, size_t utf8Bytes) override;
+
     void shape(const char* utf8, size_t utf8Bytes,
                const SkFont& srcFont,
                bool leftToRight,
@@ -34,6 +42,21 @@ private:
 
 std::unique_ptr<SkShaper> SkShaper::MakePrimitive() {
     return skstd::make_unique<SkShaperPrimitive>();
+}
+
+SkShaper::BiDiRunIterator* SkShaperPrimitive::MakeBidiRunIterator
+    (const char* utf8, size_t utf8Bytes, bool leftToRight) {
+    return nullptr;
+}
+
+SkShaper::ScriptRunIterator* SkShaperPrimitive::MakeScriptRunIterator
+    (const char* utf8, size_t utf8Bytes) {
+    return nullptr;
+}
+
+SkShaper::LanguageRunIterator* SkShaperPrimitive::MakeLanguageRunIterator
+    (const char* utf8, size_t utf8Bytes) {
+    return nullptr;
 }
 
 static inline bool is_breaking_whitespace(SkUnichar c) {

@@ -8,6 +8,7 @@ import("../../gn/skia.gni")
 config("public_config") {
   include_dirs = [ "include" ]
   defines = []
+  skia_use_icu = true
   if (skia_use_icu) {
     defines += [ "SK_SHAPER_HARFBUZZ_AVAILABLE" ]
   }

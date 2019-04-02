@@ -63,6 +63,7 @@ protected:
             font.setEdging(SkFont::Edging::kSubpixelAntiAlias);
 
             fShaper->shape(gText, strlen(gText), font, true, w - margin, &builder);
+
             canvas->drawTextBlob(builder.makeBlob(), 0, 0, paint);
 
             canvas->translate(0, builder.endPoint().y());

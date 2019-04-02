@@ -338,7 +338,7 @@ opts("hsw") {
   # Oddly, clang-cl doesn't recognize this as a valid flag.
   # If it ever does, it'd nice to move this up with -mavx2 and co.
   if (is_clang && !is_win) {
-    # This flag lets Clang generate FMAs when it sees a mul-then-add.  It's optional,
+    # This flag lets Clang addUntil FMAs when it sees a mul-then-add.  It's optional,
     # but nice to have, generating slightly better code for paths without explicit FMAs.
     cflags += [ "-ffp-contract=fast" ]
   }
@@ -1198,6 +1198,7 @@ group("modules") {
   deps = [
     "modules/particles",
     "modules/skottie",
+    "modules/skparagraph",
     "modules/skshaper",
   ]
 }
@@ -1221,6 +1222,7 @@ if (skia_enable_tools) {
     module_public_includes = [
       "modules/sksg/include",
       "modules/skshaper/include",
+      "modules/skparagraph/include",
       "modules/skottie/include",
     ]
     args =
@@ -1254,6 +1256,7 @@ if (skia_enable_tools) {
         ":skia",
         ":skia.h",
         "modules/skottie",
+        "modules/skparagraph",
         "modules/skshaper",
       ]
     }
@@ -1268,6 +1271,7 @@ if (skia_enable_tools) {
       ":skia",
       ":skia.h",
       "modules/skottie",
+      "modules/skparagraph",
       "modules/skshaper",
     ]
 
@@ -1827,6 +1831,7 @@ if (skia_enable_tools) {
         ":xml",
         "modules/sksg",
         "modules/skshaper",
+        "modules/skparagraph",
       ]
 
       # NIMA does not build on Windows clang
@@ -1977,6 +1982,7 @@ if (skia_enable_tools) {
     deps = [
       ":skia",
       "modules/skshaper",
+      "modules/skparagraph",
     ]
   }
 
@@ -2349,6 +2355,7 @@ if (skia_enable_tools) {
         ":skia",
         ":skia.h",
         "modules/skottie",
+        "modules/skparagraph",
         "modules/skshaper",
       ]
     }
@@ -2455,6 +2462,7 @@ if (skia_enable_tools) {
       deps = [
         ":tool_utils",
         "modules/skottie",
+        "modules/skparagraph",
         "modules/skshaper",
       ]
     }
