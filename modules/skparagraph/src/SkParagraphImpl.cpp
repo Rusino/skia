@@ -81,40 +81,42 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
 
-    SkFontSizes maxSizes = fRuns.begin()->maxSizes();
-    for (auto& line : fTextWrapper.getLines()) {
+    if (!fRuns.empty()) {
+      SkFontSizes maxSizes = fRuns.begin()->maxSizes();
+      for (auto& line : fTextWrapper.getLines()) {
 
-      if (line.empty()) continue;
+        if (line.empty()) continue;
 
-      auto lineOffset = line.offset();
-      lineOffset.fY -= line.sizes().diff(maxSizes);
+        auto lineOffset = line.offset();
+        lineOffset.fY -= line.sizes().diff(maxSizes);
 
-      textCanvas->save();
-      textCanvas->translate(lineOffset.fX, lineOffset.fY);
-      this->iterateThroughStyles(line, SkStyleType::Background,
-       [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
-         this->paintBackground(textCanvas, text, style, ellipsis);
-         return true;
-      });
+        textCanvas->save();
+        textCanvas->translate(lineOffset.fX, lineOffset.fY);
+        this->iterateThroughStyles(line, SkStyleType::Background,
+                                   [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
+                                     this->paintBackground(textCanvas, text, style, ellipsis);
+                                     return true;
+                                   });
 
-      this->iterateThroughStyles(line, SkStyleType::Shadow,
-       [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
-         this->paintShadow(textCanvas, text, style, ellipsis);
-         return true;
-      });
+        this->iterateThroughStyles(line, SkStyleType::Shadow,
+                                   [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
+                                     this->paintShadow(textCanvas, text, style, ellipsis);
+                                     return true;
+                                   });
 
-      this->iterateThroughStyles(line, SkStyleType::Foreground,
-       [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
-         this->paintText(textCanvas, text, style, ellipsis);
-         return true;
-      });
+        this->iterateThroughStyles(line, SkStyleType::Foreground,
+                                   [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
+                                     this->paintText(textCanvas, text, style, ellipsis);
+                                     return true;
+                                   });
 
-      this->iterateThroughStyles(line, SkStyleType::Decorations,
-       [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
-         this->paintDecorations(textCanvas, text, style, ellipsis);
-         return true;
-      });
-      textCanvas->restore();
+        this->iterateThroughStyles(line, SkStyleType::Decorations,
+                                   [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
+                                     this->paintDecorations(textCanvas, text, style, ellipsis);
+                                     return true;
+                                   });
+        textCanvas->restore();
+      }
     }
 
     fPicture = recorder.finishRecordingAsPicture();
@@ -542,6 +544,8 @@ void SkParagraphImpl::formatLinesByText(SkScalar maxWidth) {
 
   auto effectiveAlign = fParagraphStyle.effective_align();
   if (effectiveAlign == SkTextAlign::justify) {
+    fWidth = maxWidth;
+  } else {
     fWidth = maxWidth;
   }
 }

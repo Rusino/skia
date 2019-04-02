@@ -99,9 +99,6 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
     auto found = fTypefaces.find(familyKey);
     if (found) {
         SkDebugf("=findTypeface: %s\n", textStyle.getFirstFontFamily().c_str());
-        SkString name;
-        found->get()->getFamilyName(&name);
-        SkDebugf("='%s'\n", name.c_str());
         textStyle.setTypeface(*found);
         return SkRef(found->get());
     }
@@ -114,7 +111,7 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
         if (nullptr == set || set->count() == 0) {
             continue;
         }
-
+        SkDebugf("?findTypeface (%d)\n", set->count());
         for (int i = 0; i < set->count(); ++i) {
             set->createTypeface(i);
         }
@@ -122,18 +119,25 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
         sk_sp<SkTypeface> match(set->matchStyle(textStyle.getFontStyle()));
         if (match) {
             typeface = std::move(match);
+            SkDebugf("!findTypeface\n");
             break;
         }
     }
 
     if (nullptr == typeface) {
-        SkDebugf("-findTypeface: %s\n", textStyle.getFirstFontFamily().c_str());
+        SkDebugf("-findTypeface:");
         typeface.reset(fDefaultFontManager->matchFamilyStyle(DEFAULT_FONT_FAMILY,
                                                              SkFontStyle()));
     } else {
-        SkDebugf("+findTypeface: %s\n", textStyle.getFirstFontFamily().c_str());
+        SkDebugf("+findTypeface:");
         fTypefaces.set(familyKey, typeface);
     }
+
+    SkString name;
+    typeface->getFamilyName(&name);
+    SkDebugf("'%s' %s\n",
+             name.c_str(),
+             typeface->fontStyle().slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic");
 
     textStyle.setTypeface(typeface);
 

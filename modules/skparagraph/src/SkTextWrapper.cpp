@@ -132,8 +132,6 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
     fClosestBreak.add(fAfterBreak);
     addLine(fClosestBreak);
   }
-  SkDebugf("MinIntrinsicWidth: %f\n", fMinIntrinsicWidth);
-  SkDebugf("Width: %f\n", fWidth);
 }
 
 SkRun* SkTextWrapper::getEllipsis(SkRun* run) {
