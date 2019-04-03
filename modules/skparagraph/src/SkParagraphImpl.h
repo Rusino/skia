@@ -14,9 +14,25 @@
 #include "SkRun.h"
 #include "SkParagraph.h"
 #include "SkPicture.h"
-#include "SkBlock.h"
 #include "SkTHash.h"
 #include "SkTextWrapper.h"
+
+template<typename T>
+inline bool operator==(const SkSpan<T>& a, const SkSpan<T>& b) {
+  return a.size() == b.size() && a.begin() == b.begin();
+}
+
+template<typename T>
+inline bool operator<=(const SkSpan<T>& a, const SkSpan<T>& b) {
+  return a.begin() >= b.begin() && a.end() <= b.end();
+}
+
+inline bool operator&&(const SkSpan<const char>& a, const SkSpan<const char>& b) {
+  if (a.empty() || b.empty()) {
+    return false;
+  }
+  return SkTMax(a.begin(), b.begin()) < SkTMin(a.end(), b.end());
+}
 
 class SkTextBreaker {
 
@@ -121,6 +137,23 @@ class SkParagraphImpl final: public SkParagraph {
 
   friend class SkParagraphBuilder;
 
+  class SkBlock {
+   public:
+
+    SkBlock() : fText(), fTextStyle() {}
+    SkBlock(SkSpan<const char> text, const SkTextStyle& style)
+        : fText(text), fTextStyle(style) {
+    }
+
+    inline SkSpan<const char> text() const { return fText; }
+    inline SkTextStyle style() const { return fTextStyle; }
+
+   protected:
+    SkSpan<const char> fText;
+    SkTextStyle fTextStyle;
+  };
+
+
   void resetContext();
   void buildClusterTable();
   void shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles);
@@ -134,25 +167,25 @@ class SkParagraphImpl final: public SkParagraph {
       const SkLine& line,
       SkSpan<const char> text,
       const SkTextStyle& style,
-      SkRun* ellipsis) const;
+      bool endsWithEllipsis) const;
   void paintBackground(
       SkCanvas* canvas,
       const SkLine& line,
       SkSpan<const char> text,
       const SkTextStyle& style,
-      SkRun* ellipsis) const;
+      bool endsWithEllipsis) const;
   void paintShadow(
       SkCanvas* canvas,
       const SkLine& line,
       SkSpan<const char> text,
       const SkTextStyle& style,
-      SkRun* ellipsis) const;
+      bool endsWithEllipsis) const;
   void paintDecorations(
       SkCanvas* canvas,
       const SkLine& line,
       SkSpan<const char> text,
       const SkTextStyle& style,
-      SkRun* ellipsis) const;
+      bool endsWithEllipsis) const;
   void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
 
   SkCluster* findCluster(const char* ch) const;
@@ -160,11 +193,11 @@ class SkParagraphImpl final: public SkParagraph {
   void iterateThroughStyles(
       const SkLine& line,
       SkStyleType styleType,
-      std::function<bool(SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis)> apply) const;
+      std::function<bool(SkSpan<const char> text, const SkTextStyle& style, bool endsWithEllipsis)> apply) const;
   void iterateThroughRuns(
       const SkLine& line,
       SkSpan<const char> text,
-      SkRun* ellipsis,
+      bool endsWithEllipsis,
       std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
 
   // Input

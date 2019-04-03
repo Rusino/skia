@@ -18,8 +18,6 @@ skparagraph_public = [
          ]
 
 skparagraph_sources = [
-            "$_src/SkBlock.h",
-            "$_src/SkBlock.cpp",
             "$_src/SkFontCollection.cpp",
             "$_src/SkLine.h",
             "$_src/SkLine.cpp",

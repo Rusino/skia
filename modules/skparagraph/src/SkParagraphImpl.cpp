@@ -75,8 +75,9 @@ bool SkParagraphImpl::layout(double doubleWidth) {
 
   this->breakShapedTextIntoLines(width);
 
-  // The next call does not do the formatting (it's postponed until the actual painting)
-  // but does correct the paragraph width in case of SkTextAlign::justify
+  // The next call does not do the formatting
+  // (it's postponed until/if the actual painting happened)
+  // but does correct the paragraph width
   this->formatLinesByText(width);
 
   return true;
@@ -84,46 +85,48 @@ bool SkParagraphImpl::layout(double doubleWidth) {
 
 void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
 
+  if (fRuns.empty()) {
+    return;
+  }
+
   if (nullptr == fPicture) {
     // Build the picture lazily not until we actually have to paint (or never)
     this->formatLinesByWords(fWidth);
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
 
-    if (!fRuns.empty()) {
-      for (auto& line : fTextWrapper.getLines()) {
+    for (auto& line : fTextWrapper.getLines()) {
 
-        if (line.empty()) continue;
+      if (line.empty()) continue;
 
-        textCanvas->save();
-        textCanvas->translate(line.offset().fX, line.offset().fY);
+      textCanvas->save();
+      textCanvas->translate(line.offset().fX, line.offset().fY);
 
-        this->iterateThroughStyles(line, SkStyleType::Background,
-                                   [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
-                                     this->paintBackground(textCanvas, line, text, style, ellipsis);
-                                     return true;
-                                   });
+      this->iterateThroughStyles(line, SkStyleType::Background,
+         [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, bool endsWithEllipsis) {
+           this->paintBackground(textCanvas, line, text, style, endsWithEllipsis);
+           return true;
+         });
 
-        this->iterateThroughStyles(line, SkStyleType::Shadow,
-                                   [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
-                                     this->paintShadow(textCanvas, line, text, style, ellipsis);
-                                     return true;
-                                   });
+      this->iterateThroughStyles(line, SkStyleType::Shadow,
+         [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style,  bool endsWithEllipsis) {
+           this->paintShadow(textCanvas, line, text, style, endsWithEllipsis);
+           return true;
+         });
 
-        this->iterateThroughStyles(line, SkStyleType::Foreground,
-                                   [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
-                                     this->paintText(textCanvas, line, text, style, ellipsis);
-                                     return true;
-                                   });
+      this->iterateThroughStyles(line, SkStyleType::Foreground,
+         [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style,  bool endsWithEllipsis) {
+           this->paintText(textCanvas, line, text, style, endsWithEllipsis);
+           return true;
+         });
 
-        this->iterateThroughStyles(line, SkStyleType::Decorations,
-                                   [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
-                                     this->paintDecorations(textCanvas, line, text, style, ellipsis);
-                                     return true;
-                                   });
+      this->iterateThroughStyles(line, SkStyleType::Decorations,
+         [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style,  bool endsWithEllipsis) {
+           this->paintDecorations(textCanvas, line, text, style, endsWithEllipsis);
+           return true;
+         });
 
-        textCanvas->restore();
-      }
+      textCanvas->restore();
     }
 
     fPicture = recorder.finishRecordingAsPicture();
@@ -138,23 +141,20 @@ void SkParagraphImpl::paintText(
     const SkLine& line,
     SkSpan<const char> text,
     const SkTextStyle& style,
-    SkRun* ellipsis) const {
+    bool endsWithEllipsis) const {
 
   SkPaint paint;
   if (style.hasForeground()) {
     paint = style.getForeground();
   } else {
-    paint.reset();
     paint.setColor(style.getColor());
   }
-  paint.setAntiAlias(true);
 
-  // Build the blob from all the runs
-  this->iterateThroughRuns(line, text, ellipsis,
+  this->iterateThroughRuns(line, text, endsWithEllipsis,
    [paint, canvas, line](const SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
 
      SkTextBlobBuilder builder;
-     run->copyTo(builder, SkToU32(pos), size, SkVector::Make(0, - line.sizes().ascent()));
+     run->copyTo(builder, SkToU32(pos), size, SkVector::Make(0, line.sizes().leading() / 2 - line.sizes().ascent()));
      canvas->save();
      canvas->clipRect(clip);
      canvas->translate(shift, 0);
@@ -169,11 +169,11 @@ void SkParagraphImpl::paintBackground(
     const SkLine& line,
     SkSpan<const char> text,
     const SkTextStyle& style,
-    SkRun* ellipsis) const {
+    bool endsWithEllipsis) const {
 
   if (!style.hasBackground()) return;
   this->iterateThroughRuns(
-      line, text, ellipsis,
+      line, text, endsWithEllipsis,
       [canvas, style](const SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
         canvas->drawRect(clip, style.getBackground());
         return true;
@@ -185,7 +185,7 @@ void SkParagraphImpl::paintShadow(
     const SkLine& line,
     SkSpan<const char> text,
     const SkTextStyle& style,
-    SkRun* ellipsis) const {
+    bool endsWithEllipsis) const {
 
   if (style.getShadowNumber() == 0) return;
 
@@ -200,10 +200,10 @@ void SkParagraphImpl::paintShadow(
       paint.setMaskFilter(filter);
     }
 
-    this->iterateThroughRuns(line, text, ellipsis,
+    this->iterateThroughRuns(line, text, endsWithEllipsis,
      [canvas, shadow, paint, line](const SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
        SkTextBlobBuilder builder;
-       run->copyTo(builder, pos, size, line.offset());
+       run->copyTo(builder, pos, size, SkVector::Make(0, line.sizes().leading() / 2 - line.sizes().ascent()));
        canvas->save();
        clip.offset(shadow.fOffset);
        canvas->clipRect(clip);
@@ -227,7 +227,6 @@ void SkParagraphImpl::computeDecorationPaint(
   } else {
     paint.setColor(style.getDecorationColor());
   }
-  paint.setAntiAlias(true);
 
   SkScalar scaleFactor = style.getFontSize() / 14.f;
 
@@ -284,18 +283,17 @@ void SkParagraphImpl::computeDecorationPaint(
   }
 }
 
-// TODO: Make the thickness reasonable
 void SkParagraphImpl::paintDecorations(
     SkCanvas* canvas,
     const SkLine& line,
     SkSpan<const char> text,
     const SkTextStyle& style,
-    SkRun* ellipsis) const {
+    bool endsWithEllipsis) const {
 
   if (style.getDecoration() == SkTextDecoration::kNoDecoration) return;
 
   iterateThroughRuns(
-     line, text, ellipsis,
+     line, text, endsWithEllipsis,
      [this, canvas, style](const SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
 
        SkScalar thickness = style.getDecorationThicknessMultiplier();
@@ -381,7 +379,6 @@ void SkParagraphImpl::buildClusterTable() {
       data.fRun = &run;
       data.fStart = glyphStart;
       data.fEnd = glyphPos;
-      // TODO: Better methods
       data.fText = SkSpan<const char>(fUtf8.begin() + cluster, nextCluster - cluster);
       data.fWidth = width;
       data.fHeight = run.calculateHeight();
@@ -611,6 +608,7 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
   }
 }
 
+// TODO: Implement justification correctly, but only if it's needed
 void SkParagraphImpl::justifyLine(SkLine& line, SkScalar maxWidth) {
 
   SkScalar len = 0;
@@ -621,18 +619,11 @@ void SkParagraphImpl::justifyLine(SkLine& line, SkScalar maxWidth) {
     return true;
   });
 
-  // TODO: find all whitespace clusters in the line and use them instead of words
-  // TODO: increase each whitespace cluster size to spread the words across the line
-  // TODO: Add position info to the cluster and update it instead of the runs
-  // TODO: Take position info from the clusters instead of the runs when calculating clipping regions
-
   auto delta = maxWidth - len;
   auto softLineBreaks = line.fWords.size() - 1;
   if (softLineBreaks == 0) {
     auto word = line.fWords.begin();
     word->expand(delta);
-    // TODO: for one word justification cannot calculate the size of the line correctly
-    // TODO: (since we do not correct positions)
     line.fShift = 0;
     line.fAdvance.fX = maxWidth;
     return;
@@ -653,7 +644,7 @@ void SkParagraphImpl::justifyLine(SkLine& line, SkScalar maxWidth) {
     last = &word;
     word.shift(shift);
     // Correct all runs and position for all the glyphs in the word
-    this->iterateThroughRuns(line, word.text(), nullptr,
+    this->iterateThroughRuns(line, word.text(), false,
        [shift](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar) {
       for (auto i = pos; i < pos + size; ++i) {
         run->fPositions[i].fX += shift;
@@ -710,7 +701,7 @@ SkVector SkParagraphImpl::measureText(SkSpan<const char> text) const {
 void SkParagraphImpl::iterateThroughStyles(
     const SkLine& line,
     SkStyleType styleType,
-    std::function<bool(SkSpan<const char> text, const SkTextStyle& style, SkRun* ellipsis)> apply) const {
+    std::function<bool(SkSpan<const char> text, const SkTextStyle& style, bool endsWithEllipsis)> apply) const {
 
   const char* start = nullptr;
   size_t size = 0;
@@ -743,7 +734,7 @@ void SkParagraphImpl::iterateThroughStyles(
     }
     // Get all the words that cross this span
     // Generate a text blob
-    if (!apply(SkSpan<const char>(start, size), prevStyle, nullptr)) {
+    if (!apply(SkSpan<const char>(start, size), prevStyle, false)) {
       return;
     }
     // Start all over again
@@ -754,14 +745,14 @@ void SkParagraphImpl::iterateThroughStyles(
 
   // The very last style
   if (size > 0) {
-    apply(SkSpan<const char>(start, size), prevStyle, line.fEllipsis);
+    apply(SkSpan<const char>(start, size), prevStyle, line.ellipsis() != nullptr);
   }
 }
 
 void SkParagraphImpl::iterateThroughRuns(
     const SkLine& line,
     SkSpan<const char> text,
-    SkRun* ellipsis,
+    bool endsWithEllipsis,
     std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const {
 
   auto start = findCluster(text.begin());
@@ -802,7 +793,8 @@ void SkParagraphImpl::iterateThroughRuns(
 
   // The very last call
   apply(run, pos, size, clip, 0);
-  if (ellipsis != nullptr) {
+  if (endsWithEllipsis) {
+    auto ellipsis = line.ellipsis();
     apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->offset().fX);
   }
 }
@@ -810,7 +802,6 @@ void SkParagraphImpl::iterateThroughRuns(
 
 // Returns a vector of bounding boxes that enclose all text between
 // start and end glyph indexes, including start and excluding end
-// TODO: Should the first/last lines be different?
 std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     unsigned start,
     unsigned end,
@@ -829,11 +820,10 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     iterateThroughRuns(
       line,
       intersect,
-      nullptr,
+      false,
       [&results, &maxClip, line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
         clip.offset(line.fShift, 0);
         clip.offset(line.fOffset);
-        // TODO: Bidi?
         results.emplace_back(clip, run->fLtr ? SkTextDirection::ltr : SkTextDirection::rtl);
         maxClip.join(clip);
         return true;
@@ -889,7 +879,7 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, 
       this->iterateThroughRuns(
           line,
           line.text(),
-          nullptr,
+          false,
           [dx, &result](const SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
             auto offset = run->offset();
             auto advance = run->advance();

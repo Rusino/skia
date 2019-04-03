@@ -124,7 +124,6 @@ class SkTextWrapper {
   SkScalar fHeight;
   SkScalar fMinIntrinsicWidth;
 
-  // TODO: make a static cache
+  // TODO: make a static cache?
   SkTHashMap<SkFont, SkRun> fEllipsisCache; // All found so far shapes of ellipsis
-  SkTHashMap<SkFont, SkRun> fHyphenCache;   // All used so far shapes of hyphens ('-')
 };

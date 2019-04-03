@@ -74,6 +74,7 @@ class SkLine {
   inline SkSpan<const char> text() const { return fText; }
   inline SkVector advance() const { return fAdvance; }
   inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
+  inline SkRun* ellipsis() const { return fEllipsis; }
   inline SkFontSizes sizes() const { return fSizes; }
   inline bool empty() const { return fText.empty(); }
   void breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply);
