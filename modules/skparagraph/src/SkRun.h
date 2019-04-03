@@ -129,7 +129,7 @@ class SkRun {
  public:
 
   SkRun() : fFont() { }
-  SkRun(const SkShaper::RunHandler::RunInfo& info);
+  SkRun(const SkShaper::RunHandler::RunInfo& info, SkScalar shiftX);
 
   SkShaper::RunHandler::Buffer newRunBuffer();
 
@@ -169,7 +169,7 @@ class SkRun {
 
   SkFontSizes sizes() const { return SkFontSizes(fFontMetrics.fAscent, fFontMetrics.fDescent, fFontMetrics.fLeading); }
 
-  void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size) const;
+  void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 
  private:
 

@@ -91,16 +91,13 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
 
     if (!fRuns.empty()) {
-      SkFontSizes maxSizes = fRuns.begin()->sizes();
       for (auto& line : fTextWrapper.getLines()) {
 
         if (line.empty()) continue;
 
-        auto lineOffset = line.offset();
-        lineOffset.fY -= line.sizes().diff(maxSizes);
-
         textCanvas->save();
-        textCanvas->translate(lineOffset.fX, lineOffset.fY);
+        textCanvas->translate(line.offset().fX, line.offset().fY);
+
         this->iterateThroughStyles(line, SkStyleType::Background,
                                    [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, SkRun* ellipsis) {
                                      this->paintBackground(textCanvas, line, text, style, ellipsis);
@@ -124,6 +121,7 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
                                      this->paintDecorations(textCanvas, line, text, style, ellipsis);
                                      return true;
                                    });
+
         textCanvas->restore();
       }
     }
@@ -153,10 +151,10 @@ void SkParagraphImpl::paintText(
 
   // Build the blob from all the runs
   this->iterateThroughRuns(line, text, ellipsis,
-   [paint, canvas](const SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
+   [paint, canvas, line](const SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
 
      SkTextBlobBuilder builder;
-     run->copyTo(builder, SkToU32(pos), size);
+     run->copyTo(builder, SkToU32(pos), size, SkVector::Make(0, - line.sizes().ascent()));
      canvas->save();
      canvas->clipRect(clip);
      canvas->translate(shift, 0);
@@ -203,9 +201,9 @@ void SkParagraphImpl::paintShadow(
     }
 
     this->iterateThroughRuns(line, text, ellipsis,
-     [canvas, shadow, paint](const SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
+     [canvas, shadow, paint, line](const SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
        SkTextBlobBuilder builder;
-       run->copyTo(builder, pos, size);
+       run->copyTo(builder, pos, size, line.offset());
        canvas->save();
        clip.offset(shadow.fOffset);
        canvas->clipRect(clip);
@@ -358,35 +356,44 @@ void SkParagraphImpl::paintDecorations(
 
 void SkParagraphImpl::buildClusterTable() {
 
+  size_t runStart = 0;
   for (auto& run : fRuns) {
-    size_t cluster = 0;
+    size_t cluster = run.fUtf8Range.begin();
     SkScalar width = 0;
-    size_t start = 0;
-    for (size_t pos = 0; pos <= run.size(); ++pos) {
+    size_t glyphStart = 0;
+    for (size_t glyphPos = 0; glyphPos <= run.size(); ++glyphPos) {
 
-      auto next = pos == run.size() ? run.fUtf8Range.size() : run.cluster(pos);
-      width += run.calculateWidth(start, pos);
-      if (cluster == next) {
-        // Many glyphs in one cluster
-        continue;
-      } else if (next > cluster + 1) {
-        // Many characters in one cluster
+      width += run.calculateWidth(glyphStart, glyphPos);
+      size_t nextCluster;
+      if (glyphPos < run.size()) {
+        nextCluster = run.cluster(glyphPos);
+        if (cluster == nextCluster) {
+          // Many glyphs in one cluster
+          continue;
+        } else if (nextCluster > cluster + 1) {
+          // Many characters in one cluster
+        }
+      } else {
+        nextCluster = run.fUtf8Range.end();
       }
+
       SkCluster data;
       data.fRun = &run;
-      data.fStart = start;
-      data.fEnd = pos;
+      data.fStart = glyphStart;
+      data.fEnd = glyphPos;
       // TODO: Better methods
-      data.fText = SkSpan<const char>(fUtf8.begin() + run.fUtf8Range.begin() + cluster, next - cluster);
+      data.fText = SkSpan<const char>(fUtf8.begin() + cluster, nextCluster - cluster);
       data.fWidth = width;
       data.fHeight = run.calculateHeight();
       fClusters.emplace_back(data);
-      fIndexes.set(fUtf8.begin() + run.fUtf8Range.begin() + cluster, fClusters.size() - 1);
+      fIndexes.set(fUtf8.begin() + cluster, fClusters.size() - 1);
+      //SkDebugf("Cluster[%d:%d]: %d, %s\n", data.fStart, data.fEnd - 1, fClusters.size() - 1, toString(data.fText).c_str());
 
-      cluster = next;
-      start = pos;
+      cluster = nextCluster;
+      glyphStart = glyphPos;
       width = 0;
     }
+    runStart += run.size();
   }
 }
 
@@ -472,7 +479,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
 
     Buffer runBuffer(const RunInfo& info) override {
 
-      auto& run = fParagraph->fRuns.emplace_back(info);
+      auto& run = fParagraph->fRuns.emplace_back(info, fAdvance.fX);
       return run.newRunBuffer();
     }
 
@@ -757,8 +764,8 @@ void SkParagraphImpl::iterateThroughRuns(
     SkRun* ellipsis,
     std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const {
 
-  auto start = findCluster(line.text().begin());
-  auto end = findCluster(line.text().end() - 1);
+  auto start = findCluster(text.begin());
+  auto end = findCluster(text.end() - 1);
 
   SkRect clip = SkRect::MakeEmpty();
   size_t size = 0;
@@ -783,10 +790,10 @@ void SkParagraphImpl::iterateThroughRuns(
     if (cluster == start) {
       clip.fLeft = cluster->fRun->position(cluster->fStart).fX;
       clip.fRight = clip.fLeft;
-      clip.fLeft += cluster->sizeToChar(line.text().begin());
+      clip.fLeft += cluster->sizeToChar(text.begin());
     }
     if (cluster == end) {
-      clip.fRight += cluster->sizeFromChar(line.text().end() - 1);
+      clip.fRight += cluster->sizeFromChar(text.end() - 1);
     } else {
       //clip.fRight += cluster->fWidth; (because of justification)
       clip.fRight += cluster->fRun->calculateWidth(cluster->fStart, cluster->fEnd);

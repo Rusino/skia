@@ -97,10 +97,14 @@ bool SkTextStyle::matchOneAttribute(SkStyleType styleType, const SkTextStyle& ot
 
   switch (styleType) {
       case Foreground:
-          return fColor == other.fColor && fForeground == other.fForeground;
+          if (fHasForeground) {
+              return other.fHasForeground && fForeground == other.fForeground;
+          } else {
+            return !other.fHasForeground && fColor == other.fColor;
+          }
 
       case Background:
-          return fBackground == other.fBackground;
+        return (fHasBackground == other.fHasBackground && fBackground == other.fBackground);
 
       case Shadow:
           if (fTextShadows.size() != other.fTextShadows.size()) {

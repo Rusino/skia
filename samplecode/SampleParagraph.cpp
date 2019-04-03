@@ -264,6 +264,7 @@ class ParagraphView1 : public Sample {
         style.setBackgroundColor(background);
         SkPaint foreground;
         foreground.setColor(std::get<5>(para));
+        foreground.setAntiAlias(true);
         style.setForegroundColor(foreground);
         if (std::get<6>(para)) {
           style.addShadow(SkTextShadow(SK_ColorBLACK, SkPoint::Make(5, 5), 2));

@@ -964,7 +964,7 @@ void SkShaperHarfBuzz::shape(const char* utf8, size_t utf8Bytes,
     runSegmenter.insert(&script);
     runSegmenter.insert(&language);
 
-    if (true) {
+    if (false) {
         shapeCorrect(utf8, utf8Bytes, bidi, language, script, font, runSegmenter, width, handler);
     } else {
         shapeOk(utf8, utf8Bytes, bidi, language, script, font, runSegmenter, width, handler);

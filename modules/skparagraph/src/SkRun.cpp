@@ -9,7 +9,7 @@
 #include "SkRun.h"
 #include "SkSpan.h"
 
-SkRun::SkRun(const SkShaper::RunHandler::RunInfo& info) {
+SkRun::SkRun(const SkShaper::RunHandler::RunInfo& info, SkScalar offsetX) {
 
   fFont = info.fFont;
   fLtr = info.fBidiLevel % 2 == 0;
@@ -17,7 +17,7 @@ SkRun::SkRun(const SkShaper::RunHandler::RunInfo& info) {
   glyphCount = info.glyphCount;
   fUtf8Range = info.utf8Range;
 
-  fOffset = SkVector::Make(0, 0);
+  fOffset = SkVector::Make(offsetX, 0);
   fGlyphs.push_back_n(info.glyphCount);
   fPositions.push_back_n(info.glyphCount);
   fClusters.push_back_n(info.glyphCount);
@@ -49,13 +49,18 @@ SkScalar SkRun::calculateWidth(size_t start, size_t end) {
   }
 }
 
-void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size) const {
+void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const {
 
   const auto& blobBuffer = builder.allocRunPos(fFont, SkToInt(size));
   sk_careful_memcpy(blobBuffer.glyphs,
                     fGlyphs.data() + pos,
                     size * sizeof(SkGlyphID));
-  sk_careful_memcpy(blobBuffer.points(),
-                    fPositions.data() + pos,
-                    size * sizeof(SkPoint));
+
+  for (size_t i = 0; i < size; ++i) {
+    auto point = fPositions[i + pos];
+    blobBuffer.points()[i] = point + offset;
+  }
+  //sk_careful_memcpy(blobBuffer.points(),
+  //                  fPositions.data() + pos,
+  //                  size * sizeof(SkPoint));
 }
