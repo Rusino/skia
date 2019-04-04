@@ -122,8 +122,7 @@ sk_sp<SkTypeface> SkFontCollection::findTypeface(const std::string& familyName, 
     }
 
     if (nullptr == typeface) {
-        typeface.reset(fDefaultFontManager->matchFamilyStyle(DEFAULT_FONT_FAMILY,
-                                                             SkFontStyle()));
+        typeface.reset(fDefaultFontManager->matchFamilyStyle(DEFAULT_FONT_FAMILY, fontStyle));
         SkString name;
         typeface->getFamilyName(&name);
         SkDebugf("Didn't find typeface '%s' %d %s\n",

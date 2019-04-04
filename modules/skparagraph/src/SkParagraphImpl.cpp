@@ -20,7 +20,7 @@
 #include "SkUTF.h"
 
 namespace {
-/*
+
   std::string toString(SkSpan<const char> text) {
     icu::UnicodeString
         utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
@@ -28,7 +28,7 @@ namespace {
     utf16.toUTF8String(str);
     return str;
   }
-*/
+
   SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
     auto begin = SkTMax(a.begin(), b.begin());
     auto end = SkTMin(a.end(), b.end());
@@ -376,11 +376,18 @@ void SkParagraphImpl::buildClusterTable() {
       size_t nextCluster;
       if (glyphPos < run.size()) {
         nextCluster = run.cluster(glyphPos);
+        SkASSERT(nextCluster <= run.fUtf8Range.end());
         if (cluster == nextCluster) {
           // Many glyphs in one cluster
           continue;
         } else if (nextCluster > cluster + 1) {
           // Many characters in one cluster
+        } else {
+          if (nextCluster != cluster + 1) {
+            if (glyphPos == run.size() - 1) {
+              nextCluster = run.fUtf8Range.end() - 1;
+            }
+          }
         }
       } else {
         nextCluster = run.fUtf8Range.end();
@@ -395,7 +402,7 @@ void SkParagraphImpl::buildClusterTable() {
       data.fHeight = run.calculateHeight();
       fClusters.emplace_back(data);
       fIndexes.set(fUtf8.begin() + cluster, fClusters.size() - 1);
-      //SkDebugf("Cluster[%d:%d]: %d, %s\n", data.fStart, data.fEnd - 1, fClusters.size() - 1, toString(data.fText).c_str());
+      //SkDebugf("Cluster[%d:%d] (%d:%d), %s\n", data.fStart, data.fEnd - 1, cluster, nextCluster, toString(data.fText).c_str());
 
       cluster = nextCluster;
       glyphStart = glyphPos;
@@ -411,77 +418,84 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
    public:
     MultipleFontRunIterator(SkSpan<const char> utf8, SkSpan<SkBlock> styles, sk_sp<SkFontCollection> fonts)
         : fText(utf8)
-        , fCurrent(utf8.begin())
-        , fIterator(styles.begin())
-        , fNext(styles.begin())
+        , fCurrentChar(utf8.begin())
+        , fCurrentStyle(styles.begin())
         , fLast(styles.end())
         , fFontCollection(fonts) {
-
-      fCurrentTypeface = SkTypeface::MakeDefault();
-      MoveToNext();
     }
 
     void consume() override {
 
-      SkASSERT(fIterator != fLast);
-      // Find the matching font family
-      findCurrentFont(fIterator->style());
+      auto start = fCurrentChar;
+      char ch = *fCurrentChar;
+      SkUnichar u = utf8_next(&fCurrentChar, fText.end());
+      auto currentStyle = fCurrentStyle->style();
 
-      MoveToNext();
-    }
-
-    size_t endOfCurrentRun() const override { return fCurrent - fText.begin(); }
-    bool atEnd() const override { return fCurrent == fText.end(); }
-    const SkFont& currentFont() const override { return fFont; }
-
-    bool findCurrentFont(const SkTextStyle& currentStyle) {
-      SkUnichar u = utf8_next(&fCurrent, fText.end());
-
+      // Find the font
       for (auto& fontFamily : currentStyle.getFontFamilies()) {
-        // Resolve a typeface
         sk_sp<SkTypeface> typeface = fFontCollection->findTypeface(fontFamily, currentStyle.getFontStyle());
         if (typeface == nullptr) {
           continue;
         }
         // Get the font
         fFont = SkFont(typeface, currentStyle.getFontSize());
-
-        if (fFont.unicharToGlyph(u)) {
+        fFontFamilyName = fontFamily;
+        fFontStyle = currentStyle.getFontStyle();
+        if (ignored(ch) || fFont.unicharToGlyph(u)) {
           // If the current font can handle this character, use it
-          return true;
+          break;
         }
       }
 
-      // We could not find any font
-      return false;
+      // Find the character that cannot be shown in that font
+      while (fCurrentChar != fText.end() &&
+                currentFontListedInCurrentStyle() &&
+                    currentCharExistsInCurrentFont()) {
+        // Move the style iterator along with the character
+        if (fCurrentChar == fCurrentStyle->text().end()) {
+          ++fCurrentStyle;
+        }
+      }
+      if (false) {
+        SkSpan<const char> text(start, fCurrentChar - start);
+        SkDebugf("%s,%f : '%s'\n", fFontFamilyName.c_str(), fFont.getSize(), toString(text).c_str());
+      }
     }
 
-    void MoveToNext() {
+    size_t endOfCurrentRun() const override { return fCurrentChar - fText.begin(); }
+    bool atEnd() const override { return fCurrentChar == fText.end(); }
+    const SkFont& currentFont() const override { return fFont; }
 
-      fIterator = fNext;
-      if (fIterator == fLast) {
-        fCurrent = fText.end();
-        return;
-      }
-      fCurrent = fIterator->text().begin();
+    bool currentFontListedInCurrentStyle() {
 
-      auto nextTypeface = fNext->style().getTypeface();
-      auto nextFontSize = fNext->style().getFontSize();
-      while (fNext != fLast
-          && SkTypeface::Equal(fNext->style().getTypeface().get(), nextTypeface.get())
-          && nextFontSize == fNext->style().getFontSize()) {
-        ++fNext;
+      auto currentStyle = fCurrentStyle->style();
+      return currentStyle.getFontStyle() == fFontStyle &&
+             currentStyle.getFontSize() == fFont.getSize() &&
+             currentStyle.getFontFamilies()[0] == fFontFamilyName;
+    }
+
+    bool ignored(char ch) {
+      return u_charType(ch) == U_CONTROL_CHAR ||
+             u_charType(ch) == U_NON_SPACING_MARK;
+    }
+
+    bool currentCharExistsInCurrentFont() {
+      if (ignored(*fCurrentChar)) {
+        ++fCurrentChar;
+        return true;
       }
+      SkUnichar u = utf8_next(&fCurrentChar, fText.end());
+      return fFont.unicharToGlyph(u) != 0;
     }
 
    private:
     SkSpan<const char> fText;
-    const char* fCurrent;
+    const char* fCurrentChar;
     SkFont fFont;
-    SkBlock* fIterator;
-    SkBlock* fNext;
+    std::string fFontFamilyName;
+    SkFontStyle fFontStyle;
+    SkBlock* fCurrentStyle;
     SkBlock* fLast;
-    sk_sp<SkTypeface> fCurrentTypeface;
     sk_sp<SkFontCollection> fFontCollection;
   };
 
