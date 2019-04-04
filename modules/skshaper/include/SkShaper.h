@@ -10,6 +10,7 @@
 
 #include <memory>
 
+#include <unicode/ubidi.h>
 #include "SkPoint.h"
 #include "SkTextBlob.h"
 #include "SkTypeface.h"
@@ -112,6 +113,13 @@ public:
         /** Called when ending a line. */
         virtual void commitLine() = 0;
     };
+
+    virtual BiDiRunIterator*
+        MakeBidiRunIterator(const char* utf8, size_t utf8Bytes, bool leftToRightl) = 0;
+    virtual ScriptRunIterator*
+        MakeScriptRunIterator(const char* utf8, size_t utf8Bytes) = 0;
+    virtual LanguageRunIterator*
+        MakeLanguageRunIterator(const char* utf8, size_t utf8Bytes) = 0;
 
     virtual void shape(const char* utf8, size_t utf8Bytes,
                        const SkFont& srcFont,

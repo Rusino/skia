@@ -367,6 +367,7 @@ public:
         ret.init(utf8, utf8 + utf8Bytes, std::move(bidi));
         return ret;
     }
+
     IcuBiDiRunIterator(const char* utf8, const char* end, ICUBiDi bidi)
         : fBidi(std::move(bidi))
         , fEndOfCurrentRun(utf8)
@@ -375,6 +376,16 @@ public:
         , fUTF16LogicalPosition(0)
         , fLevel(UBIDI_DEFAULT_LTR)
     {}
+
+    IcuBiDiRunIterator(IcuBiDiRunIterator&& other)
+      : fBegin(other.fBegin)
+      , fEnd(other.fEnd) {
+        fBidi = std::move(other.fBidi);
+        fEndOfCurrentRun = other.fEndOfCurrentRun;
+        fUTF16LogicalPosition = other.fUTF16LogicalPosition;
+        fLevel = other.fLevel;
+    }
+
     void consume() override {
         SkASSERT(fUTF16LogicalPosition < ubidi_getLength(fBidi.get()));
         int32_t endPosition = ubidi_getLength(fBidi.get());
@@ -796,6 +807,13 @@ private:
     ICUBrk fLineBreakIterator;
     ICUBrk fGraphemeBreakIterator;
 
+    BiDiRunIterator*
+            MakeBidiRunIterator(const char* utf8, size_t utf8Bytes, bool leftToRightl) override;
+    ScriptRunIterator*
+            MakeScriptRunIterator(const char* utf8, size_t utf8Bytes) override;
+    LanguageRunIterator*
+            MakeLanguageRunIterator(const char* utf8, size_t utf8Bytes) override;
+
     void shape(const char* utf8, size_t utf8Bytes,
                const SkFont&,
                bool leftToRight,
@@ -840,6 +858,26 @@ private:
 std::unique_ptr<SkShaper> SkShaper::MakeHarfBuzz() {
     auto hb = skstd::make_unique<SkShaperHarfBuzz>();
     return hb->good() ? std::move(hb) : nullptr;
+}
+
+SkShaper::BiDiRunIterator* SkShaperHarfBuzz::MakeBidiRunIterator
+                (const char* utf8, size_t utf8Bytes, bool leftToRight) {
+ auto lazy(IcuBiDiRunIterator::Make(utf8, utf8Bytes, leftToRight ? UBIDI_DEFAULT_LTR : UBIDI_DEFAULT_RTL));
+ return new IcuBiDiRunIterator(std::move(*lazy.get()));
+}
+
+SkShaper::ScriptRunIterator* SkShaperHarfBuzz::MakeScriptRunIterator
+                (const char* utf8, size_t utf8Bytes) {
+    hb_unicode_funcs_t* hbUnicode =
+        hb_buffer_get_unicode_funcs(fBuffer.get());
+  auto lazy(HbScriptRunIterator::Make(utf8, utf8Bytes, hbUnicode));
+  return new HbScriptRunIterator(*lazy.get());
+}
+
+SkShaper::LanguageRunIterator* SkShaperHarfBuzz::MakeLanguageRunIterator
+                (const char* utf8, size_t utf8Bytes) {
+  auto lazy(StdLanguageRunIterator::Make(utf8, utf8Bytes));
+  return new StdLanguageRunIterator(*lazy.get());
 }
 
 SkShaperHarfBuzz::SkShaperHarfBuzz() {
@@ -926,7 +964,7 @@ void SkShaperHarfBuzz::shape(const char* utf8, size_t utf8Bytes,
     runSegmenter.insert(&script);
     runSegmenter.insert(&language);
 
-    if (true) {
+    if (false) {
         shapeCorrect(utf8, utf8Bytes, bidi, language, script, font, runSegmenter, width, handler);
     } else {
         shapeOk(utf8, utf8Bytes, bidi, language, script, font, runSegmenter, width, handler);
