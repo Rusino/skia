@@ -35,10 +35,8 @@ SkParagraphBuilder::~SkParagraphBuilder() = default;
 void SkParagraphBuilder::setParagraphStyle(const SkParagraphStyle& style) {
 
     fParagraphStyle = style;
-    auto& textStyle = fParagraphStyle.getTextStyle();
-    fFontCollection->findTypeface(textStyle);
-    fTextStyles.push(textStyle);
-    fStyledBlocks.emplace_back(fUtf8.size(), fUtf8.size(), textStyle);
+    fTextStyles.push(fParagraphStyle.getTextStyle());
+    fStyledBlocks.emplace_back(fUtf8.size(), fUtf8.size(), fParagraphStyle.getTextStyle());
 }
 
 void SkParagraphBuilder::pushStyle(const SkTextStyle& style) {
@@ -50,10 +48,8 @@ void SkParagraphBuilder::pushStyle(const SkTextStyle& style) {
         && fStyledBlocks.back().fStyle == style) {
         // Just continue with the same style
     } else {
-        // Resolve the new style and go with it
-        auto& textStyle = fTextStyles.top();
-        fFontCollection->findTypeface(textStyle);
-        fStyledBlocks.emplace_back(fUtf8.size(), fUtf8.size(), textStyle);
+        // Go with the new style
+        fStyledBlocks.emplace_back(fUtf8.size(), fUtf8.size(), fTextStyles.top());
     }
 }
 
@@ -123,6 +119,6 @@ std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
 
     this->endRunIfNeeded();
 
-    return std::make_unique<SkParagraphImpl>(fUtf8, fParagraphStyle, fStyledBlocks);
+    return std::make_unique<SkParagraphImpl>(fUtf8, fParagraphStyle, fStyledBlocks, fFontCollection);
 }
 

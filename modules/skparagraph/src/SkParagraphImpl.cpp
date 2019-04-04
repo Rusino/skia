@@ -17,6 +17,7 @@
 #include "SkDiscretePathEffect.h"
 #include "SkCanvas.h"
 #include "SkMaskFilter.h"
+#include "SkUTF.h"
 
 namespace {
 /*
@@ -33,9 +34,19 @@ namespace {
     auto end = SkTMin(a.end(), b.end());
     return SkSpan<const char>(begin, end - begin);
   }
+
+  static inline SkUnichar utf8_next(const char** ptr, const char* end) {
+    SkUnichar val = SkUTF::NextUTF8(ptr, end);
+    if (val < 0) {
+      return 0xFFFD;  // REPLACEMENT CHARACTER
+    }
+    return val;
+  }
 }
-SkParagraph::SkParagraph(const std::u16string& utf16text, SkParagraphStyle style)
-    : fParagraphStyle(style) {
+
+SkParagraph::SkParagraph(const std::u16string& utf16text, SkParagraphStyle style, sk_sp<SkFontCollection> fonts)
+    : fFontCollection(std::move(fonts))
+    , fParagraphStyle(style) {
   icu::UnicodeString unicode((UChar*) utf16text.data(), SkToS32(utf16text.size()));
   std::string str;
   unicode.toUTF8String(str);
@@ -398,12 +409,13 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
 
  class MultipleFontRunIterator final : public SkShaper::FontRunIterator {
    public:
-    MultipleFontRunIterator(
-        SkSpan<const char> utf8,
-        SkSpan<SkBlock> styles)
-        : fText(utf8), fCurrent(utf8.begin()), fEnd(utf8.end()),
-          fCurrentStyle(SkTextStyle()), fIterator(styles.begin()),
-          fNext(styles.begin()), fLast(styles.end()) {
+    MultipleFontRunIterator(SkSpan<const char> utf8, SkSpan<SkBlock> styles, sk_sp<SkFontCollection> fonts)
+        : fText(utf8)
+        , fCurrent(utf8.begin())
+        , fIterator(styles.begin())
+        , fNext(styles.begin())
+        , fLast(styles.end())
+        , fFontCollection(fonts) {
 
       fCurrentTypeface = SkTypeface::MakeDefault();
       MoveToNext();
@@ -411,36 +423,53 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
 
     void consume() override {
 
-      if (fIterator == fLast) {
-        fCurrent = fEnd;
-      } else {
-        fCurrent = fNext == fLast ? fEnd : std::next(fCurrent,
-                                                     fNext->text().begin() - fIterator->text().begin());
-        fCurrentStyle = fIterator->style();
-      }
-
-      fCurrentTypeface = fCurrentStyle.getTypeface();
-      fFont = SkFont(fCurrentTypeface, fCurrentStyle.getFontSize());
+      SkASSERT(fIterator != fLast);
+      // Find the matching font family
+      findCurrentFont(fIterator->style());
 
       MoveToNext();
     }
+
     size_t endOfCurrentRun() const override { return fCurrent - fText.begin(); }
-    bool atEnd() const override { return fCurrent == fEnd; }
+    bool atEnd() const override { return fCurrent == fText.end(); }
     const SkFont& currentFont() const override { return fFont; }
+
+    bool findCurrentFont(const SkTextStyle& currentStyle) {
+      SkUnichar u = utf8_next(&fCurrent, fText.end());
+
+      for (auto& fontFamily : currentStyle.getFontFamilies()) {
+        // Resolve a typeface
+        sk_sp<SkTypeface> typeface = fFontCollection->findTypeface(fontFamily, currentStyle.getFontStyle());
+        if (typeface == nullptr) {
+          continue;
+        }
+        // Get the font
+        fFont = SkFont(typeface, currentStyle.getFontSize());
+
+        if (fFont.unicharToGlyph(u)) {
+          // If the current font can handle this character, use it
+          return true;
+        }
+      }
+
+      // We could not find any font
+      return false;
+    }
 
     void MoveToNext() {
 
       fIterator = fNext;
       if (fIterator == fLast) {
+        fCurrent = fText.end();
         return;
       }
+      fCurrent = fIterator->text().begin();
+
       auto nextTypeface = fNext->style().getTypeface();
       auto nextFontSize = fNext->style().getFontSize();
-      auto nextFontStyle = fNext->style().getFontStyle();
       while (fNext != fLast
-          && fNext->style().getTypeface() == nextTypeface
-          && nextFontSize == fNext->style().getFontSize()
-          && nextFontStyle == fNext->style().getFontStyle()) {
+          && SkTypeface::Equal(fNext->style().getTypeface().get(), nextTypeface.get())
+          && nextFontSize == fNext->style().getFontSize()) {
         ++fNext;
       }
     }
@@ -448,13 +477,12 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
    private:
     SkSpan<const char> fText;
     const char* fCurrent;
-    const char* fEnd;
     SkFont fFont;
-    SkTextStyle fCurrentStyle;
     SkBlock* fIterator;
     SkBlock* fNext;
     SkBlock* fLast;
     sk_sp<SkTypeface> fCurrentTypeface;
+    sk_sp<SkFontCollection> fFontCollection;
   };
 
   class ShapeHandler final : public SkShaper::RunHandler {
@@ -497,7 +525,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
     SkVector fAdvance;
   };
 
-  MultipleFontRunIterator font(text, styles);
+  MultipleFontRunIterator font(text, styles, fFontCollection);
   ShapeHandler handler(*this);
   std::unique_ptr<SkShaper> shaper = SkShaper::Make();
 

@@ -91,22 +91,22 @@ std::vector<sk_sp<SkFontMgr>> SkFontCollection::getFontManagerOrder() const {
     return order;
 }
 
-SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
+// TODO: locale
+sk_sp<SkTypeface> SkFontCollection::findTypeface(const std::string& familyName, SkFontStyle fontStyle) {
 
+    sk_sp<SkTypeface> result;
     // Look inside the font collections cache first
-    FamilyKey
-        familyKey(textStyle.getFirstFontFamily(), "en", textStyle.getFontStyle());
+    FamilyKey familyKey(familyName, "en", fontStyle);
     auto found = fTypefaces.find(familyKey);
     if (found) {
-        textStyle.setTypeface(*found);
-        return SkRef(found->get());
+        return *found;
     }
 
     sk_sp<SkTypeface> typeface = nullptr;
     int n = 0;
     for (auto manager : this->getFontManagerOrder()) {
         ++n;
-        SkFontStyleSet* set = manager->matchFamily(textStyle.getFirstFontFamily().c_str());
+        SkFontStyleSet* set = manager->matchFamily(familyName.c_str());
         if (nullptr == set || set->count() == 0) {
             continue;
         }
@@ -114,7 +114,7 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
             set->createTypeface(i);
         }
 
-        sk_sp<SkTypeface> match(set->matchStyle(textStyle.getFontStyle()));
+        sk_sp<SkTypeface> match(set->matchStyle(fontStyle));
         if (match) {
             typeface = std::move(match);
             break;
@@ -133,10 +133,7 @@ SkTypeface* SkFontCollection::findTypeface(SkTextStyle& textStyle) {
     } else {
         fTypefaces.set(familyKey, typeface);
     }
-
-    textStyle.setTypeface(typeface);
-
-    return SkRef(typeface.get());
+    return typeface;
 }
 
 void SkFontCollection::disableFontFallback() {

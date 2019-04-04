@@ -36,7 +36,7 @@ class SkFontCollection : public SkRefCnt {
     void setDynamicFontManager(sk_sp<SkFontMgr> fontManager);
     void setTestFontManager(sk_sp<SkFontMgr> fontManager);
 
-    SkTypeface* findTypeface(SkTextStyle& textStyle);
+    sk_sp<SkTypeface> findTypeface(const std::string& familyName, SkFontStyle fontStyle);
 
     void disableFontFallback();
 

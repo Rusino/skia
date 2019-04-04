@@ -25,7 +25,7 @@
 #include "SkPaint.h"
 #include "SkFont.h"
 #include "SkDartTypes.h"
-#include "../../../src/core/SkSpan.h"
+#include "SkSpan.h"
 
 // Multiple decorations can be applied at once. Ex: Underline and overline is
 // (0x1 | 0x2)
@@ -124,7 +124,7 @@ class SkTextStyle {
 
   inline std::string getFirstFontFamily() const { return fFontFamilies.front(); };
   inline void setFontFamily(const std::string& family) { fFontFamilies = { family }; }
-  //inline std::vector<std::string>& getFontFamilies() { return fFontFamilies; }
+  inline std::vector<std::string> getFontFamilies() const { return fFontFamilies; }
   inline void setFontFamilies(const std::vector<std::string> families) { fFontFamilies = families; }
 
   inline void setHeight(SkScalar height) { fFontHeight = height; }

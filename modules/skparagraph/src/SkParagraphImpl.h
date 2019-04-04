@@ -93,9 +93,10 @@ class SkParagraphImpl final: public SkParagraph {
  public:
 
   SkParagraphImpl(const std::string& text,
-              SkParagraphStyle style,
-              std::vector<Block> blocks)
-      : SkParagraph(text, style) {
+                  SkParagraphStyle style,
+                  std::vector<Block> blocks,
+                  sk_sp<SkFontCollection> fonts)
+      : SkParagraph(text, style, std::move(fonts)) {
     fTextStyles.reserve(blocks.size());
     for (auto& block : blocks) {
       fTextStyles.emplace_back(SkSpan<const char>(fUtf8.begin() + block.fStart, block.fEnd - block.fStart),
@@ -104,9 +105,10 @@ class SkParagraphImpl final: public SkParagraph {
   }
 
   SkParagraphImpl(const std::u16string& utf16text,
-              SkParagraphStyle style,
-              std::vector<Block> blocks)
-      : SkParagraph(utf16text, style) {
+                  SkParagraphStyle style,
+                  std::vector<Block> blocks,
+                  sk_sp<SkFontCollection> fonts)
+      : SkParagraph(utf16text, style, std::move(fonts)) {
     fTextStyles.reserve(blocks.size());
     for (auto& block : blocks) {
       fTextStyles.emplace_back(SkSpan<const char>(fUtf8.begin() + block.fStart, block.fEnd - block.fStart),
