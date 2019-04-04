@@ -335,6 +335,16 @@ public:
         , fUTF16LogicalPosition(0)
         , fLevel(UBIDI_DEFAULT_LTR)
     {}
+
+    IcuBiDiRunIterator(IcuBiDiRunIterator&& other)
+      : fBegin(other.fBegin)
+      , fEnd(other.fEnd) {
+        fBidi = std::move(other.fBidi);
+        fEndOfCurrentRun = other.fEndOfCurrentRun;
+        fUTF16LogicalPosition = other.fUTF16LogicalPosition;
+        fLevel = other.fLevel;
+    }
+
     void consume() override {
         SkASSERT(fUTF16LogicalPosition < ubidi_getLength(fBidi.get()));
         int32_t endPosition = ubidi_getLength(fBidi.get());
@@ -806,7 +816,7 @@ void SkShaperHarfBuzz::shape(const char* utf8, size_t utf8Bytes,
     runSegmenter.insert(&script);
     runSegmenter.insert(&language);
 
-    if (true) {
+    if (false) {
         shapeCorrect(utf8, utf8Bytes, bidi, language, script, font, runSegmenter, width, handler);
     } else {
         shapeOk(utf8, utf8Bytes, bidi, language, script, font, runSegmenter, width, handler);

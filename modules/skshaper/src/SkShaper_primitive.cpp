@@ -17,6 +17,7 @@ class SkShaperPrimitive : public SkShaper {
 public:
     SkShaperPrimitive() {}
 private:
+
     void shape(const char* utf8, size_t utf8Bytes,
                const SkFont& srcFont,
                bool leftToRight,
