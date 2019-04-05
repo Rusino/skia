@@ -35,6 +35,7 @@ class SkFontCollection : public SkRefCnt {
     void setAssetFontManager(sk_sp<SkFontMgr> fontManager);
     void setDynamicFontManager(sk_sp<SkFontMgr> fontManager);
     void setTestFontManager(sk_sp<SkFontMgr> fontManager);
+    void setDefaultFontManager(sk_sp<SkFontMgr> fontManager, const std::string& defaultFamilyName);
 
     sk_sp<SkTypeface> findTypeface(const std::string& familyName, SkFontStyle fontStyle);
 
@@ -72,4 +73,5 @@ class SkFontCollection : public SkRefCnt {
     sk_sp<SkFontMgr> fAssetFontManager;
     sk_sp<SkFontMgr> fDynamicFontManager;
     sk_sp<SkFontMgr> fTestFontManager;
+    std::string fDefaultFamilyName;
 };

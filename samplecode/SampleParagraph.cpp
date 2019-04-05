@@ -538,6 +538,10 @@ class ParagraphView2 : public Sample {
     style.setBackgroundColor(blue);
     style.setForegroundColor(paint);
     style.setFontFamily(ff);
+    style.setFontStyle(SkFontStyle(
+        SkFontStyle::kMedium_Weight,
+        SkFontStyle::kNormal_Width,
+        SkFontStyle::kUpright_Slant ));
     style.setFontSize(fs);
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
@@ -672,7 +676,7 @@ class ParagraphView2 : public Sample {
     canvas->translate(width, 0);
     drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
     canvas->translate(width, 0);
-    drawText(canvas, width, height, text, SK_ColorBLACK, SK_ColorWHITE, "monospace", 20, 100, u"\u2026");
+    drawText(canvas, width, height, text, SK_ColorBLACK, SK_ColorWHITE, "Roboto", 20, 100, u"\u2026");
     canvas->translate(width, 0);
     drawCode(canvas, width, height);
     canvas->translate(width, 0);
