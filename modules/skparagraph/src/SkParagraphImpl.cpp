@@ -416,12 +416,17 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
 
  class MultipleFontRunIterator final : public SkShaper::FontRunIterator {
    public:
-    MultipleFontRunIterator(SkSpan<const char> utf8, SkSpan<SkBlock> styles, sk_sp<SkFontCollection> fonts)
+    MultipleFontRunIterator(
+        SkSpan<const char> utf8,
+        SkSpan<SkBlock> styles,
+        sk_sp<SkFontCollection> fonts,
+        bool hintingOn)
         : fText(utf8)
         , fCurrentChar(utf8.begin())
         , fCurrentStyle(styles.begin())
         , fLast(styles.end())
-        , fFontCollection(fonts) {
+        , fFontCollection(fonts)
+        , fHintingOn(hintingOn) {
     }
 
     void consume() override {
@@ -439,6 +444,11 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
         }
         // Get the font
         fFont = SkFont(typeface, currentStyle.getFontSize());
+        fFont.setEdging(SkFont::Edging::kAntiAlias);
+        if (!fHintingOn) {
+          fFont.setHinting(SkFontHinting::kSlight);
+          fFont.setSubpixel(true);
+        }
         fFontFamilyName = fontFamily;
         fFontStyle = currentStyle.getFontStyle();
         if (ignored(ch) || fFont.unicharToGlyph(u)) {
@@ -497,6 +507,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
     SkBlock* fCurrentStyle;
     SkBlock* fLast;
     sk_sp<SkFontCollection> fFontCollection;
+    bool fHintingOn;
   };
 
   class ShapeHandler final : public SkShaper::RunHandler {
@@ -539,7 +550,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
     SkVector fAdvance;
   };
 
-  MultipleFontRunIterator font(text, styles, fFontCollection);
+  MultipleFontRunIterator font(text, styles, fFontCollection, fParagraphStyle.hintingIsOn());
   ShapeHandler handler(*this);
   std::unique_ptr<SkShaper> shaper = SkShaper::MakeShapeThenWrap();
 

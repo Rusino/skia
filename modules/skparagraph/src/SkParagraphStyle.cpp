@@ -23,6 +23,7 @@ SkParagraphStyle::SkParagraphStyle() {
     fLinesLimit = std::numeric_limits<size_t>::max();
     //_ellipsis = u"\u2026";
     fLineHeight = 1;
+    fHintingIsOn = true;
 }
 
 SkTextAlign SkParagraphStyle::effective_align() const {
