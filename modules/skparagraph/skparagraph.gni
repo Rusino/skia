@@ -8,27 +8,27 @@ _src = get_path_info("src", "abspath")
 _include = get_path_info("include", "abspath")
 
 skparagraph_public = [
-            "$_include/SkParagraphStyle.h",
-            "$_include/SkTextStyle.h",
-            "$_include/SkTextShadow.h",
-            "$_include/SkFontCollection.h",
-            "$_include/SkParagraph.h",
-            "$_include/SkParagraphBuilder.h",
-            "$_include/SkDartTypes.h",
-         ]
+  "$_include/SkParagraphStyle.h",
+  "$_include/SkTextStyle.h",
+  "$_include/SkTextShadow.h",
+  "$_include/SkFontCollection.h",
+  "$_include/SkParagraph.h",
+  "$_include/SkParagraphBuilder.h",
+  "$_include/SkDartTypes.h",
+]
 
 skparagraph_sources = [
-            "$_src/SkFontCollection.cpp",
-            "$_src/SkLine.h",
-            "$_src/SkLine.cpp",
-            "$_src/SkParagraphBuilder.cpp",
-            "$_src/SkParagraphImpl.h",
-            "$_src/SkParagraphImpl.cpp",
-            "$_src/SkParagraphStyle.cpp",
-            "$_src/SkRun.h",
-            "$_src/SkRun.cpp",
-            "$_src/SkTextShadow.cpp",
-            "$_src/SkTextStyle.cpp",
-            "$_src/SkTextWrapper.h",
-            "$_src/SkTextWrapper.cpp"
-          ]
+  "$_src/SkFontCollection.cpp",
+  "$_src/SkLine.h",
+  "$_src/SkLine.cpp",
+  "$_src/SkParagraphBuilder.cpp",
+  "$_src/SkParagraphImpl.h",
+  "$_src/SkParagraphImpl.cpp",
+  "$_src/SkParagraphStyle.cpp",
+  "$_src/SkRun.h",
+  "$_src/SkRun.cpp",
+  "$_src/SkTextShadow.cpp",
+  "$_src/SkTextStyle.cpp",
+  "$_src/SkTextWrapper.h",
+  "$_src/SkTextWrapper.cpp",
+]

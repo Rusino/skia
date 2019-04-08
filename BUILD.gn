@@ -1822,9 +1822,9 @@ if (skia_enable_tools) {
         ":flags",
         ":gpu_tool_utils",
         ":xml",
+        "modules/skparagraph",
         "modules/sksg",
         "modules/skshaper",
-        "modules/skparagraph",
       ]
 
       # NIMA does not build on Windows clang
@@ -1976,8 +1976,8 @@ if (skia_enable_tools) {
     ]
     deps = [
       ":skia",
-      "modules/skshaper",
       "modules/skparagraph",
+      "modules/skshaper",
     ]
   }
 
@@ -2452,8 +2452,8 @@ if (skia_enable_tools) {
       deps = [
         ":tool_utils",
         "modules/skottie",
-        "modules/skshaper",
         "modules/skparagraph",
+        "modules/skshaper",
       ]
     }
   }
