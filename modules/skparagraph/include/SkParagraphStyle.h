@@ -56,6 +56,9 @@ struct SkParagraphStyle {
   inline bool ellipsized() const { return !fEllipsis.empty(); }
   SkTextAlign effective_align() const;
 
+  bool hintingIsOn() const { return fHintingIsOn; }
+  void turnHintingOff() { fHintingIsOn = false; }
+
  private:
 
   SkTextStyle fDefaultTextStyle;
@@ -64,4 +67,5 @@ struct SkParagraphStyle {
   size_t fLinesLimit;
   std::string fEllipsis;
   SkScalar fLineHeight;
+  bool fHintingIsOn;
 };

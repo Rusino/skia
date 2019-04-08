@@ -1110,9 +1110,150 @@ class ParagraphView4 : public Sample {
   sk_sp<TestFontProvider> testFontProvider;
   sk_sp<SkFontCollection> fontCollection;
 };
+
+class ParagraphView5 : public Sample {
+ public:
+  ParagraphView5() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+    LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+
+    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
+        "fonts/GoogleSans-Regular.ttf"));
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+  }
+
+  ~ParagraphView5() {
+  }
+ protected:
+  bool onQuery(Sample::Event* evt) override {
+    if (Sample::TitleQ(*evt)) {
+      Sample::TitleR(evt, "Paragraph4");
+      return true;
+    }
+    return this->INHERITED::onQuery(evt);
+  }
+
+  SkTextStyle style(SkPaint paint) {
+    SkTextStyle style;
+    paint.setAntiAlias(true);
+    style.setForegroundColor(paint);
+    style.setFontFamily("monospace");
+    style.setFontSize(30);
+
+    return style;
+  }
+
+  void drawFlutter(SkCanvas* canvas, SkScalar w, SkScalar h,
+                   std::string ff = "sans-serif",
+                   SkScalar fs = 30,
+                   SkFontStyle::Weight weight = SkFontStyle::Weight::kNormal_Weight,
+                   size_t lineLimit = std::numeric_limits<size_t>::max(),
+                   const std::u16string& ellipsis = u"\u2026") {
+
+    SkAutoCanvasRestore acr(canvas, true);
+
+    canvas->clipRect(SkRect::MakeWH(w, h));
+
+    SkScalar margin = 20;
+
+    SkPaint black;
+    black.setAntiAlias(true);
+    black.setColor(SK_ColorBLACK);
+    SkPaint gray;
+    gray.setColor(SK_ColorLTGRAY);
+
+    SkTextStyle style;
+    style.setFontFamily(ff);
+    style.setFontSize(fs);
+
+    SkTextStyle style0;
+    style0.setForegroundColor(black);
+    //style0.setBackgroundColor(gray);
+    style0.setFontFamily(ff);
+    style0.setFontSize(fs);
+    style0.setFontStyle(SkFontStyle(weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
+
+    SkParagraphStyle paraStyle;
+    paraStyle.setTextStyle(style);
+    paraStyle.setMaxLines(lineLimit);
+
+    paraStyle.setEllipsis(ellipsis);
+    fontCollection->setTestFontManager(testFontProvider);
+
+    const std::string text0 = "Flutter is an open-source project to help developers "
+                              "build high-performance, high-f";
+    const std::string text1 = "idelity, mobile apps for "
+                              "iOS and Android "
+                              "from a single codebase. This design lab is a playground "
+                              "and showcase of Flutter's many widgets, behaviors, "
+                              "anima";
+    const std::string text2 =       "tions, layouts, and more.  Learn more about Flutter at "
+                                    "https://flutter.io google";
+    const std::string text3 = "_logo.\n\nTo see the source code for this app, please visit the ";
+    const std::string text4 = "flutter github repo";
+    {
+      SkParagraphBuilder builder(paraStyle, fontCollection);
+      builder.pushStyle(style0);
+      builder.addText(text0);
+      builder.addText(text1);
+      builder.addText(text2);
+      builder.addText(text3);
+      builder.addText(text4);
+      builder.pop();
+
+      auto paragraph = builder.Build();
+      paragraph->layout(w - margin * 2);
+      paragraph->paint(canvas, margin, margin);
+    }
+  }
+  void onDrawContent(SkCanvas* canvas) override {
+
+    canvas->drawColor(SK_ColorWHITE);
+    SkScalar width = this->width()/5;
+    SkScalar height = this->height()/2;
+
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kThin_Weight);
+    canvas->translate(width, 0);
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kExtraLight_Weight);
+    canvas->translate(width, 0);
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kLight_Weight);
+    canvas->translate(width, 0);
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kNormal_Weight);
+    canvas->translate(width, 0);
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kMedium_Weight);
+    canvas->translate(-this->width(), height);
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kSemiBold_Weight);
+    canvas->translate(width, 0);
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kBold_Weight);
+    canvas->translate(width, 0);
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kExtraBold_Weight);
+    canvas->translate(width, 0);
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kBlack_Weight);
+    canvas->translate(width, 0);
+    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kExtraBlack_Weight);
+  }
+
+ private:
+  typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
+};
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_SAMPLE(return new ParagraphView1();)
 DEF_SAMPLE(return new ParagraphView2();)
 DEF_SAMPLE(return new ParagraphView3();)
 DEF_SAMPLE(return new ParagraphView4();)
+DEF_SAMPLE(return new ParagraphView5();)
