@@ -56,7 +56,7 @@ SkParagraph::SkParagraph(const std::u16string& utf16text, SkParagraphStyle style
 SkParagraphImpl::~SkParagraphImpl() = default;
 
 void SkParagraphImpl::resetContext() {
-  
+
   fAlphabeticBaseline = 0;
   fHeight = 0;
   fWidth = 0;
@@ -73,7 +73,7 @@ void SkParagraphImpl::resetContext() {
 }
 
 bool SkParagraphImpl::layout(double doubleWidth) {
-  
+
   auto width = SkDoubleToScalar(doubleWidth);
 
   this->resetContext();
