@@ -9,13 +9,15 @@
 #include "SkRun.h"
 #include "SkSpan.h"
 
-SkRun::SkRun(const SkShaper::RunHandler::RunInfo& info, SkScalar offsetX) {
+SkRun::SkRun(const SkShaper::RunHandler::RunInfo& info, size_t index, SkScalar offsetX) {
 
   fFont = info.fFont;
-  fLtr = info.fBidiLevel % 2 == 0;
+  fBidiLevel = info.fBidiLevel;
   fAdvance = info.fAdvance;
   glyphCount = info.glyphCount;
   fUtf8Range = info.utf8Range;
+
+  fIndex = index;
 
   fOffset = SkVector::Make(offsetX, 0);
   fGlyphs.push_back_n(info.glyphCount);
@@ -63,4 +65,32 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
   //sk_careful_memcpy(blobBuffer.points(),
   //                  fPositions.data() + pos,
   //                  size * sizeof(SkPoint));
+}
+
+void SkRun::iterateThroughClusters(std::function<void(
+                                        size_t glyphStart,
+                                        size_t glyphEnd,
+                                        size_t charStart,
+                                        size_t charEnd,
+                                        SkVector size)> apply) {
+
+  // We should be agnostic of bidi but there are edge cases different for LTR and RTL
+  size_t start = 0;
+  size_t cluster = leftToRight() ?  this->fUtf8Range.begin() : this->fUtf8Range.end();
+  for (size_t glyph = 1; glyph <= this->size(); ++glyph) {
+
+    auto nextCluster = leftToRight()
+            ? glyph == this->size() ? this->fUtf8Range.end() : this->cluster(glyph)
+            : this->cluster(glyph - 1);
+
+    if (nextCluster == cluster) {
+      continue;
+    }
+
+    SkVector size = SkVector::Make(this->calculateWidth(start, glyph), this->calculateHeight());
+    apply(start, glyph, cluster, nextCluster, size);
+
+    start = glyph;
+    cluster = nextCluster;
+  };
 }

@@ -160,7 +160,7 @@ SkRun* SkTextWrapper::shapeEllipsis(SkRun* run) {
 
     Buffer runBuffer(const RunInfo& info) override {
 
-      fRun = fMaster->fEllipsisCache.set(info.fFont, SkRun(info, 0));
+      fRun = fMaster->fEllipsisCache.set(info.fFont, SkRun(info, 0, 0));
       return fRun->newRunBuffer();
     }
 

@@ -129,7 +129,7 @@ class SkRun {
  public:
 
   SkRun() : fFont() { }
-  SkRun(const SkShaper::RunHandler::RunInfo& info, SkScalar shiftX);
+  SkRun(const SkShaper::RunHandler::RunInfo& info, size_t index, SkScalar shiftX);
 
   SkShaper::RunHandler::Buffer newRunBuffer();
 
@@ -149,6 +149,8 @@ class SkRun {
   inline SkScalar descent() const { return fFontMetrics.fDescent; }
   inline SkScalar leading() const { return fFontMetrics.fLeading; }
   inline const SkFont& font() const { return fFont ; };
+  bool leftToRight() const { return fBidiLevel % 2 == 0; }
+  size_t index() const { return fIndex; }
 
   inline SkShaper::RunHandler::Range range() const { return fUtf8Range; }
   inline size_t cluster(size_t pos) const { return fClusters[pos]; }
@@ -171,13 +173,17 @@ class SkRun {
 
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 
+  void iterateThroughClusters(std::function<void(
+      size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size)> apply);
+
  private:
 
   friend class SkParagraphImpl;
 
   SkFont fFont;
   SkFontMetrics fFontMetrics;
-  uint8_t fLtr;
+  size_t fIndex;
+  uint8_t fBidiLevel;
   SkVector fAdvance;
   size_t glyphCount;
   SkShaper::RunHandler::Range fUtf8Range;

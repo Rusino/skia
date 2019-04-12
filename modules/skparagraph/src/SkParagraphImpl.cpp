@@ -100,8 +100,13 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
     return;
   }
 
+  // Build the picture lazily not until we actually have to paint (or never)
   if (nullptr == fPicture) {
-    // Build the picture lazily not until we actually have to paint (or never)
+
+    // BEFORE the next call: we walk clusters via fCluster table
+    this->rearrangeLinesByBidi();
+    // AFTER the previous call: we walk clusters via visual runs
+
     this->formatLinesByWords(fWidth);
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
@@ -365,50 +370,22 @@ void SkParagraphImpl::paintDecorations(
 
 void SkParagraphImpl::buildClusterTable() {
 
-  size_t runStart = 0;
   for (auto& run : fRuns) {
-    size_t cluster = run.fUtf8Range.begin();
-    SkScalar width = 0;
-    size_t glyphStart = 0;
-    for (size_t glyphPos = 0; glyphPos <= run.size(); ++glyphPos) {
 
-      width += run.calculateWidth(glyphStart, glyphPos);
-      size_t nextCluster;
-      if (glyphPos < run.size()) {
-        nextCluster = run.cluster(glyphPos);
-        SkASSERT(nextCluster <= run.fUtf8Range.end());
-        if (cluster == nextCluster) {
-          // Many glyphs in one cluster
-          continue;
-        } else if (nextCluster > cluster + 1) {
-          // Many characters in one cluster
-        } else {
-          if (nextCluster != cluster + 1) {
-            if (glyphPos == run.size() - 1) {
-              nextCluster = run.fUtf8Range.end() - 1;
-            }
-          }
-        }
-      } else {
-        nextCluster = run.fUtf8Range.end();
-      }
+    run.iterateThroughClusters(
+      [&run, this](size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size) {
+        SkCluster data;
+        data.fRun = &run;
+        data.fStart = glyphStart;
+        data.fEnd = glyphEnd;
+        data.fText = SkSpan<const char>(fUtf8.begin() + charStart, charEnd - charStart);
 
-      SkCluster data;
-      data.fRun = &run;
-      data.fStart = glyphStart;
-      data.fEnd = glyphPos;
-      data.fText = SkSpan<const char>(fUtf8.begin() + cluster, nextCluster - cluster);
-      data.fWidth = width;
-      data.fHeight = run.calculateHeight();
-      fClusters.emplace_back(data);
-      fIndexes.set(fUtf8.begin() + cluster, fClusters.size() - 1);
-      //SkDebugf("Cluster[%d:%d] (%d:%d), %s\n", data.fStart, data.fEnd - 1, cluster, nextCluster, toString(data.fText).c_str());
-
-      cluster = nextCluster;
-      glyphStart = glyphPos;
-      width = 0;
-    }
-    runStart += run.size();
+        data.fWidth = size.fX;
+        data.fHeight = size.fY;
+        fClusters.emplace_back(data);
+        fIndexes.set(fUtf8.begin() + charStart, fClusters.size() - 1);
+        //SkDebugf("Cluster[%d:%d] (%d:%d), %s\n", data.fStart, data.fEnd - 1, cluster, nextCluster, toString(data.fText).c_str());
+      });
   }
 }
 
@@ -529,7 +506,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
 
     Buffer runBuffer(const RunInfo& info) override {
 
-      auto& run = fParagraph->fRuns.emplace_back(info, fAdvance.fX);
+      auto& run = fParagraph->fRuns.emplace_back(info, fParagraph->fRuns.count(), fAdvance.fX);
       return run.newRunBuffer();
     }
 
@@ -659,6 +636,36 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
       default:
         break;
     }
+  }
+}
+
+void SkParagraphImpl::rearrangeLinesByBidi() {
+
+  for (auto& line : fTextWrapper.getLines()) {
+
+    auto start = findCluster(line.text().begin());
+    auto end = findCluster(line.text().end() - 1);
+    int32_t numRuns = end->fRun->index() - start->fRun->index() + 1;
+
+    std::vector<UBiDiLevel> runLevels;
+    for (auto run = start->fRun; run <= end->fRun; ++run) {
+      runLevels.emplace_back(run->fBidiLevel);
+    }
+
+    std::vector<int32_t> logicalFromVisual(numRuns);
+    ubidi_reorderVisual(runLevels.data(), numRuns, logicalFromVisual.data());
+
+    SkTArray<SkRun*> visuals(numRuns);
+    for (auto visual : logicalFromVisual) {
+      auto index = start->fRun->index() + visual;
+      auto& run = fRuns[index];
+      visuals.push_back(&run);
+      SkDebugf("%d %d:", visual, run.fBidiLevel);
+      SkSpan<const char> text(fUtf8.begin() + run.range().begin(), run.range().size());
+      SkDebugf("%s\n", toString(text).c_str());
+    }
+
+    line.setVisuals(std::move(visuals));
   }
 }
 
@@ -878,7 +885,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
       [&results, &maxClip, line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
         clip.offset(line.fShift, 0);
         clip.offset(line.fOffset);
-        results.emplace_back(clip, run->fLtr ? SkTextDirection::ltr : SkTextDirection::rtl);
+        results.emplace_back(clip, run->leftToRight() ? SkTextDirection::ltr : SkTextDirection::rtl);
         maxClip.join(clip);
         return true;
       });
@@ -952,7 +959,7 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, 
                 result = { SkToS32(run->fClusters.back()), UPSTREAM };
               } else {
                 auto center = (run->position(pos + 1).fX + run->position(pos).fX) / 2;
-                if ((dx <= center) == run->fLtr) {
+                if ((dx <= center) == run->leftToRight()) {
                   result = { SkToS32(run->fClusters[pos]), DOWNSTREAM };
                 } else {
                   result = { SkToS32(run->fClusters[pos + 1]), UPSTREAM };

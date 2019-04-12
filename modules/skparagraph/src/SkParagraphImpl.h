@@ -161,6 +161,7 @@ class SkParagraphImpl final: public SkParagraph {
   void shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles);
   void markClustersWithLineBreaks();
   void breakShapedTextIntoLines(SkScalar maxWidth);
+  void rearrangeLinesByBidi();
   void formatLinesByText(SkScalar maxWidth);
   void formatLinesByWords(SkScalar maxWidth);
   void justifyLine(SkLine& line, SkScalar maxWidth);

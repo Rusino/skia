@@ -7,6 +7,7 @@
 
 #include <unicode/brkiter.h>
 #include <algorithm>
+#include <unicode/ubidi.h>
 #include "SkLine.h"
 #include "SkParagraphImpl.h"
 
@@ -30,3 +31,4 @@ void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord
     apply(fWords.back());
   }
 }
+
