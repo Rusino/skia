@@ -72,7 +72,9 @@ class SkTextWrapper {
     void extend(SkScalar w) { fWidth += w; }
 
     SkSpan<const char> trimmedText(const SkCluster* start) {
-      return SkSpan<const char>(start->fText.begin(), fTrimmedEnd->fText.end() - start->fText.begin());
+      size_t size = fTrimmedEnd->fText.end() > start->fText.begin()
+                    ? fTrimmedEnd->fText.end() - start->fText.begin() : 0;
+      return SkSpan<const char>(start->fText.begin(), size);
     }
 
    private:

@@ -826,7 +826,7 @@ void SkParagraphImpl::iterateThroughStyles(
       continue;
     }
     auto text = SkSpan<const char>(start, size);
-    SkDebugf("iterate @%f: '%s'\n", toString(text).c_str());
+    SkDebugf("iterate @%f: '%s'\n", offsetX, toString(text).c_str());
     auto width = apply(text, prevStyle, offsetX);
     offsetX += width;
     // Start all over again
@@ -837,8 +837,8 @@ void SkParagraphImpl::iterateThroughStyles(
 
   // The very last style
   auto text = SkSpan<const char>(start, size);
-  SkDebugf("iterate @%f: '%s'\n", toString(text).c_str());
-  auto width = apply(text, prevStyle, line.ellipsis() != nullptr);
+  SkDebugf("iterate @%f: '%s'\n", offsetX, toString(text).c_str());
+  auto width = apply(text, prevStyle, offsetX);
   offsetX += width;
   if (offsetX != line.width()) {
     SkDebugf("*******************************************\n");
@@ -913,7 +913,7 @@ SkScalar SkParagraphImpl::iterateThroughRuns(
   // 2. Each run should start where the previous run ends so we should offset that run to match that
   auto& visuals = line.visuals();
   SkScalar lineOffset = 0;
-  SkScalar runOffset = 0;
+  SkScalar runOffset = offsetX;
   for (int32_t index = 0; index < visuals.count(); ++index) {
     auto run = visuals[index];
     auto range = run->range();
@@ -960,6 +960,7 @@ SkScalar SkParagraphImpl::iterateThroughRuns(
                                     0,
                                     run->calculateHeight());
     clip.offset(run->offset());
+    SkScalar leftGlyphDiff = 0;
     for (auto cluster = start; cluster <= end; ++cluster) {
 
       size += (cluster->fEnd - cluster->fStart);
@@ -982,6 +983,10 @@ SkScalar SkParagraphImpl::iterateThroughRuns(
     SkDebugf("Here we move the clip to start from %f by %f\n", runOffset, shift1);
     SkDebugf("Here we move the text to start from %f by %f\n", runOffset, shift2);
     clip.offset(shift1, 0);
+    if (leftGlyphDiff != 0) {
+      SkDebugf("Correct the left side: %f\n", leftGlyphDiff);
+      clip.fLeft += leftGlyphDiff;
+    }
     SkDebugf("Clip2: %f:%f\n", clip.fLeft, clip.fRight);
     apply(run, pos, size, clip, shift2);
 
@@ -997,7 +1002,7 @@ SkScalar SkParagraphImpl::iterateThroughRuns(
     }
   }
 
-  return runOffset;
+  return runOffset - offsetX;
 }
 
 // Returns a vector of bounding boxes that enclose all text between
