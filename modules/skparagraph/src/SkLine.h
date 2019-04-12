@@ -70,12 +70,14 @@ class SkLine {
       : fText(text)
       , fShift(0)
       , fAdvance(advance)
+      , fWidth(advance.fX)
       , fOffset(offset)
       , fEllipsis(ellipsis)
       , fSizes(sizes) { }
 
   inline SkSpan<const char> text() const { return fText; }
   inline SkVector advance() const { return fAdvance; }
+  inline SkScalar width() const { return fWidth; }
   inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
   inline SkRun* ellipsis() const { return fEllipsis; }
   inline SkFontSizes sizes() const { return fSizes; }
@@ -92,6 +94,7 @@ class SkLine {
   SkTArray<SkWord, true> fWords; // Text broken into words by ICU word breaker
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size
+  SkScalar fWidth;
   SkVector fOffset;   // Text position on the screen
   SkRun* fEllipsis;   // In case the line ends with the ellipsis
   SkFontSizes fSizes;

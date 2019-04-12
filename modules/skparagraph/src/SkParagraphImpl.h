@@ -165,30 +165,15 @@ class SkParagraphImpl final: public SkParagraph {
   void formatLinesByText(SkScalar maxWidth);
   void formatLinesByWords(SkScalar maxWidth);
   void justifyLine(SkLine& line, SkScalar maxWidth);
-  void paintText(
-      SkCanvas* canvas,
-      const SkLine& line,
-      SkSpan<const char> text,
-      const SkTextStyle& style,
-      bool endsWithEllipsis) const;
-  void paintBackground(
-      SkCanvas* canvas,
-      const SkLine& line,
-      SkSpan<const char> text,
-      const SkTextStyle& style,
-      bool endsWithEllipsis) const;
-  void paintShadow(
-      SkCanvas* canvas,
-      const SkLine& line,
-      SkSpan<const char> text,
-      const SkTextStyle& style,
-      bool endsWithEllipsis) const;
-  void paintDecorations(
-      SkCanvas* canvas,
-      const SkLine& line,
-      SkSpan<const char> text,
-      const SkTextStyle& style,
-      bool endsWithEllipsis) const;
+  SkScalar paintText(
+    SkCanvas* canvas, const SkLine& line, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
+  SkScalar paintBackground(
+    SkCanvas* canvas, const SkLine& line, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
+  SkScalar paintShadow(
+    SkCanvas* canvas, const SkLine& line, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
+  SkScalar paintDecorations(
+    SkCanvas* canvas, const SkLine& line, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
+
   void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
 
   SkCluster* findCluster(const char* ch) const;
@@ -196,12 +181,12 @@ class SkParagraphImpl final: public SkParagraph {
   void iterateThroughStyles(
       const SkLine& line,
       SkStyleType styleType,
-      std::function<bool(SkSpan<const char> text, const SkTextStyle& style, bool endsWithEllipsis)> apply) const;
-  void iterateThroughRuns(
+      std::function<SkScalar(SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX)> apply) const;
+  SkScalar iterateThroughRuns(
       const SkLine& line,
       SkSpan<const char> text,
-      bool endsWithEllipsis,
-      std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
+      SkScalar offsetX,
+      std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
 
   // Input
   SkTArray<SkBlock> fTextStyles;

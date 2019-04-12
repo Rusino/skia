@@ -111,6 +111,8 @@ class SkTextWrapper {
   SkRun* shapeEllipsis(SkRun* run);
   SkRun* getEllipsis(SkRun* run);
 
+  void iterateThroughClustersByText(std::function<bool(const SkCluster&)> apply);
+
   SkSpan<SkCluster> fClusters;
   SkTArray<SkLine, true> fLines;
   SkScalar fMaxWidth;
