@@ -9,10 +9,10 @@
 #include "SkRun.h"
 #include "SkSpan.h"
 
-SkRun::SkRun(const SkShaper::RunHandler::RunInfo& info, SkScalar offsetX) {
+SkRun::SkRun(const SkShaper::RunHandler::RunInfo& info, SkScalar offsetX, size_t index) {
 
   fFont = info.fFont;
-  fLtr = info.fBidiLevel % 2 == 0;
+  fBidiLevel = info.fBidiLevel;
   fAdvance = info.fAdvance;
   glyphCount = info.glyphCount;
   fUtf8Range = info.utf8Range;
@@ -22,6 +22,8 @@ SkRun::SkRun(const SkShaper::RunHandler::RunInfo& info, SkScalar offsetX) {
   fPositions.push_back_n(info.glyphCount);
   fClusters.push_back_n(info.glyphCount);
   info.fFont.getMetrics(&fFontMetrics);
+
+  fIndex = index;
 }
 
 SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
@@ -43,9 +45,9 @@ SkScalar SkRun::calculateHeight() {
 SkScalar SkRun::calculateWidth(size_t start, size_t end) {
   SkASSERT(start <= end);
   if (end == size()) {
-    return fAdvance.fX - fPositions[start].fX + fPositions[0].fX;
+    return fAdvance.fX - fPositions[start].fX + fPositions.front().fX;
   } else {
-   return fPositions[end].fX - fPositions[start].fX;
+    return fPositions[end].fX - fPositions[start].fX;
   }
 }
 
@@ -63,4 +65,45 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
   //sk_careful_memcpy(blobBuffer.points(),
   //                  fPositions.data() + pos,
   //                  size * sizeof(SkPoint));
+}
+
+// With respect to bidi
+void SkRun::iterateThroughClusters(std::function<void(
+        size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size)> apply) {
+
+  if (leftToRight()) {
+    size_t start = 0;
+    size_t cluster = this->cluster(start);
+    for (size_t glyph = 1; glyph <= this->size(); ++glyph) {
+
+      auto nextCluster =
+          glyph == this->size() ? this->fUtf8Range.end() : this->cluster(glyph);
+      if (nextCluster == cluster) {
+        continue;
+      }
+
+      SkVector size = SkVector::Make(this->calculateWidth(start, glyph), this->calculateHeight());
+      apply(start, glyph, cluster, nextCluster, size);
+
+      start = glyph;
+      cluster = nextCluster;
+    };
+  } else {
+    size_t start = 0;
+    size_t cluster = this->fUtf8Range.end();
+    for (size_t glyph = 1; glyph <= this->size(); ++glyph) {
+
+      auto nextCluster = this->cluster(glyph - 1);
+      if (nextCluster == cluster) {
+        continue;
+      }
+
+      SkVector size = SkVector::Make(this->calculateWidth(start, glyph), this->calculateHeight());
+      apply(start, glyph, nextCluster, cluster, size);
+
+      start = glyph;
+      cluster = nextCluster;
+    };
+  }
+
 }

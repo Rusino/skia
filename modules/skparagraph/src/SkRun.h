@@ -68,7 +68,9 @@ struct SkCluster {
 
   SkScalar sizeToChar(const char* ch) const {
 
-    if (ch < fText.begin() || ch >= fText.end()) {
+    if (ch >= fText.end()) {
+      return fWidth;
+    } else if (ch < fText.begin()) {
       return 0;
     }
     auto shift = ch - fText.begin();
@@ -78,8 +80,10 @@ struct SkCluster {
   }
   SkScalar sizeFromChar(const char* ch) const {
 
-    if (ch < fText.begin() || ch >= fText.end()) {
+    if (ch < fText.begin()) {
       return 0;
+    } else if (ch >= fText.end()) {
+      return fWidth;
     }
     auto shift = fText.end() - ch - 1;
     auto ratio = shift * 1.0 / fText.size();
@@ -129,7 +133,7 @@ class SkRun {
  public:
 
   SkRun() : fFont() { }
-  SkRun(const SkShaper::RunHandler::RunInfo& info, SkScalar shiftX);
+  SkRun(const SkShaper::RunHandler::RunInfo& info, SkScalar shiftX, size_t index);
 
   SkShaper::RunHandler::Buffer newRunBuffer();
 
@@ -148,7 +152,8 @@ class SkRun {
   inline SkScalar ascent() const { return fFontMetrics.fAscent; }
   inline SkScalar descent() const { return fFontMetrics.fDescent; }
   inline SkScalar leading() const { return fFontMetrics.fLeading; }
-  inline const SkFont& font() const { return fFont ; };
+  inline const SkFont& font() const { return fFont; }
+  inline size_t index() const { return fIndex; }
 
   inline SkShaper::RunHandler::Range range() const { return fUtf8Range; }
   inline size_t cluster(size_t pos) const { return fClusters[pos]; }
@@ -163,6 +168,7 @@ class SkRun {
   SkRect clip() {
     return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
   }
+  bool leftToRight() const { return fBidiLevel % 2 == 0; }
 
   SkScalar calculateHeight();
   SkScalar calculateWidth(size_t start, size_t end);
@@ -171,13 +177,17 @@ class SkRun {
 
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 
+  void iterateThroughClusters(std::function<void(
+      size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size)> apply);
+
  private:
 
   friend class SkParagraphImpl;
 
+  size_t fIndex;
   SkFont fFont;
   SkFontMetrics fFontMetrics;
-  uint8_t fLtr;
+  uint8_t fBidiLevel;
   SkVector fAdvance;
   size_t glyphCount;
   SkShaper::RunHandler::Range fUtf8Range;

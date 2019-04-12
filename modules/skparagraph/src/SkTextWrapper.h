@@ -57,6 +57,11 @@ class SkTextWrapper {
     }
 
     void add(const SkCluster& cluster) {
+
+      auto begin = SkTMin(cluster.fText.begin(), fText.begin());
+      auto end = SkTMax(cluster.fText.end(), fText.end());
+      fText = SkSpan<const char>(begin, end - begin);
+
       if (cluster.isWhitespaces()) {
         fWhitespaces.fX += cluster.fWidth;
         fWhitespaces.fY = SkTMax(fWhitespaces.fY, cluster.fRun->calculateHeight());
@@ -65,6 +70,9 @@ class SkTextWrapper {
         fWidth += cluster.fWidth + fWhitespaces.fX;
         fWhitespaces = SkVector::Make(0, 0);
         fSizes.add(cluster.fRun->ascent(), cluster.fRun->descent(), cluster.fRun->leading());
+        auto begin = SkTMin(cluster.fText.begin(), fTrimmedText.begin());
+        auto end = SkTMax(cluster.fText.end(), fTrimmedText.end());
+        fTrimmedText = SkSpan<const char>(begin, end - begin);
       }
       fEnd = &cluster;
     }
@@ -72,7 +80,10 @@ class SkTextWrapper {
     void extend(SkScalar w) { fWidth += w; }
 
     SkSpan<const char> trimmedText(const SkCluster* start) {
-      return SkSpan<const char>(start->fText.begin(), fTrimmedEnd->fText.end() - start->fText.begin());
+
+      auto begin = SkTMin(start->fText.begin(), fEnd->fText.begin());
+      auto end = SkTMax(start->fText.end(), fEnd->fText.end());
+      return SkSpan<const char>(begin, end - begin);
     }
 
    private:
@@ -81,6 +92,8 @@ class SkTextWrapper {
     SkVector fWhitespaces;
     const SkCluster* fEnd;
     const SkCluster* fTrimmedEnd;
+    SkSpan<const char> fTrimmedText;
+    SkSpan<const char> fText;
   };
 
  public:
@@ -100,9 +113,22 @@ class SkTextWrapper {
 
   void reset() { fLines.reset(); }
 
+  SkSpan<const char> respectBidi(Position pos1, Position pos2) {
+    // Walk through the cluster table and pick all the characters
+    // that placed between text.begin() and text.end() there
+    // case: abcFED ->abcDEF, so the text will be [a:D]
+    const SkCluster* cluster1 = pos1.end();
+    const SkCluster* cluster2 = pos2.end();
+    const char* start = cluster1->fRun->leftToRight() ? cluster1->fText.begin() : cluster1->fText.end();
+    const char* end = cluster2->fRun->leftToRight() ? cluster2->fText.end() : cluster2->fText.begin();
+    return SkSpan<const char>(start, end - start);
+  }
+
  private:
 
-  bool endOfText() const { return fLineStart == fClusters.end(); }
+  void iterateThroughClustersByText(std::function<bool(const SkCluster&)> apply);
+
+  bool endOfText() const { return fLineGlyphStart == fClusters.end(); }
   bool reachedLinesLimit(int32_t delta) const {
     return fMaxLines != std::numeric_limits<size_t>::max() && fLines.size() >= fMaxLines + delta;
   }
@@ -116,7 +142,8 @@ class SkTextWrapper {
   SkScalar fMaxWidth;
   size_t fMaxLines;
   std::string fEllipsis;
-  const SkCluster* fLineStart;
+  const SkCluster* fLineGlyphStart;
+  const SkCluster* fLineCharStart;
   Position fClosestBreak;
   Position fAfterBreak;
   SkVector fCurrentLineOffset;

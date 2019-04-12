@@ -6,6 +6,17 @@
  */
 
 #include "SkTextWrapper.h"
+#include <stack>
+
+namespace {
+std::string toString(SkSpan<const char> text) {
+  icu::UnicodeString
+      utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
+  std::string str;
+  utf16.toUTF8String(str);
+  return str;
+}
+}
 
 SkRun* SkTextWrapper::createEllipsis(Position& pos) {
   if (!reachedLinesLimit(-1) || pos.end() == fClusters.end() - 1) {
@@ -17,7 +28,7 @@ SkRun* SkTextWrapper::createEllipsis(Position& pos) {
   }
   // Replace some clusters with the ellipsis
   auto lineEnd = pos.trimmed();
-  while (lineEnd >= fLineStart) {
+  while (lineEnd >= fLineGlyphStart) {
     // Calculate the ellipsis sizes for a given font
     SkRun* ellipsis = getEllipsis(lineEnd->fRun);
     if (pos.trimmedWidth() + ellipsis->advance().fX <= fMaxWidth) {
@@ -46,25 +57,53 @@ bool SkTextWrapper::addLine(Position& pos) {
   fLines.emplace_back(
       fCurrentLineOffset,
       SkVector::Make(pos.trimmedWidth(), pos.height()),
-      pos.trimmedText(fLineStart),
+      respectBidi(fLineCharStart, pos),
       ellipsis,
       pos.sizes());
-
+  if (true) {
+    auto& line = fLines.back();
+    SkDebugf("addLine %F '%s'\n", fCurrentLineOffset.fX, toString(line.text()).c_str());
+  }
   fWidth =  SkMaxScalar(fWidth, pos.trimmedWidth());
   fHeight += pos.height();
-  fLineStart = pos.end() + 1;
+
+  // Eat up all the whitespaces and set the start to the next line
+  fLineGlyphStart = pos.end() + 1;
   if (!pos.end()->isHardBreak()) {
-    while (fLineStart < fClusters.end() &&
-        fLineStart->isWhitespaces()) { ++fLineStart; }
+    while (fLineGlyphStart < fClusters.end() &&
+        fLineGlyphStart->isWhitespaces()) { ++fLineGlyphStart; }
   }
+  fLineCharStart = fLineGlyphStart;
   fCurrentLineOffset.fY += pos.height();
-  if (fLineStart < fClusters.end()) {
+  if (fLineGlyphStart < fClusters.end()) {
     // Shift the rest of the line horizontally to the left
     // to compensate for the run positions since we broke the line
-    fCurrentLineOffset.fX = - fLineStart->fRun->position(fLineStart->fStart).fX;
+    fCurrentLineOffset.fX = - fLineGlyphStart->fRun->position(fLineGlyphStart->fStart).fX;
   }
-  pos.clean(fLineStart);
+  pos.clean(fLineGlyphStart);
   return !reachedLinesLimit(0);
+}
+
+void SkTextWrapper::iterateThroughClustersByText(std::function<bool(const SkCluster&)> apply) {
+
+  std::stack<SkCluster*> clusters;
+  SkCluster* previous = nullptr;
+  for (auto& cluster : fClusters) {
+    if (previous != nullptr && previous->fText.end() != cluster.fText.begin()) {
+      clusters.push(&cluster);
+      continue;
+    }
+
+    apply(cluster);
+    previous = &cluster;
+
+    while (!clusters.empty() && previous->fText.end() == clusters.top()->fText.begin()) {
+      apply(*clusters.top());
+      previous = clusters.top();
+      clusters.pop();
+    }
+  }
+  SkASSERT(clusters.empty());
 }
 
 void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
@@ -75,23 +114,25 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
   fMaxWidth = maxWidth;
   fMaxLines = maxLines;
   fEllipsis = ellipsis;
-  fLineStart = fClusters.begin();
-  fClosestBreak.clean(fLineStart);
-  fAfterBreak.clean(fLineStart);
+  fLineGlyphStart = fClusters.begin();
+  fLineCharStart = fClusters.begin();
+  fClosestBreak.clean(fLineGlyphStart);
+  fAfterBreak.clean(fLineGlyphStart);
   fCurrentLineOffset = SkVector::Make(0, 0);
   fWidth = 0;
   fHeight = 0;
   fMinIntrinsicWidth = 0;
 
-  // Iterate through all the clusters in the text
   SkScalar wordLength = 0;
-  for (auto& cluster : fClusters) {
-
+  // Iterate through all the clusters by the TEXT order (ignoring bidi)
+  iterateThroughClustersByText([&](const SkCluster& cluster) {
     if (!cluster.isWhitespaces()) {
+      //SkDebugf("'%s'\n", toString(cluster.fText).c_str());
+      //SkDebugf("WIDTHS: %f %f %f %f\n", cluster.fWidth, fAfterBreak.width(), fClosestBreak.width(), wordLength);
       wordLength += cluster.fWidth;
       if (fClosestBreak.width() + fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
         // Cluster does not fit: add the line until the closest break
-        if (!addLine(fClosestBreak))  break;
+        if (!addLine(fClosestBreak))  return false;
       }
       if (fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
         // Cluster does not fit yet: try to break the text by hyphen
@@ -102,13 +143,13 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
         // Cluster does not fit yet: add the line with the rest of clusters
         SkASSERT(fClosestBreak.width() == 0);
         fClosestBreak.add(fAfterBreak);
-        if (!addLine(fClosestBreak))  break;
+        if (!addLine(fClosestBreak))  return false;
       }
       if (cluster.fWidth > fMaxWidth) {
         //  Cluster still does not fit: it's too long; let's clip it
         fClosestBreak.add(cluster);
-        if (!addLine(fClosestBreak))  break;
-        continue;
+        if (!addLine(fClosestBreak))  return false;
+        return true;
       }
     } else {
       fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordLength);
@@ -116,15 +157,22 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
     }
     // The cluster fits the line
     fAfterBreak.add(cluster);
+    // Update the lineCharStart with respect to bidi
+    if (fLineCharStart->fText.begin() > cluster.fText.begin()) {
+      fLineCharStart = &cluster;
+    }
 
     if (cluster.canBreakLineAfter()) {
       fClosestBreak.add(fAfterBreak);
     }
     if (cluster.isHardBreak()) {
       // Hard line break
-      if (!addLine(fClosestBreak))  break;
+      if (!addLine(fClosestBreak))  return false;
     }
-  }
+
+    return true;
+  });
+
   // Make sure nothing left
   if (!endOfText() && !reachedLinesLimit(0)) {
     fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordLength);
@@ -160,7 +208,7 @@ SkRun* SkTextWrapper::shapeEllipsis(SkRun* run) {
 
     Buffer runBuffer(const RunInfo& info) override {
 
-      fRun = fMaster->fEllipsisCache.set(info.fFont, SkRun(info, 0));
+      fRun = fMaster->fEllipsisCache.set(info.fFont, SkRun(info, 0, 0));
       return fRun->newRunBuffer();
     }
 

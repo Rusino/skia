@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <SkTHash.h>
 #include "SkDartTypes.h"
 #include "SkSpan.h"
 #include "SkTArray.h"
@@ -63,6 +64,8 @@ class SkLine {
 
   SkLine() { }
 
+  ~SkLine() = default;
+
   SkLine(SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis, SkFontSizes sizes)
       : fText(text)
       , fShift(0)
@@ -78,6 +81,12 @@ class SkLine {
   inline SkFontSizes sizes() const { return fSizes; }
   inline bool empty() const { return fText.empty(); }
   void breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply);
+  const SkTArray<SkRun*>&  visuals() const { return fVisuals; }
+
+  void addVisual(int32_t index, SkRun* run) {
+    SkASSERT(index == fVisuals.count());
+    fVisuals.push_back(run);
+  }
 
  private:
 
@@ -90,5 +99,7 @@ class SkLine {
   SkVector fOffset;   // Text position on the screen
   SkRun* fEllipsis;   // In case the line ends with the ellipsis
   SkFontSizes fSizes;
+
+  SkTArray<SkRun*> fVisuals;
 };
 

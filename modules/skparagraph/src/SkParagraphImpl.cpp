@@ -29,10 +29,14 @@ namespace {
     return str;
   }
 
+  void print(const std::string& label, const SkCluster* cluster) {
+    SkDebugf("%s[%d:%f]: '%s'\n", label.c_str(), cluster->fStart, cluster->fRun->position(cluster->fStart).fX, toString(cluster->fText).c_str());
+  }
+
   SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
     auto begin = SkTMax(a.begin(), b.begin());
     auto end = SkTMin(a.end(), b.end());
-    return SkSpan<const char>(begin, end - begin);
+    return SkSpan<const char>(begin, begin <= end ? end - begin : 0);
   }
 
   static inline SkUnichar utf8_next(const char** ptr, const char* end) {
@@ -94,6 +98,32 @@ bool SkParagraphImpl::layout(double doubleWidth) {
   return true;
 }
 
+// TODO: this is a temp solution until we find the right one
+void SkParagraphImpl::rearrangeRunsByBidi(SkLine& line) {
+
+  auto start = findCluster(line.text().begin());
+  auto end = findCluster(line.text().end() - 1);
+  int32_t numRuns = end->fRun->index() - start->fRun->index() + 1;
+  SkAutoSTMalloc<4, UBiDiLevel> runLevels(numRuns);
+
+  int32_t i = 0;
+  for (auto run = start->fRun; run <= end->fRun; ++run) {
+    runLevels[i++] = run->fBidiLevel;
+  }
+
+  SkAutoSTMalloc<4, int32_t> logicalFromVisual(numRuns);
+  ubidi_reorderVisual(runLevels, numRuns, logicalFromVisual);
+
+  for (i = 0; i < numRuns; ++i) {
+    auto index1 = start->fRun->index() + logicalFromVisual[i];
+    auto& run = fRuns[index1];
+    SkDebugf("%d %d:", index1, run.fBidiLevel);
+    SkSpan<const char> text(fUtf8.begin() + run.range().begin(), run.range().size());
+    SkDebugf("%s\n", toString(text).c_str());
+    line.addVisual(i, &fRuns[index1]);
+  }
+}
+
 void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
 
   if (fRuns.empty()) {
@@ -103,6 +133,14 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
   if (nullptr == fPicture) {
     // Build the picture lazily not until we actually have to paint (or never)
     this->formatLinesByWords(fWidth);
+
+    int i = 0;
+    for (auto& line : fTextWrapper.getLines()) {
+      SkDebugf("Line #%d: %s\n", ++i, toString(line.text()).c_str());
+      if (line.empty()) continue;
+      this->rearrangeRunsByBidi(line);
+    }
+
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
 
@@ -114,25 +152,25 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
       textCanvas->translate(line.offset().fX, line.offset().fY);
 
       this->iterateThroughStyles(line, SkStyleType::Background,
-         [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style, bool endsWithEllipsis) {
+         [this, textCanvas, &line](SkSpan<const char> text, SkTextStyle style, bool endsWithEllipsis) {
            this->paintBackground(textCanvas, line, text, style, endsWithEllipsis);
            return true;
          });
 
       this->iterateThroughStyles(line, SkStyleType::Shadow,
-         [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style,  bool endsWithEllipsis) {
+         [this, textCanvas, &line](SkSpan<const char> text, SkTextStyle style,  bool endsWithEllipsis) {
            this->paintShadow(textCanvas, line, text, style, endsWithEllipsis);
            return true;
          });
 
       this->iterateThroughStyles(line, SkStyleType::Foreground,
-         [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style,  bool endsWithEllipsis) {
+         [this, textCanvas, &line](SkSpan<const char> text, SkTextStyle style,  bool endsWithEllipsis) {
            this->paintText(textCanvas, line, text, style, endsWithEllipsis);
            return true;
          });
 
       this->iterateThroughStyles(line, SkStyleType::Decorations,
-         [this, textCanvas, line](SkSpan<const char> text, SkTextStyle style,  bool endsWithEllipsis) {
+         [this, textCanvas, &line](SkSpan<const char> text, SkTextStyle style,  bool endsWithEllipsis) {
            this->paintDecorations(textCanvas, line, text, style, endsWithEllipsis);
            return true;
          });
@@ -161,18 +199,28 @@ void SkParagraphImpl::paintText(
     paint.setColor(style.getColor());
   }
 
-  this->iterateThroughRuns(line, text, endsWithEllipsis,
-   [paint, canvas, line](const SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
+  this->iterateThroughRunsInVisualOrder(
+      line, text, endsWithEllipsis,
+    [paint, canvas, &line](const SkRun* run,
+                           int32_t pos,
+                           size_t size,
+                           SkScalar offsetX,
+                           SkRect clip,
+                           SkScalar shift) {
 
-     SkTextBlobBuilder builder;
-     run->copyTo(builder, SkToU32(pos), size, SkVector::Make(0, line.sizes().leading() / 2 - line.sizes().ascent()));
-     canvas->save();
-     canvas->clipRect(clip);
-     canvas->translate(shift, 0);
-     canvas->drawTextBlob(builder.make(), 0, 0, paint);
-     canvas->restore();
-     return true;
-   });
+      // TODO: take offsetX in account
+      SkTextBlobBuilder builder;
+      run->copyTo(builder,
+                  SkToU32(pos),
+                  size,
+                  SkVector::Make(offsetX, line.sizes().leading() / 2 - line.sizes().ascent()));
+      canvas->save();
+      canvas->clipRect(clip);
+      canvas->translate(shift, 0);
+      canvas->drawTextBlob(builder.make(), 0, 0, paint);
+      canvas->restore();
+      return true;
+    });
 }
 
 void SkParagraphImpl::paintBackground(
@@ -183,9 +231,14 @@ void SkParagraphImpl::paintBackground(
     bool endsWithEllipsis) const {
 
   if (!style.hasBackground()) return;
-  this->iterateThroughRuns(
+  this->iterateThroughRunsInVisualOrder(
       line, text, endsWithEllipsis,
-      [canvas, style](const SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
+      [canvas, style](const SkRun* run,
+                      int32_t pos,
+                      size_t size,
+                      SkScalar offsetX,
+                      SkRect clip,
+                      SkScalar shift) {
         canvas->drawRect(clip, style.getBackground());
         return true;
       });
@@ -211,18 +264,31 @@ void SkParagraphImpl::paintShadow(
       paint.setMaskFilter(filter);
     }
 
-    this->iterateThroughRuns(line, text, endsWithEllipsis,
-     [canvas, shadow, paint, line](const SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
-       SkTextBlobBuilder builder;
-       run->copyTo(builder, pos, size, SkVector::Make(0, line.sizes().leading() / 2 - line.sizes().ascent()));
-       canvas->save();
-       clip.offset(shadow.fOffset);
-       canvas->clipRect(clip);
-       canvas->translate(shift, 0);
-       canvas->drawTextBlob(builder.make(), shadow.fOffset.x(), shadow.fOffset.y(), paint);
-       canvas->restore();
-       return true;
-     });
+    this->iterateThroughRunsInVisualOrder(
+        line, text, endsWithEllipsis,
+      [canvas, shadow, paint, &line](const SkRun* run,
+                                     size_t pos,
+                                     size_t size,
+                                     SkScalar offsetX,
+                                     SkRect clip,
+                                     SkScalar shift) {
+        // TODO: take offsetX in account
+        SkTextBlobBuilder builder;
+        run->copyTo(builder,
+                    pos,
+                    size,
+                    SkVector::Make(0, line.sizes().leading() / 2 - line.sizes().ascent()));
+        canvas->save();
+        clip.offset(shadow.fOffset);
+        canvas->clipRect(clip);
+        canvas->translate(shift, 0);
+        canvas->drawTextBlob(builder.make(),
+                             shadow.fOffset.x(),
+                             shadow.fOffset.y(),
+                             paint);
+        canvas->restore();
+        return true;
+      });
   }
 }
 
@@ -303,112 +369,85 @@ void SkParagraphImpl::paintDecorations(
 
   if (style.getDecoration() == SkTextDecoration::kNoDecoration) return;
 
-  iterateThroughRuns(
-     line, text, endsWithEllipsis,
-     [this, canvas, style](const SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
+  iterateThroughRunsInVisualOrder(
+      line, text, endsWithEllipsis,
+      [this, canvas, style](const SkRun* run,
+                            int32_t pos,
+                            size_t size,
+                            SkScalar offsetX,
+                            SkRect clip,
+                            SkScalar shift) {
 
-       SkScalar thickness = style.getDecorationThicknessMultiplier();
-       SkScalar position;
-       switch (style.getDecoration()) {
-         case SkTextDecoration::kUnderline:
-           position = - run->ascent() + thickness;
-           break;
-         case SkTextDecoration::kOverline:
-           position = 0;
-           break;
-         case SkTextDecoration::kLineThrough: {
-           position = (run->descent() - run->ascent() - thickness) / 2;
-           break;
-         }
-         default:
-           position = 0;
-           SkASSERT(false);
-           break;
-       }
+        // TODO: take offsetX in account
+        SkScalar thickness = style.getDecorationThicknessMultiplier();
+        SkScalar position;
+        switch (style.getDecoration()) {
+          case SkTextDecoration::kUnderline:
+            position = -run->ascent() + thickness;
+            break;
+          case SkTextDecoration::kOverline:
+            position = 0;
+            break;
+          case SkTextDecoration::kLineThrough: {
+            position = (run->descent() - run->ascent() - thickness) / 2;
+            break;
+          }
+          default:
+            position = 0;
+            SkASSERT(false);
+            break;
+        }
 
-       auto width = clip.width();
-       SkScalar x = clip.left();
-       SkScalar y = clip.top() + position;
+        auto width = clip.width();
+        SkScalar x = clip.left();
+        SkScalar y = clip.top() + position;
 
-       // Decoration paint (for now) and/or path
-       SkPaint paint;
-       SkPath path;
-       this->computeDecorationPaint(paint, clip, style, path);
-       paint.setStrokeWidth(thickness);
+        // Decoration paint (for now) and/or path
+        SkPaint paint;
+        SkPath path;
+        this->computeDecorationPaint(paint, clip, style, path);
+        paint.setStrokeWidth(thickness);
 
-       switch (style.getDecorationStyle()) {
-         case SkTextDecorationStyle::kWavy:
-           path.offset(x, y);
-           canvas->drawPath(path, paint);
-           break;
-         case SkTextDecorationStyle::kDouble: {
-           canvas->drawLine(x, y, x + width, y, paint);
-           SkScalar bottom = y + thickness * 2;
-           canvas->drawLine(x, bottom, x + width, bottom, paint);
-           break;
-         }
-         case SkTextDecorationStyle::kDashed:
-         case SkTextDecorationStyle::kDotted:
-         case SkTextDecorationStyle::kSolid:
-           canvas->drawLine(x,
-                            y,
-                            x + width,
-                            y,
-                            paint);
-           break;
-         default:
-           break;
-       }
-       return true;
-     });
+        switch (style.getDecorationStyle()) {
+          case SkTextDecorationStyle::kWavy:
+            path.offset(x, y);
+            canvas->drawPath(path, paint);
+            break;
+          case SkTextDecorationStyle::kDouble: {
+            canvas->drawLine(x, y, x + width, y, paint);
+            SkScalar bottom = y + thickness * 2;
+            canvas->drawLine(x, bottom, x + width, bottom, paint);
+            break;
+          }
+          case SkTextDecorationStyle::kDashed:
+          case SkTextDecorationStyle::kDotted:
+          case SkTextDecorationStyle::kSolid:
+            canvas->drawLine(x, y, x + width, y, paint);
+            break;
+          default:
+            break;
+        }
+        return true;
+      });
 }
 
 void SkParagraphImpl::buildClusterTable() {
 
-  size_t runStart = 0;
   for (auto& run : fRuns) {
-    size_t cluster = run.fUtf8Range.begin();
-    SkScalar width = 0;
-    size_t glyphStart = 0;
-    for (size_t glyphPos = 0; glyphPos <= run.size(); ++glyphPos) {
 
-      width += run.calculateWidth(glyphStart, glyphPos);
-      size_t nextCluster;
-      if (glyphPos < run.size()) {
-        nextCluster = run.cluster(glyphPos);
-        SkASSERT(nextCluster <= run.fUtf8Range.end());
-        if (cluster == nextCluster) {
-          // Many glyphs in one cluster
-          continue;
-        } else if (nextCluster > cluster + 1) {
-          // Many characters in one cluster
-        } else {
-          if (nextCluster != cluster + 1) {
-            if (glyphPos == run.size() - 1) {
-              nextCluster = run.fUtf8Range.end() - 1;
-            }
-          }
-        }
-      } else {
-        nextCluster = run.fUtf8Range.end();
-      }
-
+    run.iterateThroughClusters(
+        [&run, this](size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size){
       SkCluster data;
       data.fRun = &run;
       data.fStart = glyphStart;
-      data.fEnd = glyphPos;
-      data.fText = SkSpan<const char>(fUtf8.begin() + cluster, nextCluster - cluster);
-      data.fWidth = width;
-      data.fHeight = run.calculateHeight();
-      fClusters.emplace_back(data);
-      fIndexes.set(fUtf8.begin() + cluster, fClusters.size() - 1);
-      //SkDebugf("Cluster[%d:%d] (%d:%d), %s\n", data.fStart, data.fEnd - 1, cluster, nextCluster, toString(data.fText).c_str());
+      data.fEnd = glyphEnd;
+      data.fText = SkSpan<const char>(fUtf8.begin() + charStart, charEnd - charStart);
 
-      cluster = nextCluster;
-      glyphStart = glyphPos;
-      width = 0;
-    }
-    runStart += run.size();
+      data.fWidth = size.fX;
+      data.fHeight = size.fY;
+      fClusters.emplace_back(data);
+      fIndexes.set(fUtf8.begin() + charStart, fClusters.size() - 1);
+    });
   }
 }
 
@@ -529,7 +568,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
 
     Buffer runBuffer(const RunInfo& info) override {
 
-      auto& run = fParagraph->fRuns.emplace_back(info, fAdvance.fX);
+      auto& run = fParagraph->fRuns.emplace_back(info, fAdvance.fX, fParagraph->fRuns.count());
       return run.newRunBuffer();
     }
 
@@ -579,20 +618,25 @@ void SkParagraphImpl::markClustersWithLineBreaks() {
   }
 
   size_t currentPos = 0;
+  SkTHashMap<const char*, bool> map;
+  while (!breaker.eof()) {
+    currentPos = breaker.next(currentPos);
+    map.set(currentPos +fUtf8.begin(), breaker.status() == UBRK_LINE_HARD);
+  }
+
   for (auto& cluster : fClusters) {
-    auto last = &cluster == &fClusters.back();
-    if (cluster.fText.end() < fUtf8.begin() + currentPos) {
-      continue;
-    } else if (cluster.fText.end() > fUtf8.begin() + currentPos) {
-      currentPos = breaker.next(currentPos);
-    }
-    if (cluster.fText.end() == fUtf8.begin() + currentPos || last) {
-      // Make sure every line break is also a cluster break
-      cluster.fBreakType =
-          breaker.status() == UBRK_LINE_HARD || breaker.eof()
-          ? SkCluster::BreakType::HardLineBreak
-          : SkCluster::BreakType::SoftLineBreak;
+    //SkDebugf("Cluster [%d:%d] %f [%d:%d] '%s'\n",
+    //         cluster.fStart, cluster.fEnd, cluster.fWidth,
+    //         cluster.fText.begin() - fUtf8.begin(),
+    //         cluster.fText.end() - fUtf8.begin(),
+    //         toString(cluster.fText).c_str());
+    auto found = map.find(cluster.fText.end());
+    if (found) {
+      cluster.fBreakType = *found || &cluster == &fClusters.back()
+                            ? SkCluster::BreakType::HardLineBreak
+                            : SkCluster::BreakType::SoftLineBreak;
       cluster.setIsWhiteSpaces();
+      //SkDebugf("Line break\n");
     }
   }
 }
@@ -698,13 +742,20 @@ void SkParagraphImpl::justifyLine(SkLine& line, SkScalar maxWidth) {
     last = &word;
     word.shift(shift);
     // Correct all runs and position for all the glyphs in the word
-    this->iterateThroughRuns(line, word.text(), false,
-       [shift](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar) {
-      for (auto i = pos; i < pos + size; ++i) {
-        run->fPositions[i].fX += shift;
-      }
-      return true;
-    });
+    this->iterateThroughRunsInVisualOrder(line, word.text(), false,
+                                          [shift](SkRun* run,
+                                                  size_t pos,
+                                                  size_t size,
+                                                  SkScalar offsetX,
+                                                  SkRect clip,
+                                                  SkScalar) {
+                                            // TODO: take offsetX in account
+                                            for (auto i = pos; i < pos + size;
+                                                 ++i) {
+                                              run->fPositions[i].fX += shift;
+                                            }
+                                            return true;
+                                          });
   }
 
   line.fShift = 0;
@@ -757,9 +808,13 @@ void SkParagraphImpl::iterateThroughStyles(
     SkStyleType styleType,
     std::function<bool(SkSpan<const char> text, const SkTextStyle& style, bool endsWithEllipsis)> apply) const {
 
+  // TODO: Make sure we run through the entire line text
+  //  (even if there is no special text style for some of it)
+  // Maintain the advanceX for all of them (apply should return it)
   const char* start = nullptr;
   size_t size = 0;
   SkTextStyle prevStyle;
+  SkDebugf("iterateThroughStyles: '%s'\n", toString(line.text()).c_str());
   for (auto& textStyle : fTextStyles) {
 
     if (!(textStyle.text() && line.text())) {
@@ -776,6 +831,7 @@ void SkParagraphImpl::iterateThroughStyles(
     auto begin = SkTMax(textStyle.text().begin(), line.text().begin());
     auto end = SkTMin(textStyle.text().end(), line.text().end());
     auto intersect = SkSpan<const char>(begin, end - begin);
+
     if (start != nullptr && style.matchOneAttribute(styleType, prevStyle)) {
       size += intersect.size();
       continue;
@@ -803,54 +859,110 @@ void SkParagraphImpl::iterateThroughStyles(
   }
 }
 
-void SkParagraphImpl::iterateThroughRuns(
+// TODO: have 2 methods: iterate through runs and iterate through visual runs
+// Iterate through all the runs on the line in a visual order
+void SkParagraphImpl::iterateThroughRunsInVisualOrder(
     const SkLine& line,
     SkSpan<const char> text,
     bool endsWithEllipsis,
-    std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const {
+    std::function<bool(SkRun* run,
+                       size_t pos,
+                       size_t size,
+                       SkScalar offsetX,
+                       SkRect clip,
+                       SkScalar shift)> apply) const {
 
-  auto start = findCluster(text.begin());
-  auto end = findCluster(text.end() - 1);
+  auto& visuals = line.visuals();
+  SkDebugf("\n\n");
+  SkDebugf("iterateThroughRunsInVisualOrder: '%s' %f\n", toString(line.text()).c_str(), line.offset().fX);
+  SkDebugf("================================\n");
+  SkScalar advanceX = 0;
+  for (int32_t index = 0; index < visuals.count(); ++index) {
+    auto run = visuals[index];
 
-  SkRect clip = SkRect::MakeEmpty();
-  size_t size = 0;
-  size_t pos = 0;
-  SkRun* run = nullptr;
-  for (auto cluster = start; cluster <= end; ++cluster) {
+    auto range = run->range();
 
-    if (run != cluster->fRun) {
-      if (run != nullptr) {
-        if (!apply(run, pos, size, clip, 0)) {
-          return;
-        }
+    SkSpan<const char> runText(&fUtf8[range.begin()], range.size());
+    SkSpan<const char> intersect = text * runText;
+
+    SkDebugf("\n");
+    SkDebugf("RUN:       '%s'\n", toString(runText).c_str());
+    SkDebugf("TEXT:      '%s'\n", toString(text).c_str());
+    SkDebugf("INTERSECT: '%s'\n", toString(intersect).c_str());
+    SkDebugf("advanceX: %f\n", advanceX);
+
+    if (intersect.empty()) {
+      advanceX = run->advance().fX;
+      continue;
+    }
+
+    auto start = findCluster(intersect.begin());
+    auto end = findCluster(intersect.end() - 1);
+    if (!run->leftToRight()) {
+      std::swap(start, end);
+    }
+
+    print("start", start);
+    print("end  ", end);
+
+    auto runStart = findCluster(runText.begin());
+    auto runEnd = findCluster(runText.end() - 1);
+    if (!run->leftToRight()) {
+      std::swap(runStart, runEnd);
+    }
+    print("runStart", runStart);
+    print("runEnd", runEnd);
+
+    if (runStart == start) {
+      SkDebugf("***************\n");
+    }
+
+    size_t size = 0;
+    size_t pos = start->fStart;
+    SkRect clip = SkRect::MakeXYWH( 0,
+                                    run->sizes().diff(line.sizes()),
+                                    0,
+                                    run->calculateHeight());
+    clip.offset(run->offset());
+    for (auto cluster = start; cluster <= end; ++cluster) {
+
+      size += (cluster->fEnd - cluster->fStart);
+      if (cluster == start) {
+        clip.fLeft = cluster->fRun->position(cluster->fStart).fX;
+        clip.fRight = clip.fLeft;
+        clip.fLeft += cluster->sizeToChar(text.begin());
       }
-      run = cluster->fRun;
-      clip = SkRect::MakeXYWH(0, run->sizes().diff(line.sizes()), 0, run->calculateHeight());
-      clip.offset(run->offset());
-      size = 0;
-      pos = cluster->fStart;
+      if (cluster == end) {
+        clip.fRight += cluster->sizeFromChar(text.end() - 1);
+      } else {
+        //clip.fRight += cluster->fWidth; (because of justification)
+        clip.fRight += cluster->fRun->calculateWidth(cluster->fStart, cluster->fEnd);
+      }
     }
 
-    size += (cluster->fEnd - cluster->fStart);
-    if (cluster == start) {
-      clip.fLeft = cluster->fRun->position(cluster->fStart).fX;
-      clip.fRight = clip.fLeft;
-      clip.fLeft += cluster->sizeToChar(text.begin());
-    }
-    if (cluster == end) {
-      clip.fRight += cluster->sizeFromChar(text.end() - 1);
-    } else {
-      //clip.fRight += cluster->fWidth; (because of justification)
-      clip.fRight += cluster->fRun->calculateWidth(cluster->fStart, cluster->fEnd);
-    }
-  }
+    SkDebugf("Clip: %f:%f\n", clip.fLeft, clip.fRight);
 
-  // The very last call
-  apply(run, pos, size, clip, 0);
-  if (endsWithEllipsis) {
-    auto ellipsis = line.ellipsis();
-    apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->offset().fX);
-  }
+    SkScalar offsetX = advanceX - start->fRun->position(start->fStart).fX;
+    if (offsetX != 0) {
+      SkDebugf("SHOULD SHIFT: %f - %f = %f\n", advanceX, clip.fLeft, offsetX);
+      //clip.offset(offsetX, 0);
+    }
+    if (!apply(run, pos, size, 0, clip, 0)) {
+      break;
+    }
+
+    advanceX += clip.width();
+
+    // TODO: calculate the ellipse for the last visual run
+    if (index == line.visuals().count() - 1) {
+
+      if (line.ellipsis() != nullptr) {
+        auto ellipsis = line.ellipsis();
+        apply(ellipsis, 0, ellipsis->size(), 0, ellipsis->clip(), ellipsis->offset().fX);
+      }
+      break;
+    }
+  };
 }
 
 
@@ -871,17 +983,24 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
 
     auto firstBox = results.size();
     SkRect maxClip = SkRect::MakeXYWH(0, 0, 0, 0);
-    iterateThroughRuns(
-      line,
-      intersect,
-      false,
-      [&results, &maxClip, line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
-        clip.offset(line.fShift, 0);
-        clip.offset(line.fOffset);
-        results.emplace_back(clip, run->fLtr ? SkTextDirection::ltr : SkTextDirection::rtl);
-        maxClip.join(clip);
-        return true;
-      });
+    iterateThroughRunsInVisualOrder(
+        line,
+        intersect,
+        false,
+        [&results, &maxClip, &line](SkRun* run,
+                                    size_t pos,
+                                    size_t size,
+                                    SkScalar offsetX,
+                                    SkRect clip,
+                                    SkScalar shift) {
+          // TODO: take offsetX in account
+          clip.offset(line.fShift, 0);
+          clip.offset(line.fOffset);
+          results.emplace_back(clip,
+                               run->leftToRight() ? SkTextDirection::ltr : SkTextDirection::rtl);
+          maxClip.join(clip);
+          return true;
+        });
 
     if (rectHeightStyle != RectHeightStyle::kTight) {
       // Align all the rectangles
@@ -930,11 +1049,17 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, 
   for (auto& line : fTextWrapper.getLines()) {
     if (line.fOffset.fY <= dy && dy < line.fOffset.fY + line.fAdvance.fY) {
       // Find the line
-      this->iterateThroughRuns(
+      this->iterateThroughRunsInVisualOrder(
           line,
           line.text(),
           false,
-          [dx, &result](const SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
+          [dx, &result](const SkRun* run,
+                        size_t pos,
+                        size_t size,
+                        SkScalar offsetX,
+                        SkRect clip,
+                        SkScalar shift) {
+            // TODO: take offsetX in account
             auto offset = run->offset();
             auto advance = run->advance();
             if (offset.fX <= dx && dx < offset.fX + advance.fX) {
@@ -947,21 +1072,22 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, 
                 }
               }
               if (pos == 0) {
-                result = { SkToS32(run->fClusters[0]), DOWNSTREAM };
+                result = {SkToS32(run->fClusters[0]), DOWNSTREAM};
               } else if (pos == run->size() - 1) {
-                result = { SkToS32(run->fClusters.back()), UPSTREAM };
+                result = {SkToS32(run->fClusters.back()), UPSTREAM};
               } else {
-                auto center = (run->position(pos + 1).fX + run->position(pos).fX) / 2;
-                if ((dx <= center) == run->fLtr) {
-                  result = { SkToS32(run->fClusters[pos]), DOWNSTREAM };
+                auto center =
+                    (run->position(pos + 1).fX + run->position(pos).fX) / 2;
+                if ((dx <= center) == run->leftToRight()) {
+                  result = {SkToS32(run->fClusters[pos]), DOWNSTREAM};
                 } else {
-                  result = { SkToS32(run->fClusters[pos + 1]), UPSTREAM };
+                  result = {SkToS32(run->fClusters[pos + 1]), UPSTREAM};
                 }
               }
               return false;
             }
             return true;
-      });
+          });
     }
   }
   return result;

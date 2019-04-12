@@ -1154,12 +1154,13 @@ class ParagraphView5 : public Sample {
     return style;
   }
 
-  void drawFlutter(SkCanvas* canvas, SkScalar w, SkScalar h,
-                   std::string ff = "sans-serif",
-                   SkScalar fs = 30,
-                   SkFontStyle::Weight weight = SkFontStyle::Weight::kNormal_Weight,
-                   size_t lineLimit = std::numeric_limits<size_t>::max(),
-                   const std::u16string& ellipsis = u"\u2026") {
+  void bidi(SkCanvas* canvas, SkScalar w, SkScalar h,
+             std::u16string text,
+             std::u16string expected,
+             std::string ff = "sans-serif",
+             SkScalar fs = 30,
+             size_t lineLimit = std::numeric_limits<size_t>::max(),
+             const std::u16string& ellipsis = u"\u2026") {
 
     SkAutoCanvasRestore acr(canvas, true);
 
@@ -1168,21 +1169,26 @@ class ParagraphView5 : public Sample {
     SkScalar margin = 20;
 
     SkPaint black;
-    black.setAntiAlias(true);
     black.setColor(SK_ColorBLACK);
     SkPaint gray;
     gray.setColor(SK_ColorLTGRAY);
 
     SkTextStyle style;
+    style.setForegroundColor(black);
     style.setFontFamily(ff);
     style.setFontSize(fs);
 
     SkTextStyle style0;
     style0.setForegroundColor(black);
-    //style0.setBackgroundColor(gray);
     style0.setFontFamily(ff);
     style0.setFontSize(fs);
-    style0.setFontStyle(SkFontStyle(weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
+    style0.setFontStyle(SkFontStyle(SkFontStyle::kNormal_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kItalic_Slant));
+
+    SkTextStyle style1;
+    style1.setForegroundColor(gray);
+    style1.setFontFamily(ff);
+    style1.setFontSize(fs);
+    style1.setFontStyle(SkFontStyle(SkFontStyle::kBold_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
 
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
@@ -1191,57 +1197,136 @@ class ParagraphView5 : public Sample {
     paraStyle.setEllipsis(ellipsis);
     fontCollection->setTestFontManager(testFontProvider);
 
-    const std::string text0 = "Flutter is an open-source project to help developers "
-                              "build high-performance, high-f";
-    const std::string text1 = "idelity, mobile apps for "
-                              "iOS and Android "
-                              "from a single codebase. This design lab is a playground "
-                              "and showcase of Flutter's many widgets, behaviors, "
-                              "anima";
-    const std::string text2 =       "tions, layouts, and more.  Learn more about Flutter at "
-                                    "https://flutter.io google";
-    const std::string text3 = "_logo.\n\nTo see the source code for this app, please visit the ";
-    const std::string text4 = "flutter github repo";
-    {
-      SkParagraphBuilder builder(paraStyle, fontCollection);
+    SkParagraphBuilder builder(paraStyle, fontCollection);
+
+    if (text.empty()) {
+      const std::u16string text0 = u"\u202Dabc";
+      const std::u16string text1 = u"\u202EFED";
+      const std::u16string text2 = u"\u202Dghi";
+      const std::u16string text3 = u"\u202ELKJ";
+      const std::u16string text4 = u"\u202Dmno";
       builder.pushStyle(style0);
       builder.addText(text0);
+      builder.pop();
+      builder.pushStyle(style1);
       builder.addText(text1);
+      builder.pop();
+      builder.pushStyle(style0);
       builder.addText(text2);
+      builder.pop();
+      builder.pushStyle(style1);
       builder.addText(text3);
+      builder.pop();
+      builder.pushStyle(style0);
       builder.addText(text4);
       builder.pop();
-
-      auto paragraph = builder.Build();
-      paragraph->layout(w - margin * 2);
-      paragraph->paint(canvas, margin, margin);
+    } else {
+      icu::UnicodeString unicode((UChar*) text.data(), SkToS32(text.size()));
+      std::string str;
+      unicode.toUTF8String(str);
+      SkDebugf("Text: %s\n", str.c_str());
+      builder.addText(text + expected);
     }
+
+    auto paragraph = builder.Build();
+    paragraph->layout(w - margin * 2);
+    paragraph->paint(canvas, margin, margin);
   }
   void onDrawContent(SkCanvas* canvas) override {
 
     canvas->drawColor(SK_ColorWHITE);
-    SkScalar width = this->width()/5;
-    SkScalar height = this->height()/2;
+    SkScalar width = this->width();
+    SkScalar height = this->height();
 
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kThin_Weight);
-    canvas->translate(width, 0);
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kExtraLight_Weight);
-    canvas->translate(width, 0);
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kLight_Weight);
-    canvas->translate(width, 0);
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kNormal_Weight);
-    canvas->translate(width, 0);
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kMedium_Weight);
-    canvas->translate(-this->width(), height);
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kSemiBold_Weight);
-    canvas->translate(width, 0);
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kBold_Weight);
-    canvas->translate(width, 0);
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kExtraBold_Weight);
-    canvas->translate(width, 0);
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kBlack_Weight);
-    canvas->translate(width, 0);
-    drawFlutter(canvas, width, height, "sans-serif", 24, SkFontStyle::kExtraBlack_Weight);
+    const std::u16string text1 = u"A \u202ENAC\u202Cner, exceedingly \u202ENAC\u202Cny,\n"
+                                 "One morning remarked to his granny.\n"
+                                 "A \u202ENAC\u202Cner \u202ENAC\u202C \u202ENAC\u202C,\n"
+                                 "Anything that he \u202ENAC\u202C,\n"
+                                 "But a \u202ENAC\u202Cner \u202ENAC\u202C't \u202ENAC\u202C a \u202ENAC\u202C, \u202ENAC\u202C he?.";
+    //bidi(canvas, width, height, text1, u"");
+    //canvas->translate(0, height);
+
+    //bidi(canvas, width, height, u"\u2067DETALOSI\u2069", u"");
+    //canvas->translate(0, height);
+
+    //bidi(canvas, width, height, u"\u202BDEDDEBME\u202C", u"");
+    //canvas->translate(0, height);
+
+    //bidi(canvas, width, height, u"\u202EEDIRREVO\u202C", u"");
+    //canvas->translate(0, height);
+
+    //bidi(canvas, width, height, u"\u200FTICILPMI\u200E", u"");
+    //canvas->translate(0, height);
+
+    bidi(canvas, width, height, u"he said \u202E\"THE VALUES ARE 123, 456, 789, OK\"\u202C.", u"");
+    canvas->translate(0, height);
+
+
+    //bidi(canvas, width, height, u"", u"");
+    //canvas->translate(0, height);
+
+    return;
+
+    /*
+     * Paragraph text: text1·RLE·text2·PDF·RLE·text3·PDF·text4
+
+        Level runs:
+
+        text1 – level 0
+        text2·text3 – level 1
+        text4 – level 0
+        Resulting isolating run sequences:
+
+        text1 – level 0
+        text2·text3 – level 1
+        text4 – level 0
+     */
+    bidi(canvas, width, height, u"text1\u202Btext2\u202C\u202Btext3\u202Ctext4 ", u"(text12txet3txettext4)");
+    canvas->translate(0, height);
+
+    /*
+     * Paragraph text: text1·RLI·text2·PDI·RLI·text3·PDI·text4
+
+        Level runs:
+
+        text1·RLI – level 0
+        text2 – level 1
+        PDI·RLI – level 0
+        text3 – level 1
+        PDI·text4 – level 0
+        Resulting isolating run sequences:
+
+        text1·RLI PDI·RLI PDI·text4 – level 0
+        text2 – level 1
+        text3 – level 1
+     */
+    bidi(canvas, width, height, u"text1\u2067text2\u2069\u2067text3\u2069text4 ", u"(text1text42txet3txet)");
+    canvas->translate(0, height);
+
+    /*
+     * Paragraph text: text1·RLI·text2·LRI·text3·RLE·text4·PDF·text5·PDI·text6·PDI·text7
+
+        Level runs:
+
+        text1·RLI – level 0
+        text2·LRI – level 1
+        text3 – level 2
+        text4 – level 3
+        text5 – level 2
+        PDI·text6 – level 1
+        PDI·text7 – level 0
+        Resulting isolating run sequences:
+
+        text1·RLI PDI·text7 – level 0
+        text2·LRI PDI·text6 – level 1
+        text3 – level 2
+        text4 – level 3
+        text5 – level 2
+     */
+    bidi(canvas, width, height,
+        u"text1\u2067text2\u2066text3\u202Btext4\u202Ctext5\u2069text6\u2069text7 ",
+        u"(text1text72txet6txettext34txettext5)");
+    canvas->translate(0, height);
   }
 
  private:

@@ -192,15 +192,22 @@ class SkParagraphImpl final: public SkParagraph {
 
   SkCluster* findCluster(const char* ch) const;
 
+  void rearrangeRunsByBidi(SkLine& line);
+
   void iterateThroughStyles(
       const SkLine& line,
       SkStyleType styleType,
       std::function<bool(SkSpan<const char> text, const SkTextStyle& style, bool endsWithEllipsis)> apply) const;
-  void iterateThroughRuns(
+  void iterateThroughRunsInVisualOrder(
       const SkLine& line,
       SkSpan<const char> text,
       bool endsWithEllipsis,
-      std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
+      std::function<bool(SkRun* run,
+                         size_t pos,
+                         size_t size,
+                         SkScalar offsetX,
+                         SkRect clip,
+                         SkScalar shift)> apply) const;
 
   // Input
   SkTArray<SkBlock> fTextStyles;
