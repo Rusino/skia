@@ -1157,9 +1157,9 @@ class ParagraphView5 : public Sample {
   void bidi(SkCanvas* canvas, SkScalar w, SkScalar h,
              std::u16string text,
              std::u16string expected,
+             size_t lineLimit = std::numeric_limits<size_t>::max(),
              std::string ff = "sans-serif",
              SkScalar fs = 30,
-             size_t lineLimit = std::numeric_limits<size_t>::max(),
              const std::u16string& ellipsis = u"\u2026") {
 
     SkAutoCanvasRestore acr(canvas, true);
@@ -1232,6 +1232,7 @@ class ParagraphView5 : public Sample {
     paragraph->layout(w - margin * 2);
     paragraph->paint(canvas, margin, margin);
   }
+
   void onDrawContent(SkCanvas* canvas) override {
 
     canvas->drawColor(SK_ColorWHITE);
@@ -1243,7 +1244,7 @@ class ParagraphView5 : public Sample {
                                  "A \u202ENAC\u202Cner \u202ENAC\u202C \u202ENAC\u202C,\n"
                                  "Anything that he \u202ENAC\u202C,\n"
                                  "But a \u202ENAC\u202Cner \u202ENAC\u202C't \u202ENAC\u202C a \u202ENAC\u202C, \u202ENAC\u202C he?.";
-    //bidi(canvas, width, height, text1, u"");
+    //bidi(canvas, width, height, text1, u"", 5);
     //canvas->translate(0, height);
 
     //bidi(canvas, width, height, u"\u2067DETALOSI\u2069", u"");
@@ -1258,7 +1259,7 @@ class ParagraphView5 : public Sample {
     //bidi(canvas, width, height, u"\u200FTICILPMI\u200E", u"");
     //canvas->translate(0, height);
 
-    bidi(canvas, width, height, u"he said \u202E\"THE VALUES ARE 123, 456, 789, OK\"\u202C.", u"");
+    bidi(canvas, width, height, u"he said \u202E\"THE VALUES ARE 123, 456, 789, OK\"\u202C.", u"", 2);
     canvas->translate(0, height);
 
 

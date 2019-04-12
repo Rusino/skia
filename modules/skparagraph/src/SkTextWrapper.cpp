@@ -23,8 +23,7 @@ SkRun* SkTextWrapper::createEllipsis(Position& pos) {
     SkRun* ellipsis = getEllipsis(lineEnd->fRun);
     if (pos.trimmedWidth() + ellipsis->advance().fX <= fMaxWidth) {
       // Ellipsis fit; place and size it correctly
-      ellipsis->shift(-fCurrentLineOffset.fX + pos.trimmedWidth(),
-                      lineEnd->fRun->sizes().diff(pos.sizes()));
+      ellipsis->shift(pos.trimmedWidth(), lineEnd->fRun->sizes().diff(pos.sizes()));
       ellipsis->setHeight(pos.height());
       pos.extend(ellipsis->advance().fX);
       return ellipsis;
@@ -197,11 +196,15 @@ void SkTextWrapper::iterateThroughClustersByText(std::function<bool(const SkClus
       continue;
     }
 
-    apply(cluster);
+    if (!apply(cluster)) {
+      return;
+    }
     previous = &cluster;
 
     while (!clusters.empty() && previous->fText.end() == clusters.top()->fText.begin()) {
-      apply(*clusters.top());
+      if (!apply(*clusters.top())) {
+        return;
+      }
       previous = clusters.top();
       clusters.pop();
     }
