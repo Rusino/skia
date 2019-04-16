@@ -11,7 +11,26 @@
 #include "SkDartTypes.h"
 #include "SkSpan.h"
 #include "SkTArray.h"
+#include "SkCanvas.h"
+#include "SkTextStyle.h"
 #include "SkRun.h"
+
+
+class SkBlock {
+ public:
+
+  SkBlock() : fText(), fTextStyle() {}
+  SkBlock(SkSpan<const char> text, const SkTextStyle& style)
+      : fText(text), fTextStyle(style) {
+  }
+
+  inline SkSpan<const char> text() const { return fText; }
+  inline SkTextStyle style() const { return fTextStyle; }
+
+ protected:
+  SkSpan<const char> fText;
+  SkTextStyle fTextStyle;
+};
 
 class SkWord {
 
@@ -36,7 +55,7 @@ class SkWord {
 
  private:
 
-  friend class SkParagraphImpl;
+  friend class SkLine;
 
   void setIsWhiteSpaces() {
     fWhiteSpaces = false;
@@ -64,7 +83,12 @@ class SkLine {
 
   SkLine() { }
 
-  ~SkLine() = default;
+  SkLine(const SkLine&);
+
+  ~SkLine() {
+    fReindexing.reset();
+    fWords.reset();
+  }
 
   SkLine(SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis, SkFontSizes sizes)
       : fText(text)
@@ -83,8 +107,36 @@ class SkLine {
   inline SkFontSizes sizes() const { return fSizes; }
   inline bool empty() const { return fText.empty(); }
   void breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply);
-  const SkTArray<SkRun*>&  visuals() const { return fVisuals; }
-  void setVisuals(SkTArray<SkRun*> visuals) { fVisuals = std::move(visuals); }
+  void reshuffle(SkCluster* start, SkCluster* end);
+
+  SkCluster* findCluster(const char* ch) const;
+  SkVector measureText(SkSpan<const char> text) const;
+  void justify(SkScalar maxWidth);
+
+  void iterateThroughStyles(
+      SkStyleType styleType,
+      SkSpan<SkBlock> blocks,
+      std::function<SkScalar(
+          SkSpan<const char> text,
+          const SkTextStyle& style,
+          SkScalar offsetX)> apply) const;
+
+  SkScalar iterateThroughRuns(
+      SkSpan<const char> text,
+      SkScalar offsetX,
+      std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
+
+  SkScalar paintText(
+      SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
+  SkScalar paintBackground(
+      SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
+  SkScalar paintShadow(
+      SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
+  SkScalar paintDecorations(
+      SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
+
+  void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
+
 
  private:
 
@@ -99,6 +151,6 @@ class SkLine {
   SkRun* fEllipsis;   // In case the line ends with the ellipsis
   SkFontSizes fSizes;
 
-  SkTArray<SkRun*> fVisuals;
+  SkTHashMap<const char*, SkCluster*> fReindexing;
 };
 

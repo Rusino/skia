@@ -6,10 +6,11 @@
  */
 
 #include "SkTextWrapper.h"
+#include "SkParagraphImpl.h"
 #include <stack>
 
 SkRun* SkTextWrapper::createEllipsis(Position& pos) {
-  if (!reachedLinesLimit(-1) || pos.end() == fClusters.end() - 1) {
+  if (!fParent->reachedLinesLimit(-1) || pos.end() == fClusters.end() - 1) {
     // We must be on the last line and not at the end of the text
     return nullptr;
   }
@@ -43,7 +44,7 @@ bool SkTextWrapper::addLine(Position& pos) {
     return true;
   }
   auto ellipsis = createEllipsis(pos);
-  fLines.emplace_back(
+  fParent->addLine(
       SkVector::Make(0, fCurrentLineOffset.fY),
       SkVector::Make(pos.trimmedWidth(), pos.height()),
       pos.trimmedText(fLineStart),
@@ -64,7 +65,7 @@ bool SkTextWrapper::addLine(Position& pos) {
     fCurrentLineOffset.fX = - fLineStart->fRun->position(fLineStart->fStart).fX;
   }
   pos.clean(fLineStart);
-  return !reachedLinesLimit(0);
+  return !fParent->reachedLinesLimit(0);
 }
 
 void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
@@ -73,7 +74,6 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
                                const std::string& ellipsis) {
   fClusters = clusters;
   fMaxWidth = maxWidth;
-  fMaxLines = maxLines;
   fEllipsis = ellipsis;
   fLineStart = fClusters.begin();
   fClosestBreak.clean(fLineStart);
@@ -129,7 +129,7 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
     return true;
   });
   // Make sure nothing left
-  if (!endOfText() && !reachedLinesLimit(0)) {
+  if (!endOfText() && !fParent->reachedLinesLimit(0)) {
     fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordLength);
     fClosestBreak.add(fAfterBreak);
     addLine(fClosestBreak);

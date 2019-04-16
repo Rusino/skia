@@ -12,6 +12,7 @@
 #include "SkTHash.h"
 #include "SkLine.h"
 
+class SkParagraphImpl;
 class SkTextWrapper {
 
   class Position {
@@ -24,16 +25,21 @@ class SkTextWrapper {
     }
    public:
     Position(const SkCluster* start) {
-      clean(start);
+      if (start != nullptr) {
+        clean(start);
+      } else {
+        fEnd = nullptr;
+        fTrimmedEnd = nullptr;
+      }
     }
     inline SkScalar width() const { return fWidth + fWhitespaces.fX; }
     inline SkScalar trimmedWidth() const { return fWidth; }
     inline SkScalar height() const {
       return fWidth == 0 ? fWhitespaces.fY : fSizes.height();
     }
-    inline const SkCluster* trimmed() { return fTrimmedEnd; }
-    inline const SkCluster* end() { return fEnd; }
-    inline SkFontSizes sizes() { return fSizes; }
+    inline const SkCluster* trimmed() const { return fTrimmedEnd; }
+    inline const SkCluster* end() const { return fEnd; }
+    inline SkFontSizes sizes() const { return fSizes; }
 
     void clean(const SkCluster* start) {
       fEnd = start;
@@ -87,27 +93,32 @@ class SkTextWrapper {
 
  public:
 
-  SkTextWrapper() : fClosestBreak(nullptr), fAfterBreak(nullptr), fMinIntrinsicWidth(0) { }
+  SkTextWrapper(SkParagraphImpl* parent)
+  : fParent(parent), fClosestBreak(nullptr), fAfterBreak(nullptr) { reset(); }
   void formatText(SkSpan<SkCluster> clusters,
                   SkScalar maxWidth,
                   size_t maxLines,
                   const std::string& ellipsis);
-  SkSpan<SkLine> getLines() { return SkSpan<SkLine>(fLines.begin(), fLines.size()); }
-  SkSpan<const SkLine> getConstLines() const { return SkSpan<const SkLine>(fLines.begin(), fLines.size()); }
-  SkLine* getLastLine() { return &fLines.back(); }
 
   inline SkScalar height() const { return fHeight; }
   inline SkScalar width() const { return fWidth; }
   inline SkScalar intrinsicWidth() const { return fMinIntrinsicWidth; }
 
-  void reset() { fLines.reset(); }
+
+  void reset() {
+    fLineStart = nullptr;
+    fClosestBreak = nullptr;
+    fAfterBreak = nullptr;
+    fMinIntrinsicWidth = 0;
+    fCurrentLineOffset = SkVector::Make(0, 0);
+    fWidth = 0;
+    fHeight = 0;
+  }
 
  private:
 
   bool endOfText() const { return fLineStart == fClusters.end(); }
-  bool reachedLinesLimit(int32_t delta) const {
-    return fMaxLines != std::numeric_limits<size_t>::max() && fLines.size() >= fMaxLines + delta;
-  }
+
   SkRun* createEllipsis(Position& pos);
   bool addLine(Position& pos);
   SkRun* shapeEllipsis(SkRun* run);
@@ -115,15 +126,14 @@ class SkTextWrapper {
 
   void iterateThroughClustersByText(std::function<bool(const SkCluster&)> apply);
 
+  SkParagraphImpl* fParent;
   SkSpan<SkCluster> fClusters;
-  SkTArray<SkLine, true> fLines;
-  SkScalar fMaxWidth;
-  size_t fMaxLines;
   std::string fEllipsis;
   const SkCluster* fLineStart;
   Position fClosestBreak;
   Position fAfterBreak;
   SkVector fCurrentLineOffset;
+  SkScalar fMaxWidth;
   SkScalar fWidth;
   SkScalar fHeight;
   SkScalar fMinIntrinsicWidth;

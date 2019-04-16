@@ -65,6 +65,13 @@ struct SkCluster {
   };
 
   SkCluster() : fRun(nullptr), fWhiteSpaces(false), fIgnore(false), fBreakType(None) { }
+  SkCluster(SkRun* run, size_t start, size_t end, SkSpan<const char> text, SkScalar width, SkScalar height)
+    : fText(text), fRun(run)
+    , fStart(start), fEnd(end)
+    , fWidth(width), fHeight(height)
+    , fWhiteSpaces(false), fBreakType(None) { }
+
+  ~SkCluster() = default;
 
   SkScalar sizeToChar(const char* ch) const {
 
@@ -128,8 +135,13 @@ struct SkCluster {
 class SkRun {
  public:
 
-  SkRun() : fFont() { }
+  SkRun() : fFont() {
+
+  }
   SkRun(const SkShaper::RunHandler::RunInfo& info, size_t index, SkScalar shiftX);
+  ~SkRun() {
+
+  }
 
   SkShaper::RunHandler::Buffer newRunBuffer();
 
@@ -166,19 +178,20 @@ class SkRun {
     return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
   }
 
-  SkScalar calculateHeight();
-  SkScalar calculateWidth(size_t start, size_t end);
+  SkScalar calculateHeight() const;
+  SkScalar calculateWidth(size_t start, size_t end) const;
 
   SkFontSizes sizes() const { return SkFontSizes(fFontMetrics.fAscent, fFontMetrics.fDescent, fFontMetrics.fLeading); }
 
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 
-  void iterateThroughClusters(std::function<void(
+  void iterateThroughClusters(std::function<void(SkRun* run,
       size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size)> apply);
 
  private:
 
   friend class SkParagraphImpl;
+  friend class SkLine;
 
   SkFont fFont;
   SkFontMetrics fFontMetrics;
@@ -188,7 +201,7 @@ class SkRun {
   size_t glyphCount;
   SkShaper::RunHandler::Range fUtf8Range;
   SkVector fOffset;
-  SkSTArray<128, SkGlyphID, true> fGlyphs;
+  SkSTArray<128, SkGlyphID, false> fGlyphs;
   SkSTArray<128, SkPoint, true> fPositions;
   SkSTArray<128, uint32_t, true> fClusters;
 };

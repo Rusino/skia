@@ -37,12 +37,12 @@ SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
     };
 }
 
-SkScalar SkRun::calculateHeight() {
+SkScalar SkRun::calculateHeight() const {
   // The height of the run, not the height of the entire text (fInfo)
   return fFontMetrics.fDescent - fFontMetrics.fAscent + fFontMetrics.fLeading;
 }
 
-SkScalar SkRun::calculateWidth(size_t start, size_t end) {
+SkScalar SkRun::calculateWidth(size_t start, size_t end) const {
   SkASSERT(start <= end);
   if (end == size()) {
     return fAdvance.fX - fPositions[start].fX + fPositions[0].fX;
@@ -53,6 +53,7 @@ SkScalar SkRun::calculateWidth(size_t start, size_t end) {
 
 void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const {
 
+  SkASSERT(pos + size <= this->size());
   const auto& blobBuffer = builder.allocRunPos(fFont, SkToInt(size));
   sk_careful_memcpy(blobBuffer.glyphs,
                     fGlyphs.data() + pos,
@@ -68,6 +69,7 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
 }
 
 void SkRun::iterateThroughClusters(std::function<void(
+                                        SkRun* run,
                                         size_t glyphStart,
                                         size_t glyphEnd,
                                         size_t charStart,
@@ -88,7 +90,7 @@ void SkRun::iterateThroughClusters(std::function<void(
     }
 
     SkVector size = SkVector::Make(this->calculateWidth(start, glyph), this->calculateHeight());
-    apply(start, glyph, cluster, nextCluster, size);
+    apply(this, start, glyph, cluster, nextCluster, size);
 
     start = glyph;
     cluster = nextCluster;

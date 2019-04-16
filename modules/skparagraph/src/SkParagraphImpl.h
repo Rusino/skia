@@ -96,7 +96,9 @@ class SkParagraphImpl final: public SkParagraph {
                   SkParagraphStyle style,
                   std::vector<Block> blocks,
                   sk_sp<SkFontCollection> fonts)
-      : SkParagraph(text, style, std::move(fonts)) {
+      : SkParagraph(text, style, std::move(fonts))
+      , fTextWrapper(this)
+      , fPicture(nullptr) {
     fTextStyles.reserve(blocks.size());
     for (auto& block : blocks) {
       fTextStyles.emplace_back(SkSpan<const char>(fUtf8.begin() + block.fStart, block.fEnd - block.fStart),
@@ -108,7 +110,9 @@ class SkParagraphImpl final: public SkParagraph {
                   SkParagraphStyle style,
                   std::vector<Block> blocks,
                   sk_sp<SkFontCollection> fonts)
-      : SkParagraph(utf16text, style, std::move(fonts)) {
+      : SkParagraph(utf16text, style, std::move(fonts))
+      , fTextWrapper(this)
+      , fPicture(nullptr) {
     fTextStyles.reserve(blocks.size());
     for (auto& block : blocks) {
       fTextStyles.emplace_back(SkSpan<const char>(fUtf8.begin() + block.fStart, block.fEnd - block.fStart),
@@ -130,31 +134,20 @@ class SkParagraphImpl final: public SkParagraph {
   SkRange<size_t> getWordBoundary(unsigned offset) override;
   bool didExceedMaxLines() override {
     return !fParagraphStyle.unlimited_lines()
-        && fTextWrapper.getLines().size() > fParagraphStyle.getMaxLines();
+        && fLines.size() > fParagraphStyle.getMaxLines();
   }
 
-  SkVector measureText(SkSpan<const char> text) const;
+  void addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis, SkFontSizes sizes) {
+    fLines.emplace_back(offset, advance, text, ellipsis, sizes);
+  }
+
+  bool reachedLinesLimit(int32_t delta) const {
+    return !fParagraphStyle.unlimited_lines() && fLines.size() >= fParagraphStyle.getMaxLines() + delta;
+  }
 
  private:
 
   friend class SkParagraphBuilder;
-
-  class SkBlock {
-   public:
-
-    SkBlock() : fText(), fTextStyle() {}
-    SkBlock(SkSpan<const char> text, const SkTextStyle& style)
-        : fText(text), fTextStyle(style) {
-    }
-
-    inline SkSpan<const char> text() const { return fText; }
-    inline SkTextStyle style() const { return fTextStyle; }
-
-   protected:
-    SkSpan<const char> fText;
-    SkTextStyle fTextStyle;
-  };
-
 
   void resetContext();
   void buildClusterTable();
@@ -164,38 +157,15 @@ class SkParagraphImpl final: public SkParagraph {
   void rearrangeLinesByBidi();
   void formatLinesByText(SkScalar maxWidth);
   void formatLinesByWords(SkScalar maxWidth);
-  void justifyLine(SkLine& line, SkScalar maxWidth);
-  SkScalar paintText(
-    SkCanvas* canvas, const SkLine& line, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
-  SkScalar paintBackground(
-    SkCanvas* canvas, const SkLine& line, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
-  SkScalar paintShadow(
-    SkCanvas* canvas, const SkLine& line, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
-  SkScalar paintDecorations(
-    SkCanvas* canvas, const SkLine& line, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
-
-  void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
-
-  SkCluster* findCluster(const char* ch) const;
-
-  void iterateThroughStyles(
-      const SkLine& line,
-      SkStyleType styleType,
-      std::function<SkScalar(SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX)> apply) const;
-  SkScalar iterateThroughRuns(
-      const SkLine& line,
-      SkSpan<const char> text,
-      SkScalar offsetX,
-      std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
 
   // Input
-  SkTArray<SkBlock> fTextStyles;
+  SkTArray<SkBlock, true> fTextStyles;
 
   // Internal structures
-  SkTHashMap<const char*, size_t> fIndexes;
-  SkTArray<SkCluster> fClusters;
-  SkTArray<SkRun, true> fRuns;
-  SkTextWrapper fTextWrapper; // constains all the lines
+  SkTArray<SkRun> fRuns;
+  SkTArray<SkCluster, true> fClusters;
+  SkTArray<SkLine> fLines;
+  SkTextWrapper fTextWrapper;
 
   // Painting
   sk_sp<SkPicture> fPicture;
