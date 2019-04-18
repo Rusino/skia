@@ -138,19 +138,20 @@ class SkParagraphImpl final: public SkParagraph {
   }
 
   void addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis, SkFontSizes sizes) {
-    fLines.emplace_back(offset, advance, text, ellipsis, sizes);
+    fLines.emplace_back(offset, advance, SkSpan<SkCluster>(fClusters.begin(), fClusters.size()), text, ellipsis, sizes);
+  }
+
+  void rearrangeLinesByBidi() {
+    for (auto& line : fLines) {
+      line.reorderRuns();
+    }
   }
 
   bool reachedLinesLimit(int32_t delta) const {
     return !fParagraphStyle.unlimited_lines() && fLines.size() >= fParagraphStyle.getMaxLines() + delta;
   }
 
-  static void iterateThroughClustersByText
-      (const SkCluster* start, const SkCluster* end, std::function<bool(const SkCluster&)> apply);
-
-  void iterateThroughClustersByText(std::function<bool(const SkCluster&)> apply) {
-    SkParagraphImpl::iterateThroughClustersByText(fClusters.begin(), fClusters.end(), apply);
-  }
+  inline SkSpan<const char> text() const { return fUtf8; }
 
  private:
 
@@ -160,7 +161,6 @@ class SkParagraphImpl final: public SkParagraph {
   void buildClusterTable();
   void shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles);
   void breakShapedTextIntoLines(SkScalar maxWidth);
-  void rearrangeLinesByBidi();
   void formatLinesByText(SkScalar maxWidth);
   void formatLinesByWords(SkScalar maxWidth);
 

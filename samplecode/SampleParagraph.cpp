@@ -1340,5 +1340,5 @@ class ParagraphView5 : public Sample {
 DEF_SAMPLE(return new ParagraphView1();)
 DEF_SAMPLE(return new ParagraphView2();)
 DEF_SAMPLE(return new ParagraphView3();)
-DEF_SAMPLE(return new ParagraphView4();)
-DEF_SAMPLE(return new ParagraphView5();)
+//DEF_SAMPLE(return new ParagraphView4();)
+//DEF_SAMPLE(return new ParagraphView5();)

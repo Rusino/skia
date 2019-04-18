@@ -95,6 +95,7 @@ class SkLine {
         SkRun* ellipsis, SkFontSizes sizes)
       : fText(text)
       , fClusters(clusters)
+      , fLogical()
       , fShift(0)
       , fAdvance(advance)
       , fWidth(advance.fX)
@@ -113,7 +114,6 @@ class SkLine {
   void breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply);
   void reorderRuns();
 
-  SkCluster* findCluster(const char* ch) const;
   SkVector measureText(SkSpan<const char> text) const;
   void justify(SkScalar maxWidth);
 
@@ -148,6 +148,7 @@ class SkLine {
 
   SkSpan<const char> fText;
   SkSpan<SkCluster> fClusters;
+  SkTArray<SkRun*, true> fLogical;
   SkTArray<SkWord, true> fWords; // Text broken into words by ICU word breaker
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size

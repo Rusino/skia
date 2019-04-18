@@ -91,7 +91,7 @@ struct SkCluster {
     auto shift = fText.end() - ch - 1;
     auto ratio = shift * 1.0 / fText.size();
 
-    return fWidth * (1 - ratio);
+    return fWidth * ratio;
   }
   inline void setBreakType(BreakType type) { fBreakType = type; }
   inline BreakType getBreakType() const { return fBreakType; }
@@ -135,13 +135,9 @@ struct SkCluster {
 class SkRun {
  public:
 
-  SkRun() : fFont() {
-
-  }
-  SkRun(const SkShaper::RunHandler::RunInfo& info, size_t index, SkScalar shiftX);
-  ~SkRun() {
-
-  }
+  SkRun() : fFont() { }
+  SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info, size_t index, SkScalar shiftX);
+  ~SkRun() { }
 
   SkShaper::RunHandler::Buffer newRunBuffer();
 
@@ -164,8 +160,8 @@ class SkRun {
   bool leftToRight() const { return fBidiLevel % 2 == 0; }
   size_t index() const { return fIndex; }
 
-  inline SkShaper::RunHandler::Range range() const { return fUtf8Range; }
-  inline size_t cluster(size_t pos) const { return fClusters[pos]; }
+  inline SkSpan<const char> text() const { return fText; }
+  inline size_t clusterIndex(size_t pos) const { return fClusterIndexes[pos]; }
   inline SkPoint position(size_t pos) const {
     if (pos < size()) {
       return fPositions[pos];
@@ -174,6 +170,8 @@ class SkRun {
         fAdvance.fX - (fPositions[size() - 1].fX - fPositions[0].fX),
         fAdvance.fY);
   }
+  inline SkSpan<SkCluster> clusters() const { return fClusters; }
+  inline void setClusters(SkSpan<SkCluster> clusters) { fClusters = clusters; }
   SkRect clip() {
     return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
   }
@@ -181,11 +179,11 @@ class SkRun {
   SkScalar calculateHeight() const;
   SkScalar calculateWidth(size_t start, size_t end) const;
 
-  SkFontSizes sizes() const { return SkFontSizes(fFontMetrics.fAscent, fFontMetrics.fDescent, fFontMetrics.fLeading); }
+  SkFontSizes sizes() const { return { fFontMetrics.fAscent, fFontMetrics.fDescent, fFontMetrics.fLeading }; }
 
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 
-  void iterateThroughClusters(std::function<void(SkRun* run,
+  void iterateThroughClusters(std::function<void(
       size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size)> apply);
 
  private:
@@ -199,9 +197,11 @@ class SkRun {
   uint8_t fBidiLevel;
   SkVector fAdvance;
   size_t glyphCount;
-  SkShaper::RunHandler::Range fUtf8Range;
+  SkSpan<const char> fText;
+  SkSpan<SkCluster> fClusters;
   SkVector fOffset;
+  SkShaper::RunHandler::Range fUtf8Range;
   SkSTArray<128, SkGlyphID, false> fGlyphs;
   SkSTArray<128, SkPoint, true> fPositions;
-  SkSTArray<128, uint32_t, true> fClusters;
+  SkSTArray<128, uint32_t, true> fClusterIndexes;
 };

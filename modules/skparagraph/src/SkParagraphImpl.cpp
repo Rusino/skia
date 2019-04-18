@@ -182,55 +182,45 @@ void SkParagraphImpl::buildClusterTable() {
   }
 
   for (auto& run : fRuns) {
-    size_t posStart = 0;
-    size_t posEnd = run.size();
-    int32_t posStep = 1;
-    if (!run.leftToRight()) {
-      posEnd = 0;
-      posStart = run.size();
-      posStep = -1;
-    }
 
     SkDebugf("Run #%d:\n", run.index());
 
-    // Walk through the glyph in the right direction
-    size_t glyphStart = posStart;
-    size_t charStart = run.range().begin();
-    for (auto glyphEnd = posStart + posStep; glyphEnd != posEnd; glyphEnd += posStep) {
+    auto runStart = fClusters.size();
+    // Walk through the glyph in the correct direction
+    run.iterateThroughClusters(
+        [&run, this, &map](size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size) {
 
-      auto charEnd = glyphEnd == run.size() ? run.range().end() : run.cluster(glyphEnd);
-
-      SkVector size = SkVector::Make(run.calculateWidth(glyphStart, glyphEnd),
-                                     run.calculateHeight());
       SkASSERT(charEnd >= charStart);
-      auto text(SkSpan<const char>(fUtf8.begin() + charStart, charEnd - charStart));
+      SkSpan<const char> text(fUtf8.begin() + charStart, charEnd - charStart);
+
       auto& cluster = fClusters.emplace_back(&run, glyphStart, glyphEnd, text, size.fX, size.fY);
       // Mark line breaks
       auto found = map.find(cluster.fText.begin());
       if (found) {
-        cluster.fBreakType = *found || &cluster == &fClusters.back()
+        cluster.fBreakType = *found
                              ? SkCluster::BreakType::HardLineBreak
                              : SkCluster::BreakType::SoftLineBreak;
         cluster.setIsWhiteSpaces();
       }
 
-      SkDebugf("Cluster%s", cluster.isWhitespaces() ? "*" : " ");
-      if (cluster.fStart + 1 == cluster.fEnd) {
-        SkDebugf("[%d] ", cluster.fStart);
-      } else {
-        SkDebugf("[%d:%d] \n", cluster.fStart, cluster.fEnd - 1);
-      }
+      SkDebugf("Cluster %s ", cluster.isWhitespaces() ? (cluster.isHardBreak() ? "!" : "?") : " ");
+      SkDebugf("[%d:%d) %f ", cluster.fStart, cluster.fEnd, size.fX);
 
-      if (cluster.fText.size() == 1) {
-        SkDebugf("(%d), %s\n", charStart, toString(cluster.fText).c_str());
-      } else {
-        SkDebugf("(%d:%d), %s\n", charStart, charEnd - 1, toString(cluster.fText).c_str());
+      SkDebugf("'");
+      for (auto ch = cluster.fText.begin(); ch != cluster.fText.end(); ++ch) {
+        SkDebugf("%c", *ch);
       }
+      SkDebugf("'");
 
-      glyphStart = glyphEnd;
-      charStart = charEnd;
-    }
+      if (cluster.fText.size() != 1) {
+        SkDebugf("(%d)\n", cluster.fText.size());
+      } else {
+        SkDebugf("\n");
+      }
+    });
+    run.setClusters(SkSpan<SkCluster>(&fClusters[runStart], fClusters.size() - runStart));
   }
+  fClusters.back().setBreakType(SkCluster::BreakType::HardLineBreak);
 }
 
 void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles) {
@@ -350,7 +340,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
 
     Buffer runBuffer(const RunInfo& info) override {
 
-      auto& run = fParagraph->fRuns.emplace_back(info, fParagraph->fRuns.count(), fAdvance.fX);
+      auto& run = fParagraph->fRuns.emplace_back(fParagraph->text(), info, fParagraph->fRuns.count(), fAdvance.fX);
       return run.newRunBuffer();
     }
 
@@ -456,89 +446,6 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
   }
 }
 
-void SkParagraphImpl::rearrangeLinesByBidi() {
-
-  for (auto& line : fLines) {
-    // Let's deal with the line
-    line.reorderRuns();
-  }
-  const SkCluster* start = nullptr;
-  const SkCluster* end = nullptr;
-  SkLine* line = fLines.begin();
-  this->iterateThroughClustersByText(
-      [&](const SkCluster& cluster) {
-  //for (auto& cluster : fClusters) {
-    if (cluster.fText.begin() == line->fText.begin()) {
-      // New line start
-      SkASSERT(end == nullptr);
-      start = &cluster;
-      end = nullptr;
-    } else if ((cluster.fText.begin() < line->fText.begin())) {
-      // Some new lines here
-      return true;
-    }
-
-    SkASSERT(start != nullptr);
-    if (cluster.fText.end() == line->fText.end()) {
-      // End of the line
-      end = &cluster;
-    }
-    if (end == nullptr) {
-      // Middle of the line
-      return true;
-    }
-
-    // Let's deal with the line
-        line->reorderRuns(start, end);
-
-    // Move to the next line
-    start = nullptr;
-    end = nullptr;
-    while (line != fLines.end()) {
-      ++line;
-      if (!line->empty()) {
-        break;
-      }
-    }
-
-    if (line == fLines.end()) {
-      // We have line limit
-      return false;
-    }
-
-    return true;
-  });
-}
-
-void SkParagraphImpl::iterateThroughClustersByText
-(const SkCluster* start, const SkCluster* end, std::function<bool(const SkCluster&)> apply) {
-
-  std::stack<const SkCluster*> backwards;
-  for (auto cluster = start; cluster != end; ++cluster) {
-    if (!cluster->fRun->leftToRight()) {
-      backwards.push(cluster);
-      continue;
-    }
-
-    while (!backwards.empty()) {
-      if (!apply(*backwards.top())) {
-        return;
-      }
-      backwards.pop();
-    }
-
-    if (!apply(*cluster)) {
-      return;
-    }
-  }
-  while (!backwards.empty()) {
-    if (!apply(*backwards.top())) {
-      return;
-    }
-    backwards.pop();
-  }
-}
-
 // Returns a vector of bounding boxes that enclose all text between
 // start and end glyph indexes, including start and excluding end
 std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
@@ -630,15 +537,15 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, 
                 }
               }
               if (pos == 0) {
-                result = { SkToS32(run->fClusters[0]), DOWNSTREAM };
+                result = { SkToS32(run->fClusterIndexes[0]), DOWNSTREAM };
               } else if (pos == run->size() - 1) {
-                result = { SkToS32(run->fClusters.back()), UPSTREAM };
+                result = { SkToS32(run->fClusterIndexes.back()), UPSTREAM };
               } else {
                 auto center = (run->position(pos + 1).fX + run->position(pos).fX) / 2;
                 if ((dx <= center) == run->leftToRight()) {
-                  result = { SkToS32(run->fClusters[pos]), DOWNSTREAM };
+                  result = { SkToS32(run->fClusterIndexes[pos]), DOWNSTREAM };
                 } else {
-                  result = { SkToS32(run->fClusters[pos + 1]), UPSTREAM };
+                  result = { SkToS32(run->fClusterIndexes[pos + 1]), UPSTREAM };
                 }
               }
               return false;

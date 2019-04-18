@@ -9,20 +9,20 @@
 #include "SkRun.h"
 #include "SkSpan.h"
 
-SkRun::SkRun(const SkShaper::RunHandler::RunInfo& info, size_t index, SkScalar offsetX) {
+SkRun::SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info, size_t index, SkScalar offsetX) {
 
   fFont = info.fFont;
   fBidiLevel = info.fBidiLevel;
   fAdvance = info.fAdvance;
   glyphCount = info.glyphCount;
-  fUtf8Range = info.utf8Range;
+  fText = SkSpan<const char>(text.begin() + info.utf8Range.begin(), info.utf8Range.size());
 
   fIndex = index;
-
+  fUtf8Range = info.utf8Range;
   fOffset = SkVector::Make(offsetX, 0);
   fGlyphs.push_back_n(info.glyphCount);
   fPositions.push_back_n(info.glyphCount);
-  fClusters.push_back_n(info.glyphCount);
+  fClusterIndexes.push_back_n(info.glyphCount);
   info.fFont.getMetrics(&fFontMetrics);
 }
 
@@ -32,7 +32,7 @@ SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
         fGlyphs.data(),
         fPositions.data(),
         nullptr,
-        fClusters.data(),
+        fClusterIndexes.data(),
         fOffset
     };
 }
@@ -43,6 +43,9 @@ SkScalar SkRun::calculateHeight() const {
 }
 
 SkScalar SkRun::calculateWidth(size_t start, size_t end) const {
+  if (!leftToRight()) {
+    //std::swap(start, end);
+  }
   SkASSERT(start <= end);
   if (end == size()) {
     return fAdvance.fX - fPositions[start].fX + fPositions[0].fX;
@@ -69,30 +72,43 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
 }
 
 void SkRun::iterateThroughClusters(std::function<void(
-                                        SkRun* run,
-                                        size_t glyphStart,
-                                        size_t glyphEnd,
-                                        size_t charStart,
-                                        size_t charEnd,
-                                        SkVector size)> apply) {
+    size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size)> apply) {
 
-  // We should be agnostic of bidi but there are edge cases different for LTR and RTL
-  size_t start = 0;
-  size_t cluster = leftToRight() ?  this->fUtf8Range.begin() : this->fUtf8Range.end();
-  for (size_t glyph = 1; glyph <= this->size(); ++glyph) {
+  if (leftToRight()) {
+    size_t start = 0;
+    size_t cluster = this->clusterIndex(start);
+    for (size_t glyph = 1; glyph <= this->size(); ++glyph) {
 
-    auto nextCluster = leftToRight()
-            ? glyph == this->size() ? this->fUtf8Range.end() : this->cluster(glyph)
-            : this->cluster(glyph - 1);
+      auto nextCluster =
+          glyph == this->size() ? this->fUtf8Range.end() : this->clusterIndex(glyph);
+      if (nextCluster == cluster) {
+        continue;
+      }
 
-    if (nextCluster == cluster) {
-      continue;
+      SkVector size = SkVector::Make(this->calculateWidth(start, glyph), this->calculateHeight());
+      apply(start, glyph, cluster, nextCluster, size);
+
+      start = glyph;
+      cluster = nextCluster;
+    };
+  } else {
+    size_t glyph = this->size();
+    size_t cluster = this->fUtf8Range.begin();
+    for (int32_t start = this->size() - 1; start >= 0; --start) {
+
+      size_t nextCluster =
+          start == 0 ? this->fUtf8Range.end() : this->clusterIndex(start - 1);
+      if (nextCluster == cluster) {
+        continue;
+      }
+
+      SkVector size = SkVector::Make(this->calculateWidth(start, glyph), this->calculateHeight());
+      apply(start, glyph, cluster, nextCluster, size);
+
+      glyph = start;
+      cluster = nextCluster;
     }
+  }
 
-    SkVector size = SkVector::Make(this->calculateWidth(start, glyph), this->calculateHeight());
-    apply(this, start, glyph, cluster, nextCluster, size);
 
-    start = glyph;
-    cluster = nextCluster;
-  };
 }

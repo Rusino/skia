@@ -43,12 +43,15 @@ SkLine::SkLine(const SkLine& other) {
   this->fText = other.fText;
   this->fWords.reset();
   this->fWords = std::move(other.fWords);
+  this->fLogical.reset();
+  this->fLogical = std::move(other.fLogical);
   this->fShift = other.fShift;
   this->fAdvance = other.fAdvance;
   this->fWidth = other.fWidth;
   this->fOffset = other.fOffset;
   this->fEllipsis = other.fEllipsis;
   this->fSizes = other.sizes();
+  this->fClusters = other.fClusters;
 }
 
 void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply) {
@@ -75,7 +78,7 @@ void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord
 void SkLine::reorderRuns() {
 
   auto start = fClusters.begin();
-  auto end = fClusters.end();
+  auto end = fClusters.end() - 1;
   size_t numRuns = end->fRun->index() - start->fRun->index() + 1;
 
   // Get the logical order
@@ -83,74 +86,18 @@ void SkLine::reorderRuns() {
   for (auto run = start->fRun; run <= end->fRun; ++run) {
     runLevels.emplace_back(run->fBidiLevel);
   }
-  std::vector<int32_t> logicalFromVisual(numRuns);
-  ubidi_reorderVisual(runLevels.data(), SkToU32(numRuns), logicalFromVisual.data());
 
-  // Build the reindex table
-  SkTArray<size_t> shifts(SkToU32(numRuns));
-  size_t shift = 0;
-  for (auto& logical : logicalFromVisual) {
-    shifts.push_back(shift);
-    int index = start->fRun->index() + shifts.size() - 1;
-    if (index == logical) {
-      SkDebugf("shift %d: %d\n",index, shift);
-    } else {
-      SkDebugf("shift %d->%d: %d\n", index, logical, shift);
-    }
+  std::vector<int32_t> logicals(numRuns);
+  ubidi_reorderVisual(runLevels.data(), SkToU32(numRuns), logicals.data());
 
-    auto run = start->fRun + logical;
-    shift += &logical == &logicalFromVisual.front() ? run->size() - start->fStart : run->size();
-    // 1. Find the text intersection between line and run
-    // 2. Reindex all the text by the order of runs
+  auto firstRun = start->fRun;
+  for (auto logical : logicals) {
+    fLogical.push_back(firstRun + logical);
   }
-
-  size_t runIndex = start->fRun->index();
-  size_t starting = shifts[runIndex - start->fRun->index()];
-  size_t inside = 0;
-
-  SkDebugf("Reindex:\n");
-  SkParagraphImpl::iterateThroughClustersByText(start, end, [&](const SkCluster& cluster) {
-
-    // Move all the clusters for the run
-    if (cluster.fRun->index() != runIndex) {
-      runIndex = cluster.fRun->index();
-      starting = shifts[runIndex - start->fRun->index()];
-      inside = 0;
-    }
-
-    auto newCluster = (SkCluster*)start + starting + inside;
-    fReindexing.set(cluster.fText.begin(), newCluster);
-
-    SkDebugf("Reindex '%s': @ %d", toString(cluster.fText).c_str(), newCluster->fRun->index());
-    if (newCluster->fStart + 1 == newCluster->fEnd) {
-      SkDebugf("[%d]\n", newCluster->fStart);
-    } else {
-      SkDebugf("[%d:%d]\n", newCluster->fStart, newCluster->fEnd - 1);
-    }
-
-    ++inside;
-
-    return true;
-  });
-}
-
-SkCluster* SkLine::findCluster(const char* ch) const {
-
-  const char* start = ch;
-
-  while (start >= fText.begin()) {
-    auto found = fReindexing.find(start);
-    if (found != nullptr) {
-      auto cluster = *found;
-      SkASSERT(cluster->fText.begin() <= ch && cluster->fText.end() > ch);
-      return cluster;
-    }
-    --start;
-  }
-  return nullptr;
 }
 
 // The text must be shaped within one single run
+// TODO: optimize
 SkVector SkLine::measureText(SkSpan<const char> text) const {
 
   SkVector size = SkVector::Make(0, 0);
@@ -158,19 +105,26 @@ SkVector SkLine::measureText(SkSpan<const char> text) const {
     return size;
   }
 
-  auto start = findCluster(text.begin());
-  auto end = findCluster(text.end() - 1);
-  for (auto cluster = start; cluster <= end; ++cluster) {
+  auto start = text.begin();
+  auto end = text.end() - 1;
+  for (auto& cluster : fClusters) {
 
-    if (cluster == start) {
-      size.fX -= cluster->sizeToChar(text.begin());
+    if (cluster.fText.begin() >= text.end()) {
+      continue;
+    } else if (cluster.fText.end() <= text.begin()) {
+      break;
     }
-    if (cluster == end) {
-      size.fX += cluster->sizeFromChar(text.end() - 1);
+
+    if (cluster.fText.begin() <= start && cluster.fText.end() > start) {
+      size.fX -= cluster.sizeToChar(start);
+    }
+    if (cluster.fText.begin() < end && cluster.fText.end() >= end) {
+      size.fX += cluster.sizeFromChar(end);
     } else {
-      size.fX += cluster->fWidth;
+      size.fX += cluster.fWidth;
     }
-    size.fY = SkTMax(size.fY, cluster->fHeight);
+
+    size.fY = SkTMax(size.fY, cluster.fHeight);
   }
 
   return size;
@@ -226,7 +180,7 @@ void SkLine::justify(SkScalar maxWidth) {
   this->fWidth = maxWidth;
 }
 
-
+// TODO: optimize
 SkScalar SkLine::iterateThroughRuns(
     SkSpan<const char> text,
     SkScalar runOffset,
@@ -236,99 +190,67 @@ SkScalar SkLine::iterateThroughRuns(
     return 0;
   }
 
-  // Find the starting and the ending cluster
-  SkCluster* start = nullptr;
-  for (auto ch = text.begin(); ch >= this->fText.begin(); --ch) {
-    auto found = fReindexing.find(ch);
-    if (found != nullptr) {
-      // The character can be in the middle of a cluster; find the next and then go back
-      start = *found;
-      break;
-    }
-  }
-
-  SkCluster* end = nullptr;
-  for (auto ch = text.end() - 1; ch >= this->fText.begin(); --ch) {
-    auto found = fReindexing.find(ch);
-    if (found != nullptr) {
-      // The character can be in the middle of a cluster; the previous cluster is always good
-      end = *found;
-      break;
-    }
-  }
-  SkASSERT(start != nullptr && end != nullptr);
-
+  // Walk through the runs in the logical order
   SkScalar width = 0;
-  for (auto current = start; current <= end + 1; ++current) {
-    if (current->fRun == start->fRun && current <= end) {
+  for (auto run : fLogical) {
+
+    // Find the intersection between the text and the run
+    SkSpan<const char> intersect = run->text() * text;
+    if (intersect.empty()) {
       continue;
     }
+    
+    auto first = intersect.begin();
+    auto last = intersect.end() - 1;
+    
+    SkCluster* start = nullptr;
+    SkCluster* end = nullptr;
 
-    SkSpan<const char> runText;
-    if (start->fRun->leftToRight()) {
-      auto finish = current > end ? end->fText.end() : current->fText.end();
-      SkASSERT(finish >= start->fText.end());
-      runText = SkSpan<const char>(start->fText.begin(), finish - start->fText.begin());
-    } else {
-      auto finish = current > end ? end->fText.begin() : current->fText.begin();
-      SkASSERT(finish >= start->fText.begin());
-      runText = SkSpan<const char>(start->fText.begin(), finish - start->fText.begin());
+    for (auto& cluster : fClusters) {
+      if (cluster.fText.begin() <= first && cluster.fText.end() >= first) {
+        start = &cluster;
+      }
+      if (cluster.fText.begin() <= last && cluster.fText.end() >= last) {
+        end = &cluster;
+      }
     }
-
-    SkDebugf("runText: '%s'\n", toString(runText).c_str());
-    SkSpan<const char> intersect = text * runText;
-    SkDebugf("intersect: '%s'\n", toString(intersect).c_str());
-
-    // Find a part of the run that intersects with the text
-    auto run = start->fRun;
+    SkASSERT(start != nullptr && end != nullptr);
     if (!run->leftToRight()) {
-      //std::swap(start, end);
+      std::swap(start, end);
     }
 
     auto lineOffset = run->position(0).fX;
-    size_t size = 0;
+    size_t size = end->fEnd - start->fStart;
     size_t pos = start->fStart;
-    SkRect clip = SkRect::MakeXYWH( 0,
+    SkRect clip = SkRect::MakeXYWH( run->position(start->fStart).fX - lineOffset,
                                     run->sizes().diff(sizes()),
-                                    0,
+                                    run->calculateWidth(start->fStart, end->fEnd),
                                     run->calculateHeight());
-    clip.offset(run->offset());
-    SkScalar leftGlyphDiff = 0;
-    for (auto cluster = start; cluster < current; ++cluster) {
 
-      size += (cluster->fEnd - cluster->fStart);
-      if (cluster == start) {
-        clip.fLeft = cluster->fRun->position(cluster->fStart).fX - lineOffset;
-        clip.fRight = clip.fLeft;
-        clip.fLeft += cluster->sizeToChar(intersect.begin());
-      }
-      if (cluster == end) {
-        clip.fRight += cluster->sizeFromChar(intersect.end() - 1);
-      } else {
-        //clip.fRight += cluster->fWidth; (because of justification)
-        clip.fRight += cluster->fRun->calculateWidth(cluster->fStart, cluster->fEnd);
-      }
+    // Correct the width in case the text edges don't match clusters
+    if (start->fText.begin() <= first && start->fText.end() > first) {
+      auto diff = start->sizeToChar(first);
+      clip.fLeft += diff;
+    }
+    if (end->fText.begin() <= last && end->fText.end() > last) {
+      auto diff = end->sizeFromChar(last);
+      clip.fRight -= diff;
     }
 
     auto shift1 = runOffset - clip.fLeft;
     auto shift2 = runOffset - clip.fLeft - lineOffset;
     clip.offset(shift1, 0);
-    if (leftGlyphDiff != 0) {
-      clip.fLeft += leftGlyphDiff;
-    }
     //SkDebugf("%f -%f - %f = %f (%f)\n", runOffset, clip.fLeft, lineOffset, shift2, clip.width());
     apply(run, pos, size, clip, shift2);
 
     width += clip.width();
     runOffset += clip.width();
+  }
 
-    // TODO: calculate the ellipse for the last visual run
-    if (this->ellipsis() != nullptr) {
-      auto ellipsis = this->ellipsis();
-      apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->offset().fX);
-    }
-
-    start = current;
+  // TODO: calculate the ellipse for the last visual run
+  if (this->ellipsis() != nullptr) {
+    auto ellipsis = this->ellipsis();
+    apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->offset().fX);
   }
 
   return width;
