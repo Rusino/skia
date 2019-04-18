@@ -86,12 +86,15 @@ class SkLine {
   SkLine(const SkLine&);
 
   ~SkLine() {
-    fReindexing.reset();
     fWords.reset();
   }
 
-  SkLine(SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis, SkFontSizes sizes)
+  SkLine(SkVector offset, SkVector advance,
+        SkSpan<SkCluster> clusters,
+        SkSpan<const char> text,
+        SkRun* ellipsis, SkFontSizes sizes)
       : fText(text)
+      , fClusters(clusters)
       , fShift(0)
       , fAdvance(advance)
       , fWidth(advance.fX)
@@ -100,6 +103,7 @@ class SkLine {
       , fSizes(sizes) { }
 
   inline SkSpan<const char> text() const { return fText; }
+  inline SkSpan<SkCluster> clusters() const { return fClusters; }
   inline SkVector advance() const { return fAdvance; }
   inline SkScalar width() const { return fWidth; }
   inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
@@ -107,7 +111,7 @@ class SkLine {
   inline SkFontSizes sizes() const { return fSizes; }
   inline bool empty() const { return fText.empty(); }
   void breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply);
-  void reshuffle(SkCluster* start, SkCluster* end);
+  void reorderRuns();
 
   SkCluster* findCluster(const char* ch) const;
   SkVector measureText(SkSpan<const char> text) const;
@@ -143,6 +147,7 @@ class SkLine {
   friend class SkParagraphImpl;
 
   SkSpan<const char> fText;
+  SkSpan<SkCluster> fClusters;
   SkTArray<SkWord, true> fWords; // Text broken into words by ICU word breaker
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size
@@ -150,7 +155,5 @@ class SkLine {
   SkVector fOffset;   // Text position on the screen
   SkRun* fEllipsis;   // In case the line ends with the ellipsis
   SkFontSizes fSizes;
-
-  SkTHashMap<const char*, SkCluster*> fReindexing;
 };
 

@@ -124,8 +124,6 @@ class SkTextWrapper {
   SkRun* shapeEllipsis(SkRun* run);
   SkRun* getEllipsis(SkRun* run);
 
-  void iterateThroughClustersByText(std::function<bool(const SkCluster&)> apply);
-
   SkParagraphImpl* fParent;
   SkSpan<SkCluster> fClusters;
   std::string fEllipsis;

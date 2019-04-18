@@ -49,10 +49,6 @@ SkLine::SkLine(const SkLine& other) {
   this->fOffset = other.fOffset;
   this->fEllipsis = other.fEllipsis;
   this->fSizes = other.sizes();
-  this->fReindexing.reset();
-  other.fReindexing.foreach([this](const char* ch, SkCluster* cluster) {
-    this->fReindexing.set(ch, cluster);
-  });
 }
 
 void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply) {
@@ -76,9 +72,10 @@ void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord
   }
 }
 
-void SkLine::reshuffle(SkCluster* start, SkCluster* end) {
+void SkLine::reorderRuns() {
 
-  SkASSERT(start->fRun->index() <= end->fRun->index());
+  auto start = fClusters.begin();
+  auto end = fClusters.end();
   size_t numRuns = end->fRun->index() - start->fRun->index() + 1;
 
   // Get the logical order
@@ -94,34 +91,47 @@ void SkLine::reshuffle(SkCluster* start, SkCluster* end) {
   size_t shift = 0;
   for (auto& logical : logicalFromVisual) {
     shifts.push_back(shift);
-    SkDebugf("shift %d -> %d\n", start->fRun->index() + shifts.size() - 1, shift);
+    int index = start->fRun->index() + shifts.size() - 1;
+    if (index == logical) {
+      SkDebugf("shift %d: %d\n",index, shift);
+    } else {
+      SkDebugf("shift %d->%d: %d\n", index, logical, shift);
+    }
+
     auto run = start->fRun + logical;
     shift += &logical == &logicalFromVisual.front() ? run->size() - start->fStart : run->size();
+    // 1. Find the text intersection between line and run
+    // 2. Reindex all the text by the order of runs
   }
 
-  SkTHashMap<const char*, size_t> perLine;
-  for (auto cluster = start; cluster <= end; ) {
+  size_t runIndex = start->fRun->index();
+  size_t starting = shifts[runIndex - start->fRun->index()];
+  size_t inside = 0;
+
+  SkDebugf("Reindex:\n");
+  SkParagraphImpl::iterateThroughClustersByText(start, end, [&](const SkCluster& cluster) {
 
     // Move all the clusters for the run
-    size_t runIndex = cluster->fRun->index();
-    auto starting = shifts[runIndex - start->fRun->index()];
-    size_t inside = 0;
-    while (cluster->fRun->index() == runIndex) {
-      auto newCluster = start + starting + inside;
-      fReindexing.set(cluster->fText.begin(), newCluster);
-      SkDebugf("Reindex '%s': @%d", toString(cluster->fText).c_str(), newCluster->fRun->index());
-      if (newCluster->fStart + 1 == newCluster->fEnd) {
-        SkDebugf("[%d]\n", newCluster->fStart);
-      } else {
-        SkDebugf("[%d:%d]\n", newCluster->fStart, newCluster->fEnd - 1);
-      }
-      ++inside;
-      ++cluster;
-      if (cluster > end) {
-        break;
-      }
+    if (cluster.fRun->index() != runIndex) {
+      runIndex = cluster.fRun->index();
+      starting = shifts[runIndex - start->fRun->index()];
+      inside = 0;
     }
-  }
+
+    auto newCluster = (SkCluster*)start + starting + inside;
+    fReindexing.set(cluster.fText.begin(), newCluster);
+
+    SkDebugf("Reindex '%s': @ %d", toString(cluster.fText).c_str(), newCluster->fRun->index());
+    if (newCluster->fStart + 1 == newCluster->fEnd) {
+      SkDebugf("[%d]\n", newCluster->fStart);
+    } else {
+      SkDebugf("[%d:%d]\n", newCluster->fStart, newCluster->fEnd - 1);
+    }
+
+    ++inside;
+
+    return true;
+  });
 }
 
 SkCluster* SkLine::findCluster(const char* ch) const {
@@ -140,6 +150,7 @@ SkCluster* SkLine::findCluster(const char* ch) const {
   return nullptr;
 }
 
+// The text must be shaped within one single run
 SkVector SkLine::measureText(SkSpan<const char> text) const {
 
   SkVector size = SkVector::Make(0, 0);
@@ -253,9 +264,17 @@ SkScalar SkLine::iterateThroughRuns(
       continue;
     }
 
-    auto finish = current == end + 1 ? end->fText.end() : current->fText.end();
-    SkASSERT(finish >= start->fText.end());
-    SkSpan<const char> runText(start->fText.begin(), finish - start->fText.begin());
+    SkSpan<const char> runText;
+    if (start->fRun->leftToRight()) {
+      auto finish = current > end ? end->fText.end() : current->fText.end();
+      SkASSERT(finish >= start->fText.end());
+      runText = SkSpan<const char>(start->fText.begin(), finish - start->fText.begin());
+    } else {
+      auto finish = current > end ? end->fText.begin() : current->fText.begin();
+      SkASSERT(finish >= start->fText.begin());
+      runText = SkSpan<const char>(start->fText.begin(), finish - start->fText.begin());
+    }
+
     SkDebugf("runText: '%s'\n", toString(runText).c_str());
     SkSpan<const char> intersect = text * runText;
     SkDebugf("intersect: '%s'\n", toString(intersect).c_str());
@@ -263,7 +282,7 @@ SkScalar SkLine::iterateThroughRuns(
     // Find a part of the run that intersects with the text
     auto run = start->fRun;
     if (!run->leftToRight()) {
-      std::swap(start, end);
+      //std::swap(start, end);
     }
 
     auto lineOffset = run->position(0).fX;
@@ -283,7 +302,7 @@ SkScalar SkLine::iterateThroughRuns(
         clip.fRight = clip.fLeft;
         clip.fLeft += cluster->sizeToChar(intersect.begin());
       }
-      if (cluster == current) {
+      if (cluster == end) {
         clip.fRight += cluster->sizeFromChar(intersect.end() - 1);
       } else {
         //clip.fRight += cluster->fWidth; (because of justification)
@@ -297,7 +316,7 @@ SkScalar SkLine::iterateThroughRuns(
     if (leftGlyphDiff != 0) {
       clip.fLeft += leftGlyphDiff;
     }
-    SkDebugf("%f -%f - %f = %f (%f)\n", runOffset, clip.fLeft, lineOffset, shift2, clip.width());
+    //SkDebugf("%f -%f - %f = %f (%f)\n", runOffset, clip.fLeft, lineOffset, shift2, clip.width());
     apply(run, pos, size, clip, shift2);
 
     width += clip.width();

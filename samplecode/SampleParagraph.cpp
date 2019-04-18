@@ -1244,8 +1244,8 @@ class ParagraphView5 : public Sample {
                                  "A \u202ENAC\u202Cner \u202ENAC\u202C \u202ENAC\u202C,\n"
                                  "Anything that he \u202ENAC\u202C,\n"
                                  "But a \u202ENAC\u202Cner \u202ENAC\u202C't \u202ENAC\u202C a \u202ENAC\u202C, \u202ENAC\u202C he?";
-    bidi(canvas, width, height, text1, u"", 5);
-    canvas->translate(0, height);
+    //bidi(canvas, width, height, text1, u"", 5);
+    //canvas->translate(0, height);
 
     //bidi(canvas, width, height, u"\u2067DETALOSI\u2069", u"");
     //canvas->translate(0, height);
@@ -1259,8 +1259,8 @@ class ParagraphView5 : public Sample {
     //bidi(canvas, width, height, u"\u200FTICILPMI\u200E", u"");
     //canvas->translate(0, height);
 
-    //bidi(canvas, width, height, u"he said \u202E\"THE VALUES ARE 123, 456, 789, OK\"\u202C.", u"", 2);
-    //canvas->translate(0, height);
+    bidi(canvas, width, height, u"123 456 7890 \u202EZYXWV UTS RQP ONM LKJ IHG FED CBA\u202C.", u"", 2);
+    canvas->translate(0, height);
 
     //bidi(canvas, width, height, u"", u"");
     //canvas->translate(0, height);

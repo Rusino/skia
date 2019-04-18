@@ -6,6 +6,7 @@
  */
 
 #include <algorithm>
+#include <stack>
 #include <unicode/brkiter.h>
 #include <SkBlurTypes.h>
 #include <SkFontMgr.h>
@@ -59,23 +60,6 @@ SkParagraph::SkParagraph(const std::u16string& utf16text, SkParagraphStyle style
 
 SkParagraphImpl::~SkParagraphImpl() = default;
 
-void SkParagraphImpl::resetContext() {
-
-  fAlphabeticBaseline = 0;
-  fHeight = 0;
-  fWidth = 0;
-  fIdeographicBaseline = 0;
-  fMaxIntrinsicWidth = 0;
-  fMinIntrinsicWidth = 0;
-  fMaxLineWidth = 0;
-
-  fPicture = nullptr;
-  fRuns.reset();
-  fClusters.reset();
-  fLines.reset();
-  fTextWrapper.reset();
-}
-
 bool SkParagraphImpl::layout(double doubleWidth) {
 
   auto width = SkDoubleToScalar(doubleWidth);
@@ -86,13 +70,11 @@ bool SkParagraphImpl::layout(double doubleWidth) {
 
   this->buildClusterTable();
 
-  this->markClustersWithLineBreaks();
-
   this->breakShapedTextIntoLines(width);
 
   // The next call does not do the formatting
   // (it's postponed until/if the actual painting happened)
-  // but does correct the paragraph width
+  // but does correct the paragraph width as formatting requires
   this->formatLinesByText(width);
 
   return true;
@@ -165,38 +147,89 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
   canvas->drawPicture(fPicture, &matrix, nullptr);
 }
 
+void SkParagraphImpl::resetContext() {
+
+  fAlphabeticBaseline = 0;
+  fHeight = 0;
+  fWidth = 0;
+  fIdeographicBaseline = 0;
+  fMaxIntrinsicWidth = 0;
+  fMinIntrinsicWidth = 0;
+  fMaxLineWidth = 0;
+
+  fPicture = nullptr;
+  fRuns.reset();
+  fClusters.reset();
+  fLines.reset();
+  fTextWrapper.reset();
+}
+
+// Cluster table goes in text order (ignoring bidi)
+// so we can walk the table as if we walk the text
 void SkParagraphImpl::buildClusterTable() {
 
-  // We should be agnostic of bidi but there are edge cases different for LTR and RTL
+  // Find all clusters with line breaks
+  SkTextBreaker breaker;
+  if (!breaker.initialize(fUtf8, UBRK_LINE)) {
+    return;
+  }
+
+  size_t currentPos = 0;
+  SkTHashMap<const char*, bool> map;
+  while (!breaker.eof()) {
+    currentPos = breaker.next(currentPos);
+    map.set(currentPos + fUtf8.begin() - 1, breaker.status() == UBRK_LINE_HARD);
+  }
+
   for (auto& run : fRuns) {
+    size_t posStart = 0;
+    size_t posEnd = run.size();
+    int32_t posStep = 1;
+    if (!run.leftToRight()) {
+      posEnd = 0;
+      posStart = run.size();
+      posStep = -1;
+    }
 
-    SkDebugf("Run #%d\n", run.index());
-    size_t glyphStart = 0;
-    size_t charStart = run.leftToRight() ? run.range().begin() : run.range().end();
-    for (size_t glyphEnd = 1; glyphEnd <= run.size(); ++glyphEnd) {
+    SkDebugf("Run #%d:\n", run.index());
 
-      auto charEnd = run.leftToRight()
-                         ? (glyphEnd == run.size() ? run.range().end() : run.cluster(glyphEnd))
-                         : run.cluster(glyphEnd - 1);
+    // Walk through the glyph in the right direction
+    size_t glyphStart = posStart;
+    size_t charStart = run.range().begin();
+    for (auto glyphEnd = posStart + posStep; glyphEnd != posEnd; glyphEnd += posStep) {
 
-      if (charEnd == charStart) {
-        continue;
-      }
+      auto charEnd = glyphEnd == run.size() ? run.range().end() : run.cluster(glyphEnd);
 
       SkVector size = SkVector::Make(run.calculateWidth(glyphStart, glyphEnd),
                                      run.calculateHeight());
-      if (!run.leftToRight()) {
-        std::swap(charStart, charEnd);
-      }
-
       SkASSERT(charEnd >= charStart);
       auto text(SkSpan<const char>(fUtf8.begin() + charStart, charEnd - charStart));
+      auto& cluster = fClusters.emplace_back(&run, glyphStart, glyphEnd, text, size.fX, size.fY);
+      // Mark line breaks
+      auto found = map.find(cluster.fText.begin());
+      if (found) {
+        cluster.fBreakType = *found || &cluster == &fClusters.back()
+                             ? SkCluster::BreakType::HardLineBreak
+                             : SkCluster::BreakType::SoftLineBreak;
+        cluster.setIsWhiteSpaces();
+      }
 
-      fClusters.emplace_back(&run, glyphStart, glyphEnd, text, size.fX, size.fY);
+      SkDebugf("Cluster%s", cluster.isWhitespaces() ? "*" : " ");
+      if (cluster.fStart + 1 == cluster.fEnd) {
+        SkDebugf("[%d] ", cluster.fStart);
+      } else {
+        SkDebugf("[%d:%d] \n", cluster.fStart, cluster.fEnd - 1);
+      }
+
+      if (cluster.fText.size() == 1) {
+        SkDebugf("(%d), %s\n", charStart, toString(cluster.fText).c_str());
+      } else {
+        SkDebugf("(%d:%d), %s\n", charStart, charEnd - 1, toString(cluster.fText).c_str());
+      }
 
       glyphStart = glyphEnd;
       charStart = charEnd;
-    };
+    }
   }
 }
 
@@ -358,47 +391,6 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
   fMaxIntrinsicWidth = handler.advance().fX;
 }
 
-void SkParagraphImpl::markClustersWithLineBreaks() {
-
-  // Find all clusters with line breaks
-  SkTextBreaker breaker;
-  if (!breaker.initialize(fUtf8, UBRK_LINE)) {
-    return;
-  }
-
-  size_t currentPos = 0;
-  SkTHashMap<const char*, bool> map;
-  while (!breaker.eof()) {
-    currentPos = breaker.next(currentPos);
-    map.set(currentPos +fUtf8.begin(), breaker.status() == UBRK_LINE_HARD);
-  }
-
-  for (auto& cluster : fClusters) {
-    auto found = map.find(cluster.fText.end());
-    if (found) {
-      cluster.fBreakType = *found || &cluster == &fClusters.back()
-                           ? SkCluster::BreakType::HardLineBreak
-                           : SkCluster::BreakType::SoftLineBreak;
-      cluster.setIsWhiteSpaces();
-    }
-
-    SkDebugf("Cluster%s", cluster.isWhitespaces() ? "*" : " ");
-    if (cluster.fStart + 1 == cluster.fEnd) {
-      SkDebugf("[%d] ", cluster.fStart);
-    } else {
-      SkDebugf("[%d:%d] (%d:%d), %s\n", cluster.fStart, cluster.fEnd - 1);
-    }
-
-    auto charStart = cluster.fText.begin() - fUtf8.begin();
-    auto charEnd = cluster.fText.end() - fUtf8.begin();
-    if (charStart + 1 == charEnd) {
-      SkDebugf("(%d), %s\n", charStart, toString(cluster.fText).c_str());
-    } else {
-      SkDebugf("(%d:%d), %s\n", charStart, charEnd - 1, toString(cluster.fText).c_str());
-    }
-  }
-}
-
 void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
 
   fTextWrapper.formatText(
@@ -466,18 +458,24 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
 
 void SkParagraphImpl::rearrangeLinesByBidi() {
 
-  SkCluster* start = nullptr;
-  SkCluster* end = nullptr;
+  for (auto& line : fLines) {
+    // Let's deal with the line
+    line.reorderRuns();
+  }
+  const SkCluster* start = nullptr;
+  const SkCluster* end = nullptr;
   SkLine* line = fLines.begin();
-  for (auto& cluster : fClusters) {
+  this->iterateThroughClustersByText(
+      [&](const SkCluster& cluster) {
+  //for (auto& cluster : fClusters) {
     if (cluster.fText.begin() == line->fText.begin()) {
       // New line start
       SkASSERT(end == nullptr);
       start = &cluster;
       end = nullptr;
-    } else if (cluster.fText.begin() < line->fText.begin()) {
+    } else if ((cluster.fText.begin() < line->fText.begin())) {
       // Some new lines here
-      continue;
+      return true;
     }
 
     SkASSERT(start != nullptr);
@@ -487,11 +485,11 @@ void SkParagraphImpl::rearrangeLinesByBidi() {
     }
     if (end == nullptr) {
       // Middle of the line
-      continue;
+      return true;
     }
 
     // Let's deal with the line
-    line->reshuffle(start, end);
+        line->reorderRuns(start, end);
 
     // Move to the next line
     start = nullptr;
@@ -505,8 +503,39 @@ void SkParagraphImpl::rearrangeLinesByBidi() {
 
     if (line == fLines.end()) {
       // We have line limit
-      break;
+      return false;
     }
+
+    return true;
+  });
+}
+
+void SkParagraphImpl::iterateThroughClustersByText
+(const SkCluster* start, const SkCluster* end, std::function<bool(const SkCluster&)> apply) {
+
+  std::stack<const SkCluster*> backwards;
+  for (auto cluster = start; cluster != end; ++cluster) {
+    if (!cluster->fRun->leftToRight()) {
+      backwards.push(cluster);
+      continue;
+    }
+
+    while (!backwards.empty()) {
+      if (!apply(*backwards.top())) {
+        return;
+      }
+      backwards.pop();
+    }
+
+    if (!apply(*cluster)) {
+      return;
+    }
+  }
+  while (!backwards.empty()) {
+    if (!apply(*backwards.top())) {
+      return;
+    }
+    backwards.pop();
   }
 }
 

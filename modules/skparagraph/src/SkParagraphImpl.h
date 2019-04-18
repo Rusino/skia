@@ -145,6 +145,13 @@ class SkParagraphImpl final: public SkParagraph {
     return !fParagraphStyle.unlimited_lines() && fLines.size() >= fParagraphStyle.getMaxLines() + delta;
   }
 
+  static void iterateThroughClustersByText
+      (const SkCluster* start, const SkCluster* end, std::function<bool(const SkCluster&)> apply);
+
+  void iterateThroughClustersByText(std::function<bool(const SkCluster&)> apply) {
+    SkParagraphImpl::iterateThroughClustersByText(fClusters.begin(), fClusters.end(), apply);
+  }
+
  private:
 
   friend class SkParagraphBuilder;
@@ -152,7 +159,6 @@ class SkParagraphImpl final: public SkParagraph {
   void resetContext();
   void buildClusterTable();
   void shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles);
-  void markClustersWithLineBreaks();
   void breakShapedTextIntoLines(SkScalar maxWidth);
   void rearrangeLinesByBidi();
   void formatLinesByText(SkScalar maxWidth);

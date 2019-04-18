@@ -7,7 +7,6 @@
 
 #include "SkTextWrapper.h"
 #include "SkParagraphImpl.h"
-#include <stack>
 
 SkRun* SkTextWrapper::createEllipsis(Position& pos) {
   if (!fParent->reachedLinesLimit(-1) || pos.end() == fClusters.end() - 1) {
@@ -53,10 +52,11 @@ bool SkTextWrapper::addLine(Position& pos) {
 
   fWidth =  SkMaxScalar(fWidth, pos.trimmedWidth());
   fHeight += pos.height();
-  fLineStart = pos.end() + 1;
+
+  fLineStart = pos.end() + (pos.end()->fRun->leftToRight() ? 1 : -1);
   if (!pos.end()->isHardBreak()) {
     while (fLineStart < fClusters.end() &&
-        fLineStart->isWhitespaces()) { ++fLineStart; }
+        fLineStart->isWhitespaces()) { fLineStart += (fLineStart->fRun->leftToRight() ? 1 : -1); }
   }
   fCurrentLineOffset.fY += pos.height();
   if (fLineStart < fClusters.end()) {
@@ -85,14 +85,12 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
 
   // Iterate through all the clusters in the text
   SkScalar wordLength = 0;
-  iterateThroughClustersByText([&](const SkCluster& cluster) {
-  //for (auto& cluster : fClusters) {
-
+  for (auto& cluster : clusters) {
     if (!cluster.isWhitespaces()) {
       wordLength += cluster.fWidth;
       if (fClosestBreak.width() + fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
         // Cluster does not fit: add the line until the closest break
-        if (!addLine(fClosestBreak)) return false;
+        if (!addLine(fClosestBreak)) continue;
       }
       if (fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
         // Cluster does not fit yet: try to break the text by hyphen
@@ -103,13 +101,13 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
         // Cluster does not fit yet: add the line with the rest of clusters
         SkASSERT(fClosestBreak.width() == 0);
         fClosestBreak.add(fAfterBreak);
-        if (!addLine(fClosestBreak)) return false;
+        if (!addLine(fClosestBreak)) break;
       }
       if (cluster.fWidth > fMaxWidth) {
         //  Cluster still does not fit: it's too long; let's clip it
         fClosestBreak.add(cluster);
-        if (!addLine(fClosestBreak)) return false;
-        return true;
+        if (!addLine(fClosestBreak)) break;
+        continue;
       }
     } else {
       fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordLength);
@@ -123,11 +121,9 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
     }
     if (cluster.isHardBreak()) {
       // Hard line break
-      if (!addLine(fClosestBreak)) return false;
+      if (!addLine(fClosestBreak)) break;
     }
-
-    return true;
-  });
+  };
   // Make sure nothing left
   if (!endOfText() && !fParent->reachedLinesLimit(0)) {
     fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordLength);
@@ -184,30 +180,4 @@ SkRun* SkTextWrapper::shapeEllipsis(SkRun* run) {
                 &handler);
 
   return handler.run();
-}
-
-void SkTextWrapper::iterateThroughClustersByText(std::function<bool(const SkCluster&)> apply) {
-
-  std::stack<SkCluster*> clusters;
-  SkCluster* previous = nullptr;
-  for (auto& cluster : fClusters) {
-    if (previous != nullptr && previous->fText.end() != cluster.fText.begin()) {
-      clusters.push(&cluster);
-      continue;
-    }
-
-    if (!apply(cluster)) {
-      return;
-    }
-    previous = &cluster;
-
-    while (!clusters.empty() && previous->fText.end() == clusters.top()->fText.begin()) {
-      if (!apply(*clusters.top())) {
-        return;
-      }
-      previous = clusters.top();
-      clusters.pop();
-    }
-  }
-  SkASSERT(clusters.empty());
 }
