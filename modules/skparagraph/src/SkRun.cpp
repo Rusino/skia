@@ -22,8 +22,10 @@ SkRun::SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info,
   fOffset = SkVector::Make(offsetX, 0);
   fGlyphs.push_back_n(info.glyphCount);
   fPositions.push_back_n(info.glyphCount);
+  fOffsets.push_back_n(info.glyphCount, SkScalar(0));
   fClusterIndexes.push_back_n(info.glyphCount);
   info.fFont.getMetrics(&fFontMetrics);
+  fJustified = false;
 }
 
 SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
@@ -43,14 +45,18 @@ SkScalar SkRun::calculateHeight() const {
 }
 
 SkScalar SkRun::calculateWidth(size_t start, size_t end) const {
-  if (!leftToRight()) {
-    //std::swap(start, end);
-  }
+
   SkASSERT(start <= end);
+
+  SkScalar offset = 0;
+  if (fJustified && end > start) {
+    offset = fOffsets[end - 1] - fOffsets[start];
+  }
+
   if (end == size()) {
-    return fAdvance.fX - fPositions[start].fX + fPositions[0].fX;
+    return fAdvance.fX - fPositions[start].fX + fPositions[0].fX + offset;
   } else {
-   return fPositions[end].fX - fPositions[start].fX;
+   return fPositions[end].fX - fPositions[start].fX + offset;
   }
 }
 
@@ -64,6 +70,9 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
 
   for (size_t i = 0; i < size; ++i) {
     auto point = fPositions[i + pos];
+    if (fJustified) {
+      point.fX += fOffsets[i + pos];
+    }
     blobBuffer.points()[i] = point + offset;
   }
   //sk_careful_memcpy(blobBuffer.points(),

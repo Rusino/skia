@@ -137,8 +137,9 @@ class SkParagraphImpl final: public SkParagraph {
         && fLines.size() > fParagraphStyle.getMaxLines();
   }
 
-  void addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkRun* ellipsis, SkFontSizes sizes) {
-    fLines.emplace_back(offset, advance, SkSpan<SkCluster>(fClusters.begin(), fClusters.size()), text, ellipsis, sizes);
+  void addLine (SkVector offset, SkVector advance, SkSpan<const char> text, std::unique_ptr<SkRun> ellipsis, SkFontSizes sizes) {
+    fLines.emplace_back
+    (offset, advance, SkSpan<SkCluster>(fClusters.begin(), fClusters.size()), text, std::move(ellipsis), sizes);
   }
 
   void rearrangeLinesByBidi() {

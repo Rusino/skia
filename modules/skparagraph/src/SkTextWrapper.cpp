@@ -8,7 +8,7 @@
 #include "SkTextWrapper.h"
 #include "SkParagraphImpl.h"
 
-SkRun* SkTextWrapper::createEllipsis(Position& pos) {
+std::unique_ptr<SkRun> SkTextWrapper::createEllipsis(Position& pos) {
   if (!fParent->reachedLinesLimit(-1) || pos.end() == fClusters.end() - 1) {
     // We must be on the last line and not at the end of the text
     return nullptr;
@@ -20,19 +20,28 @@ SkRun* SkTextWrapper::createEllipsis(Position& pos) {
   auto lineEnd = pos.trimmed();
   while (lineEnd >= fLineStart) {
     // Calculate the ellipsis sizes for a given font
-    SkRun* ellipsis = getEllipsis(lineEnd->fRun);
-    if (pos.trimmedWidth() + ellipsis->advance().fX <= fMaxWidth) {
-      // Ellipsis fit; place and size it correctly
-      ellipsis->shift(pos.trimmedWidth(), lineEnd->fRun->sizes().diff(pos.sizes()));
-      ellipsis->setHeight(pos.height());
-      pos.extend(ellipsis->advance().fX);
-      return ellipsis;
+    if (!lineEnd->isWhitespaces()) {
+      SkRun* cached = fEllipsisCache.find(lineEnd->fRun->font());
+      if (cached == nullptr) {
+        cached = shapeEllipsis(lineEnd->fRun);
+      }
+      auto ellipsis = std::make_unique<SkRun>(*cached);
+
+      if (pos.trimmedWidth() + ellipsis->advance().fX <= fMaxWidth) {
+        // Ellipsis fit; place and size it correctly
+        ellipsis->shift(pos.trimmedWidth(),
+                        lineEnd->fRun->sizes().diff(pos.sizes()));
+        ellipsis->setHeight(pos.height());
+        pos.extend(ellipsis->advance().fX);
+        return ellipsis;
+      }
     }
     // It is possible that the ellipsis is wider than the line itself for a given font;
     // we still need to continue because we can find a smaller font and it will fit
     pos.extend(-lineEnd->fWidth);
     --lineEnd;
   }
+  // We could not fit the ellipsis on the line :(
   return nullptr;
 }
 
@@ -47,7 +56,7 @@ bool SkTextWrapper::addLine(Position& pos) {
       SkVector::Make(0, fCurrentLineOffset.fY),
       SkVector::Make(pos.trimmedWidth(), pos.height()),
       pos.trimmedText(fLineStart),
-      ellipsis,
+      std::move(ellipsis),
       pos.sizes());
 
   fWidth =  SkMaxScalar(fWidth, pos.trimmedWidth());
@@ -62,6 +71,7 @@ bool SkTextWrapper::addLine(Position& pos) {
   if (fLineStart < fClusters.end()) {
     // Shift the rest of the line horizontally to the left
     // to compensate for the run positions since we broke the line
+    // TODO: It's not used anymore
     fCurrentLineOffset.fX = - fLineStart->fRun->position(fLineStart->fStart).fX;
   }
   pos.clean(fLineStart);
@@ -130,15 +140,6 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
     fClosestBreak.add(fAfterBreak);
     addLine(fClosestBreak);
   }
-}
-
-SkRun* SkTextWrapper::getEllipsis(SkRun* run) {
-  SkRun* found = fEllipsisCache.find(run->font());
-  if (found != nullptr) {
-    return found;
-  }
-  found = shapeEllipsis(run);
-  return found;
 }
 
 SkRun* SkTextWrapper::shapeEllipsis(SkRun* run) {

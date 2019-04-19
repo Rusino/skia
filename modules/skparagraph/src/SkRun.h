@@ -203,5 +203,7 @@ class SkRun {
   SkShaper::RunHandler::Range fUtf8Range;
   SkSTArray<128, SkGlyphID, false> fGlyphs;
   SkSTArray<128, SkPoint, true> fPositions;
+  SkSTArray<128, SkScalar, true> fOffsets;
   SkSTArray<128, uint32_t, true> fClusterIndexes;
+  bool fJustified;
 };

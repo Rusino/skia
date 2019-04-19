@@ -119,10 +119,9 @@ class SkTextWrapper {
 
   bool endOfText() const { return fLineStart == fClusters.end(); }
 
-  SkRun* createEllipsis(Position& pos);
+  std::unique_ptr<SkRun> createEllipsis(Position& pos);
   bool addLine(Position& pos);
   SkRun* shapeEllipsis(SkRun* run);
-  SkRun* getEllipsis(SkRun* run);
 
   SkParagraphImpl* fParent;
   SkSpan<SkCluster> fClusters;

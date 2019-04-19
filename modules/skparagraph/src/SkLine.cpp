@@ -49,7 +49,7 @@ SkLine::SkLine(const SkLine& other) {
   this->fAdvance = other.fAdvance;
   this->fWidth = other.fWidth;
   this->fOffset = other.fOffset;
-  this->fEllipsis = other.fEllipsis;
+  this->fEllipsis.reset(other.fEllipsis == nullptr ? nullptr : new SkRun(*other.fEllipsis));
   this->fSizes = other.sizes();
   this->fClusters = other.fClusters;
 }
@@ -105,6 +105,14 @@ SkVector SkLine::measureText(SkSpan<const char> text) const {
     return size;
   }
 
+  this->iterateThroughRuns(text, 0,
+    [&](SkRun* run, int32_t p, size_t s, SkRect clip, SkScalar shift) {
+
+      size.fX += clip.width();
+      size.fY = SkTMax(size.fY, clip.height());
+      return true;
+    });
+/*
   auto start = text.begin();
   auto end = text.end() - 1;
   for (auto& cluster : fClusters) {
@@ -126,7 +134,7 @@ SkVector SkLine::measureText(SkSpan<const char> text) const {
 
     size.fY = SkTMax(size.fY, cluster.fHeight);
   }
-
+*/
   return size;
 }
 
@@ -169,8 +177,10 @@ void SkLine::justify(SkScalar maxWidth) {
     this->iterateThroughRuns(word.text(), false,
                              [shift](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar) {
                                for (auto i = pos; i < pos + size; ++i) {
-                                 run->fPositions[i].fX += shift;
+                                 run->fOffsets[i] = shift;
                                }
+                               run->fAdvance.fX += shift;
+                               run->fJustified = true;
                                return true;
                              });
   }
@@ -178,6 +188,48 @@ void SkLine::justify(SkScalar maxWidth) {
   this->fShift = 0;
   this->fAdvance.fX = maxWidth;
   this->fWidth = maxWidth;
+}
+
+SkRect SkLine::measureText(SkSpan<const char> text, SkRun* run, size_t& pos, size_t& size) const {
+
+  auto first = text.begin();
+  auto last = text.end() - 1;
+
+  SkCluster* start = nullptr;
+  SkCluster* end = nullptr;
+
+  for (auto& cluster : fClusters) {
+    if (cluster.fText.begin() <= first && cluster.fText.end() >= first) {
+      start = &cluster;
+    }
+    if (cluster.fText.begin() <= last && cluster.fText.end() >= last) {
+      end = &cluster;
+    }
+  }
+  SkASSERT(start != nullptr && end != nullptr);
+  if (!run->leftToRight()) {
+    std::swap(start, end);
+  }
+
+  auto lineOffset = run->position(0).fX;
+  size = end->fEnd - start->fStart;
+  pos = start->fStart;
+  SkRect clip = SkRect::MakeXYWH( run->position(start->fStart).fX - lineOffset,
+                                  run->sizes().diff(sizes()),
+                                  run->calculateWidth(start->fStart, end->fEnd),
+                                  run->calculateHeight());
+
+  // Correct the width in case the text edges don't match clusters
+  if (start->fText.begin() <= first && start->fText.end() > first) {
+    auto diff = start->sizeToChar(first);
+    clip.fLeft += diff;
+  }
+  if (end->fText.begin() <= last && end->fText.end() > last) {
+    auto diff = end->sizeFromChar(last);
+    clip.fRight -= diff;
+  }
+
+  return clip;
 }
 
 // TODO: optimize
@@ -199,7 +251,11 @@ SkScalar SkLine::iterateThroughRuns(
     if (intersect.empty()) {
       continue;
     }
-    
+
+    size_t pos;
+    size_t size;
+    SkRect clip = this->measureText(intersect, run, pos, size);
+    /*
     auto first = intersect.begin();
     auto last = intersect.end() - 1;
     
@@ -236,7 +292,8 @@ SkScalar SkLine::iterateThroughRuns(
       auto diff = end->sizeFromChar(last);
       clip.fRight -= diff;
     }
-
+    */
+    auto lineOffset = run->position(0).fX;
     auto shift1 = runOffset - clip.fLeft;
     auto shift2 = runOffset - clip.fLeft - lineOffset;
     clip.offset(shift1, 0);
@@ -250,7 +307,7 @@ SkScalar SkLine::iterateThroughRuns(
   // TODO: calculate the ellipse for the last visual run
   if (this->ellipsis() != nullptr) {
     auto ellipsis = this->ellipsis();
-    apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->offset().fX);
+    apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft);
   }
 
   return width;
