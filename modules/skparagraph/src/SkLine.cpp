@@ -52,6 +52,7 @@ SkLine::SkLine(const SkLine& other) {
   this->fEllipsis.reset(other.fEllipsis == nullptr ? nullptr : new SkRun(*other.fEllipsis));
   this->fSizes = other.sizes();
   this->fClusters = other.fClusters;
+  this->fLeftToRight = other.fLeftToRight;
 }
 
 void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply) {
@@ -62,10 +63,10 @@ void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord
     return;
   }
   fWords.reset();
-  size_t currentPos = 0;
+  size_t currentPos = breaker.first();
   while (true) {
     auto start = currentPos;
-    currentPos = breaker.next(currentPos);
+    currentPos = breaker.next();
     if (breaker.eof()) {
       break;
     }
@@ -175,11 +176,12 @@ void SkLine::justify(SkScalar maxWidth) {
     word.shift(shift);
     // Correct all runs and position for all the glyphs in the word
     this->iterateThroughRuns(word.text(), false,
-                             [shift](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar) {
+                             [shift, word](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar) {
+                               SkDebugf("Word '%s': +%f =%f\n", toString(word.text()).c_str(), shift, clip.width());
                                for (auto i = pos; i < pos + size; ++i) {
                                  run->fOffsets[i] = shift;
                                }
-                               run->fAdvance.fX += shift;
+                               //run->fAdvance.fX += shift;
                                run->fJustified = true;
                                return true;
                              });
@@ -242,8 +244,15 @@ SkScalar SkLine::iterateThroughRuns(
     return 0;
   }
 
-  // Walk through the runs in the logical order
   SkScalar width = 0;
+  if (!fLeftToRight && this->ellipsis() != nullptr) {
+    auto ellipsis = this->ellipsis();
+    apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft);
+    runOffset += ellipsis->advance().fX;
+    width += ellipsis->advance().fX;
+  }
+
+  // Walk through the runs in the logical order
   for (auto run : fLogical) {
 
     // Find the intersection between the text and the run
@@ -255,44 +264,7 @@ SkScalar SkLine::iterateThroughRuns(
     size_t pos;
     size_t size;
     SkRect clip = this->measureText(intersect, run, pos, size);
-    /*
-    auto first = intersect.begin();
-    auto last = intersect.end() - 1;
-    
-    SkCluster* start = nullptr;
-    SkCluster* end = nullptr;
 
-    for (auto& cluster : fClusters) {
-      if (cluster.fText.begin() <= first && cluster.fText.end() >= first) {
-        start = &cluster;
-      }
-      if (cluster.fText.begin() <= last && cluster.fText.end() >= last) {
-        end = &cluster;
-      }
-    }
-    SkASSERT(start != nullptr && end != nullptr);
-    if (!run->leftToRight()) {
-      std::swap(start, end);
-    }
-
-    auto lineOffset = run->position(0).fX;
-    size_t size = end->fEnd - start->fStart;
-    size_t pos = start->fStart;
-    SkRect clip = SkRect::MakeXYWH( run->position(start->fStart).fX - lineOffset,
-                                    run->sizes().diff(sizes()),
-                                    run->calculateWidth(start->fStart, end->fEnd),
-                                    run->calculateHeight());
-
-    // Correct the width in case the text edges don't match clusters
-    if (start->fText.begin() <= first && start->fText.end() > first) {
-      auto diff = start->sizeToChar(first);
-      clip.fLeft += diff;
-    }
-    if (end->fText.begin() <= last && end->fText.end() > last) {
-      auto diff = end->sizeFromChar(last);
-      clip.fRight -= diff;
-    }
-    */
     auto lineOffset = run->position(0).fX;
     auto shift1 = runOffset - clip.fLeft;
     auto shift2 = runOffset - clip.fLeft - lineOffset;
@@ -305,7 +277,7 @@ SkScalar SkLine::iterateThroughRuns(
   }
 
   // TODO: calculate the ellipse for the last visual run
-  if (this->ellipsis() != nullptr) {
+  if (fLeftToRight && this->ellipsis() != nullptr) {
     auto ellipsis = this->ellipsis();
     apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft);
   }
@@ -370,7 +342,7 @@ void SkLine::iterateThroughStyles(
   auto width = apply(text, prevStyle, offsetX);
   offsetX += width;
   if (offsetX != this->width()) {
-    SkDebugf("!!!\n");
+    //SkDebugf("!!!\n");
   }
 }
 

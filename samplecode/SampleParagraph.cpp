@@ -733,72 +733,17 @@ class ParagraphView3 : public Sample {
     return style;
   }
 
-  void drawText(SkCanvas* canvas, SkScalar w, SkScalar h,
-                std::vector<std::string>& text,
-                SkColor fg = SK_ColorDKGRAY,
-                SkColor bg = SK_ColorWHITE,
-                std::string ff = "sans-serif",
-                SkScalar fs = 24,
-                size_t lineLimit = std::numeric_limits<size_t>::max(),
-                const std::u16string& ellipsis = u"\u2026") {
-
-    SkAutoCanvasRestore acr(canvas, true);
-
-    canvas->clipRect(SkRect::MakeWH(w, h));
-    canvas->drawColor(bg);
-
-    SkScalar margin = 20;
-
-    SkPaint paint;
-    paint.setAntiAlias(true);
-    paint.setColor(fg);
-
-    SkPaint blue;
-    blue.setColor(SK_ColorBLUE);
-
-    SkTextStyle style;
-    style.setBackgroundColor(blue);
-    style.setForegroundColor(paint);
-    style.setFontFamily(ff);
-    style.setFontSize(fs);
-    SkParagraphStyle paraStyle;
-    paraStyle.setTextStyle(style);
-    paraStyle.setMaxLines(lineLimit);
-    paraStyle.setEllipsis(ellipsis);
-    paraStyle.getTextStyle().setFontSize(20);
-    fontCollection->setTestFontManager(testFontProvider);
-    SkParagraphBuilder builder(paraStyle, fontCollection);
-
-    SkPaint background;
-    background.setColor(bg);
-
-    SkPaint foreground;
-    foreground.setColor(fg);
-    style.setForegroundColor(foreground);
-    style.setBackgroundColor(background);
-
-    for (auto& part : text) {
-      builder.pushStyle(style);
-      builder.addText(part);
-      builder.pop();
-    }
-
-    auto paragraph = builder.Build();
-    paragraph->layout(w - margin * 2);
-    paragraph->paint(canvas, margin, margin);
-
-    canvas->translate(0, paragraph->getHeight() + margin);
-  }
-
   void drawLine(SkCanvas* canvas, SkScalar w, SkScalar h,
                 const std::string& text,
                 SkTextAlign align,
                 size_t lineLimit = std::numeric_limits<size_t>::max(),
+                bool RTL = false,
+                SkColor background = SK_ColorGRAY,
                 const std::u16string& ellipsis = u"\u2026") {
     SkAutoCanvasRestore acr(canvas, true);
 
     canvas->clipRect(SkRect::MakeWH(w, h));
-    canvas->drawColor(SK_ColorWHITE);
+    canvas->drawColor(SK_ColorRED);
 
     SkScalar margin = 20;
 
@@ -807,7 +752,10 @@ class ParagraphView3 : public Sample {
     paint.setColor(SK_ColorBLACK);
 
     SkPaint gray;
-    gray.setColor(SK_ColorLTGRAY);
+    gray.setColor(background);
+
+    SkPaint yellow;
+    yellow.setColor(SK_ColorYELLOW);
 
     SkTextStyle style;
     style.setBackgroundColor(gray);
@@ -819,38 +767,86 @@ class ParagraphView3 : public Sample {
     paraStyle.setTextAlign(align);
     paraStyle.setMaxLines(lineLimit);
     paraStyle.setEllipsis(ellipsis);
+    //paraStyle.setTextDirection(RTL ? SkTextDirection::rtl : SkTextDirection::ltr);
 
     SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
-    builder.addText(text);
+    if (RTL) {
+      builder.addText(mirror(text));
+    } else {
+      builder.addText(normal(text));
+    }
 
+    canvas->drawRect(SkRect::MakeXYWH(margin, margin, w - margin * 2, h - margin * 2), yellow);
     auto paragraph = builder.Build();
     paragraph->layout(w - margin * 2);
     paragraph->paint(canvas, margin, margin);
+  }
 
-    canvas->translate(0, paragraph->getHeight() + margin);
+  std::u16string mirror(const std::string& text) {
+    std::u16string result;
+    result += u"\u202E";
+    //for (auto i = text.size(); i > 0; --i) {
+    //  result += text[i - 1];
+    //}
+
+    for (auto i = text.size(); i > 0; --i) {
+      auto ch = text[i - 1];
+      if (ch == ',') {
+        result += u"!";
+      } else if (ch == '.') {
+          result += u"!";
+      } else {
+        result += ch;
+      }
+    }
+
+    result += u"\u202C";
+    return result;
+  }
+
+  std::u16string normal(const std::string& text) {
+    std::u16string result;
+    result += u"\u202D";
+    for (auto i = 0ul; i < text.size(); ++i) {
+      result += text[i];
+    }
+    result += u"\u202C";
+    return result;
   }
 
   void onDrawContent(SkCanvas* canvas) override {
 
-    const std::string options = {"Flutter is an open-source project to help developers "
-                                "build high-performance, high-fidelity, mobile apps for "
-                                "iOS and Android "
-                                "from a single codebase. This design lab is a playground "
-                                "and showcase of Flutter's many widgets, behaviors, "
-                                "animations, layouts, and more."};
+    const std::string options = // { "open-source open-source open-source open-source" };
+                     {"Flutter is an open-source project to help developers "
+                      "build high-performance, high-fidelity, mobile apps for "
+                      "iOS and Android "
+                      "from a single codebase. This design lab is a playground "
+                      "and showcase of Flutter's many widgets, behaviors, "
+                      "animations, layouts, and more."};
 
     canvas->drawColor(SK_ColorDKGRAY);
     SkScalar width = this->width() / 4;
-    SkScalar height = this->height();
+    SkScalar height = this->height() / 2;
 
-    const std::string line = "Hesitation is always easy rarely useful.";
-    drawLine(canvas, width, height, options, SkTextAlign::left, 10);
+    const std::string line = "World domination is such an ugly phrase - I prefer to call it world optimisation";
+
+    //drawLine(canvas, width, height, line, SkTextAlign::left, 1, false, SK_ColorLTGRAY);
     canvas->translate(width, 0);
-    drawLine(canvas, width, height, options, SkTextAlign::right, 11);
+    //drawLine(canvas, width, height, line, SkTextAlign::right, 2, false, SK_ColorGRAY);
     canvas->translate(width, 0);
-    drawLine(canvas, width, height, options, SkTextAlign::center, 12);
+    //drawLine(canvas, width, height, line, SkTextAlign::center, 3, false, SK_ColorCYAN);
     canvas->translate(width, 0);
-    drawLine(canvas, width, height, options, SkTextAlign::justify, 13);
+    //drawLine(canvas, width, height, line, SkTextAlign::justify, 4, false, SK_ColorBLUE);
+    canvas->translate(-width * 3, height);
+
+    //drawLine(canvas, width, height, line, SkTextAlign::left, 1, true, SK_ColorLTGRAY);
+    canvas->translate(width, 0);
+    //drawLine(canvas, width, height, line, SkTextAlign::right, 2, true, SK_ColorGRAY);
+    canvas->translate(width, 0);
+    //drawLine(canvas, width, height, line, SkTextAlign::left, 3, true, SK_ColorCYAN);
+    canvas->translate(width, 0);
+    drawLine(canvas, width, height, line, SkTextAlign::justify, 4, true, SK_ColorBLUE);
+    canvas->translate(width, 0);
   }
 
  private:
@@ -950,11 +946,6 @@ class ParagraphView4 : public Sample {
     style0.setBackgroundColor(gray);
     style0.setFontFamily(ff);
     style0.setFontSize(fs);
-    //style0.addShadow(SkTextShadow(SK_ColorBLACK, SkPoint::Make(5, 5), 2));
-    //style0.setFontStyle(SkFontStyle(
-    //    SkFontStyle::Weight::kExtraBold_Weight,
-    //    SkFontStyle::Width::kNormal_Width,
-    //    SkFontStyle::Slant::kUpright_Slant));
     style0.setDecoration(SkTextDecoration::kUnderline);
     style0.setDecorationStyle(SkTextDecorationStyle::kDouble);
     style0.setDecorationColor(SK_ColorBLACK);
@@ -964,11 +955,6 @@ class ParagraphView4 : public Sample {
     style1.setBackgroundColor(yellow);
     style1.setFontFamily(ff);
     style1.setFontSize(fs);
-    //style1.addShadow(SkTextShadow(SK_ColorGREEN, SkPoint::Make(5, 5), 2));
-    //style1.setFontStyle(SkFontStyle(
-    //    SkFontStyle::Weight::kNormal_Weight,
-    //    SkFontStyle::Width::kNormal_Width,
-    //    SkFontStyle::Slant::kItalic_Slant));
     style1.setDecoration(SkTextDecoration::kOverline);
     style1.setDecorationStyle(SkTextDecorationStyle::kWavy);
     style1.setDecorationColor(SK_ColorBLACK);
@@ -995,7 +981,6 @@ class ParagraphView4 : public Sample {
     paraStyle.setEllipsis(ellipsis);
     fontCollection->setTestFontManager(testFontProvider);
 
-    const std::string line = "Hesitation is always easy rarely useful.";
     const std::string logo1 = "google_";
     const std::string logo2 = "logo";
     const std::string logo3 = "go";
@@ -1035,65 +1020,6 @@ class ParagraphView4 : public Sample {
       paragraph->paint(canvas, margin, margin);
       canvas->translate(0, h + margin);
     }
-
-    const std::string text0 = "Flutter is an open-source project to help developers "
-                              "build high-performance, high-f";
-    const std::string text1 = "idelity, mobile apps for "
-                              "iOS and Android "
-                              "from a single codebase. This design lab is a playground "
-                              "and showcase of Flutter's many widgets, behaviors, "
-                              "anima";
-    const std::string text2 =       "tions, layouts, and more.  Learn more about Flutter at "
-                                    "https://flutter.io google";
-    const std::string text3 = "_logo.\n\nTo see the source code for this app, please visit the ";
-    const std::string text4 = "flutter github repo";
-/*
-    {
-      SkParagraphBuilder builder(paraStyle, fontCollection);
-      builder.pushStyle(style0);
-      builder.addText(text0);
-      builder.pop();
-
-      builder.pushStyle(style1);
-      builder.addText(text1);
-      builder.pop();
-
-      builder.pushStyle(style2);
-      builder.addText(text2);
-      builder.pop();
-
-      builder.pushStyle(style3);
-      builder.addText(text3);
-      builder.pop();
-
-      builder.pushStyle(style4);
-      builder.addText(text4);
-      builder.pop();
-
-      auto paragraph = builder.Build();
-      paragraph->layout(w - margin * 2);
-      paragraph->paint(canvas, margin, margin);
-    }
-  }
-*/
-    const std::string word0 = "Hesitation ";
-    const std::string tail0 = "is always easy rarely useful.";
-    /*
-    {
-      SkParagraphBuilder builder(paraStyle, fontCollection);
-      builder.pushStyle(style0);
-      builder.addText(word0);
-      builder.pop();
-
-      builder.pushStyle(style1);
-      builder.addText(tail0);
-      builder.pop();
-
-      auto paragraph = builder.Build();
-      paragraph->layout(w - margin * 2);
-      paragraph->paint(canvas, margin, margin);
-    }
-     */
   }
   void onDrawContent(SkCanvas* canvas) override {
 
@@ -1266,67 +1192,6 @@ class ParagraphView5 : public Sample {
     //canvas->translate(0, height);
 
     return;
-
-    /*
-     * Paragraph text: text1·RLE·text2·PDF·RLE·text3·PDF·text4
-
-        Level runs:
-
-        text1 – level 0
-        text2·text3 – level 1
-        text4 – level 0
-        Resulting isolating run sequences:
-
-        text1 – level 0
-        text2·text3 – level 1
-        text4 – level 0
-     */
-    bidi(canvas, width, height, u"text1\u202Btext2\u202C\u202Btext3\u202Ctext4 ", u"(text12txet3txettext4)");
-    canvas->translate(0, height);
-
-    /*
-     * Paragraph text: text1·RLI·text2·PDI·RLI·text3·PDI·text4
-
-        Level runs:
-
-        text1·RLI – level 0
-        text2 – level 1
-        PDI·RLI – level 0
-        text3 – level 1
-        PDI·text4 – level 0
-        Resulting isolating run sequences:
-
-        text1·RLI PDI·RLI PDI·text4 – level 0
-        text2 – level 1
-        text3 – level 1
-     */
-    bidi(canvas, width, height, u"text1\u2067text2\u2069\u2067text3\u2069text4 ", u"(text1text42txet3txet)");
-    canvas->translate(0, height);
-
-    /*
-     * Paragraph text: text1·RLI·text2·LRI·text3·RLE·text4·PDF·text5·PDI·text6·PDI·text7
-
-        Level runs:
-
-        text1·RLI – level 0
-        text2·LRI – level 1
-        text3 – level 2
-        text4 – level 3
-        text5 – level 2
-        PDI·text6 – level 1
-        PDI·text7 – level 0
-        Resulting isolating run sequences:
-
-        text1·RLI PDI·text7 – level 0
-        text2·LRI PDI·text6 – level 1
-        text3 – level 2
-        text4 – level 3
-        text5 – level 2
-     */
-    bidi(canvas, width, height,
-        u"text1\u2067text2\u2066text3\u202Btext4\u202Ctext5\u2069text6\u2069text7 ",
-        u"(text1text72txet6txettext34txettext5)");
-    canvas->translate(0, height);
   }
 
  private:
@@ -1337,8 +1202,8 @@ class ParagraphView5 : public Sample {
 };
 //////////////////////////////////////////////////////////////////////////////
 
-DEF_SAMPLE(return new ParagraphView1();)
-DEF_SAMPLE(return new ParagraphView2();)
+//DEF_SAMPLE(return new ParagraphView1();)
+//DEF_SAMPLE(return new ParagraphView2();)
 DEF_SAMPLE(return new ParagraphView3();)
-DEF_SAMPLE(return new ParagraphView4();)
-DEF_SAMPLE(return new ParagraphView5();)
+//DEF_SAMPLE(return new ParagraphView4();)
+//DEF_SAMPLE(return new ParagraphView5();)

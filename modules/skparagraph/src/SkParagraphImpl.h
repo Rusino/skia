@@ -52,7 +52,7 @@ class SkTextBreaker {
       SkDebugf("Could not create utf8UText: %s", u_errorName(status));
       return false;
     }
-    fIterator = ubrk_open(type, "th", nullptr, 0, &status);
+    fIterator = ubrk_open(type, "en", nullptr, 0, &status);
     if (U_FAILURE(status)) {
       SkDebugf("Could not create line break iterator: %s",
                u_errorName(status));
@@ -70,8 +70,13 @@ class SkTextBreaker {
     return true;
   }
 
-  size_t next(size_t pos) {
-    fPos = ubrk_following(fIterator, SkToS32(pos));
+  size_t first() {
+    fPos = ubrk_first(fIterator);
+    return eof() ?  fSize : fPos;
+  }
+
+  size_t next() {
+    fPos = ubrk_next(fIterator);
     return eof() ?  fSize : fPos;
   }
 
@@ -137,9 +142,19 @@ class SkParagraphImpl final: public SkParagraph {
         && fLines.size() > fParagraphStyle.getMaxLines();
   }
 
-  void addLine (SkVector offset, SkVector advance, SkSpan<const char> text, std::unique_ptr<SkRun> ellipsis, SkFontSizes sizes) {
+  void addLine (SkVector offset
+      , SkVector advance,
+      SkSpan<const char> text,
+      std::unique_ptr<SkRun> ellipsis,
+      SkFontSizes sizes) {
     fLines.emplace_back
-    (offset, advance, SkSpan<SkCluster>(fClusters.begin(), fClusters.size()), text, std::move(ellipsis), sizes);
+       (offset,
+        advance,
+        SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
+        text,
+        std::move(ellipsis),
+        sizes,
+        true);
   }
 
   void rearrangeLinesByBidi() {
@@ -153,6 +168,9 @@ class SkParagraphImpl final: public SkParagraph {
   }
 
   inline SkSpan<const char> text() const { return fUtf8; }
+
+  bool isLeftToRight() { return /*fParagraphStyle.getTextDirection() == SkTextDirection::ltr;*/
+        this->fParagraphStyle.effective_align() != SkTextAlign::right; }
 
  private:
 

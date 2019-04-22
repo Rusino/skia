@@ -76,6 +76,7 @@ class SkTextWrapper {
     }
 
     void extend(SkScalar w) { fWidth += w; }
+    void trim(const SkCluster* end) { fTrimmedEnd = end; }
 
     SkSpan<const char> trimmedText(const SkCluster* start) {
       size_t size = fTrimmedEnd->fText.end() > start->fText.begin()
@@ -119,7 +120,7 @@ class SkTextWrapper {
 
   bool endOfText() const { return fLineStart == fClusters.end(); }
 
-  std::unique_ptr<SkRun> createEllipsis(Position& pos);
+  std::unique_ptr<SkRun> createEllipsis(Position& pos, bool ltr);
   bool addLine(Position& pos);
   SkRun* shapeEllipsis(SkRun* run);
 

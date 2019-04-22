@@ -174,12 +174,19 @@ void SkParagraphImpl::buildClusterTable() {
     return;
   }
 
-  size_t currentPos = 0;
+  size_t currentPos = breaker.first();
   SkTHashMap<const char*, bool> map;
+  SkDebugf("Line breaks: %d ", currentPos);
   while (!breaker.eof()) {
-    currentPos = breaker.next(currentPos);
-    map.set(currentPos + fUtf8.begin() - 1, breaker.status() == UBRK_LINE_HARD);
+    currentPos = breaker.next();
+    if (breaker.status() != 0) {
+      SkDebugf("[%d] ", breaker.status());
+    }
+    const char* ch = currentPos + fUtf8.begin();
+    map.set(ch, breaker.status() == UBRK_LINE_HARD);
+    SkDebugf("%d:%c ", currentPos, *ch);
   }
+  SkDebugf("\n");
 
   for (auto& run : fRuns) {
 
@@ -195,7 +202,7 @@ void SkParagraphImpl::buildClusterTable() {
 
       auto& cluster = fClusters.emplace_back(&run, glyphStart, glyphEnd, text, size.fX, size.fY);
       // Mark line breaks
-      auto found = map.find(cluster.fText.begin());
+      auto found = map.find(cluster.fText.end());
       if (found) {
         cluster.fBreakType = *found
                              ? SkCluster::BreakType::HardLineBreak
@@ -203,7 +210,10 @@ void SkParagraphImpl::buildClusterTable() {
         cluster.setIsWhiteSpaces();
       }
 
-      SkDebugf("Cluster %s ", cluster.isWhitespaces() ? (cluster.isHardBreak() ? "!" : "?") : " ");
+      auto type = cluster.fBreakType == SkCluster::BreakType::HardLineBreak
+          ? "!"
+          : (cluster.fBreakType == SkCluster::BreakType::SoftLineBreak ? "?" : " ");
+      SkDebugf("Cluster %s%s", type, cluster.isWhitespaces() ? "*" : " ");
       SkDebugf("[%d:%d) %f ", cluster.fStart, cluster.fEnd, size.fX);
 
       SkDebugf("'");
@@ -567,10 +577,10 @@ SkRange<size_t> SkParagraphImpl::getWordBoundary(unsigned offset) {
     return {0, 0};
   }
 
-  size_t currentPos = 0;
+  size_t currentPos = breaker.first();
   while (true) {
     auto start = currentPos;
-    currentPos = breaker.next(currentPos);
+    currentPos = breaker.next();
     if (breaker.eof()) {
       break;
     }

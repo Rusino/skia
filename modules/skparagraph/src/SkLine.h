@@ -89,11 +89,13 @@ class SkLine {
     fWords.reset();
   }
 
-  SkLine(SkVector offset, SkVector advance,
-        SkSpan<SkCluster> clusters,
-        SkSpan<const char> text,
-        std::unique_ptr<SkRun> ellipsis
-        , SkFontSizes sizes)
+  SkLine(SkVector offset
+        , SkVector advance
+        , SkSpan<SkCluster> clusters
+        , SkSpan<const char> text
+        , std::unique_ptr<SkRun> ellipsis
+        , SkFontSizes sizes
+        , bool ltr)
       : fText(text)
       , fClusters(clusters)
       , fLogical()
@@ -102,7 +104,8 @@ class SkLine {
       , fWidth(advance.fX)
       , fOffset(offset)
       , fEllipsis(std::move(ellipsis))
-      , fSizes(sizes) { }
+      , fSizes(sizes)
+      , fLeftToRight(ltr) { }
 
   inline SkSpan<const char> text() const { return fText; }
   inline SkSpan<SkCluster> clusters() const { return fClusters; }
@@ -158,5 +161,6 @@ class SkLine {
   SkVector fOffset;   // Text position on the screen
   std::unique_ptr<SkRun> fEllipsis;   // In case the line ends with the ellipsis
   SkFontSizes fSizes;
+  bool fLeftToRight;
 };
 

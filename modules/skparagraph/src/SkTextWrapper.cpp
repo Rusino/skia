@@ -8,7 +8,7 @@
 #include "SkTextWrapper.h"
 #include "SkParagraphImpl.h"
 
-std::unique_ptr<SkRun> SkTextWrapper::createEllipsis(Position& pos) {
+std::unique_ptr<SkRun> SkTextWrapper::createEllipsis(Position& pos, bool) {
   if (!fParent->reachedLinesLimit(-1) || pos.end() == fClusters.end() - 1) {
     // We must be on the last line and not at the end of the text
     return nullptr;
@@ -18,7 +18,8 @@ std::unique_ptr<SkRun> SkTextWrapper::createEllipsis(Position& pos) {
   }
   // Replace some clusters with the ellipsis
   auto lineEnd = pos.trimmed();
-  while (lineEnd >= fLineStart) {
+  auto lineStart = fLineStart;
+  while (lineEnd >= lineStart) {
     // Calculate the ellipsis sizes for a given font
     if (!lineEnd->isWhitespaces()) {
       SkRun* cached = fEllipsisCache.find(lineEnd->fRun->font());
@@ -29,10 +30,11 @@ std::unique_ptr<SkRun> SkTextWrapper::createEllipsis(Position& pos) {
 
       if (pos.trimmedWidth() + ellipsis->advance().fX <= fMaxWidth) {
         // Ellipsis fit; place and size it correctly
-        ellipsis->shift(pos.trimmedWidth(),
-                        lineEnd->fRun->sizes().diff(pos.sizes()));
+        ellipsis->shift(pos.trimmedWidth(), lineEnd->fRun->sizes().diff(pos.sizes()));
         ellipsis->setHeight(pos.height());
         pos.extend(ellipsis->advance().fX);
+        pos.trim(lineEnd);
+
         return ellipsis;
       }
     }
@@ -51,7 +53,9 @@ bool SkTextWrapper::addLine(Position& pos) {
     pos.clean(pos.end());
     return true;
   }
-  auto ellipsis = createEllipsis(pos);
+
+  // TODO: Set the ellipsis direction accordingly to text direction... or text alignment?..
+  auto ellipsis = createEllipsis(pos, true);
   fParent->addLine(
       SkVector::Make(0, fCurrentLineOffset.fY),
       SkVector::Make(pos.trimmedWidth(), pos.height()),
@@ -62,18 +66,12 @@ bool SkTextWrapper::addLine(Position& pos) {
   fWidth =  SkMaxScalar(fWidth, pos.trimmedWidth());
   fHeight += pos.height();
 
-  fLineStart = pos.end() + (pos.end()->fRun->leftToRight() ? 1 : -1);
+  fLineStart = pos.end() + 1;
   if (!pos.end()->isHardBreak()) {
     while (fLineStart < fClusters.end() &&
-        fLineStart->isWhitespaces()) { fLineStart += (fLineStart->fRun->leftToRight() ? 1 : -1); }
+        fLineStart->isWhitespaces()) { fLineStart += 1; }
   }
   fCurrentLineOffset.fY += pos.height();
-  if (fLineStart < fClusters.end()) {
-    // Shift the rest of the line horizontally to the left
-    // to compensate for the run positions since we broke the line
-    // TODO: It's not used anymore
-    fCurrentLineOffset.fX = - fLineStart->fRun->position(fLineStart->fStart).fX;
-  }
   pos.clean(fLineStart);
   return !fParent->reachedLinesLimit(0);
 }
@@ -100,7 +98,7 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
       wordLength += cluster.fWidth;
       if (fClosestBreak.width() + fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
         // Cluster does not fit: add the line until the closest break
-        if (!addLine(fClosestBreak)) continue;
+        if (!addLine(fClosestBreak)) break;
       }
       if (fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
         // Cluster does not fit yet: try to break the text by hyphen
