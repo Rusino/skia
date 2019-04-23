@@ -15,7 +15,6 @@
 #include "SkTextStyle.h"
 #include "SkRun.h"
 
-
 class SkBlock {
  public:
 
@@ -46,8 +45,8 @@ class SkWord {
   }
 
   inline SkSpan<const char> text() const { return fText; }
-  inline SkVector advance() const { return fAdvance; }
-  inline SkScalar offset() const { return fShift; }
+  //inline SkVector advance() const { return fAdvance; }
+  //inline SkScalar offset() const { return fShift; }
   inline void shift(SkScalar shift) { fShift += shift; }
   inline void expand(SkScalar step) { fAdvance.fX += step; }
   inline bool empty() const { return fText.empty(); }
@@ -93,7 +92,6 @@ class SkLine {
         , SkVector advance
         , SkSpan<SkCluster> clusters
         , SkSpan<const char> text
-        , std::unique_ptr<SkRun> ellipsis
         , SkFontSizes sizes
         , bool ltr)
       : fText(text)
@@ -101,26 +99,30 @@ class SkLine {
       , fLogical()
       , fShift(0)
       , fAdvance(advance)
-      , fWidth(advance.fX)
+      //, fWidth(advance.fX)
       , fOffset(offset)
-      , fEllipsis(std::move(ellipsis))
+      , fEllipsis(nullptr)
       , fSizes(sizes)
       , fLeftToRight(ltr) { }
 
   inline SkSpan<const char> text() const { return fText; }
   inline SkSpan<SkCluster> clusters() const { return fClusters; }
-  inline SkVector advance() const { return fAdvance; }
-  inline SkScalar width() const { return fWidth; }
   inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
   inline SkRun* ellipsis() const { return fEllipsis.get(); }
   inline SkFontSizes sizes() const { return fSizes; }
   inline bool empty() const { return fText.empty(); }
   void breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply);
   void reorderRuns();
+  SkScalar height() const { return fAdvance.fX; }
+  SkScalar width() const { return fAdvance.fX + (fEllipsis != nullptr ? fEllipsis->fAdvance.fX : 0); }
+  void setWidth(SkScalar width) { fAdvance.fX = width - (fEllipsis != nullptr ? fEllipsis->fAdvance.fX : 0); }
+  SkScalar shift() const { return fShift; }
+  void shiftTo(SkScalar shift) { fShift = shift; }
 
   SkRect measureText(SkSpan<const char> text, SkRun* run, size_t& pos, size_t& size) const;
   SkVector measureText(SkSpan<const char> text) const;
   void justify(SkScalar maxWidth);
+  void setEllipsis(std::unique_ptr<SkRun> ellipsis) { fEllipsis = std::move(ellipsis); }
 
   void iterateThroughStyles(
       SkStyleType styleType,
@@ -135,6 +137,9 @@ class SkLine {
       SkScalar offsetX,
       std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
 
+  void iterateThroughClusters(bool reverse,
+                              std::function<bool(const SkCluster* cluster)> apply) const;
+
   SkScalar paintText(
       SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
   SkScalar paintBackground(
@@ -146,10 +151,11 @@ class SkLine {
 
   void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
 
+  void createEllipsis(SkScalar maxWidth, const std::string& ellipsis, bool ltr);
 
  private:
 
-  friend class SkParagraphImpl;
+  SkRun* shapeEllipsis(const std::string& ellipsis, SkRun* run);
 
   SkSpan<const char> fText;
   SkSpan<SkCluster> fClusters;
@@ -157,10 +163,12 @@ class SkLine {
   SkTArray<SkWord, true> fWords; // Text broken into words by ICU word breaker
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size
-  SkScalar fWidth;
+  //SkScalar fWidth;
   SkVector fOffset;   // Text position on the screen
   std::unique_ptr<SkRun> fEllipsis;   // In case the line ends with the ellipsis
   SkFontSizes fSizes;
   bool fLeftToRight;
+
+  static SkTHashMap<SkFont, SkRun> fEllipsisCache; // All found so far shapes of ellipsis
 };
 

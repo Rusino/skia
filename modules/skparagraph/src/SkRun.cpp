@@ -21,11 +21,14 @@ SkRun::SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info,
   fUtf8Range = info.utf8Range;
   fOffset = SkVector::Make(offsetX, 0);
   fGlyphs.push_back_n(info.glyphCount);
-  fPositions.push_back_n(info.glyphCount);
-  fOffsets.push_back_n(info.glyphCount, SkScalar(0));
-  fClusterIndexes.push_back_n(info.glyphCount);
+  fPositions.push_back_n(info.glyphCount + 1);
+  fOffsets.push_back_n(info.glyphCount + 1, SkScalar(0));
+  fClusterIndexes.push_back_n(info.glyphCount + 1);
   info.fFont.getMetrics(&fFontMetrics);
   fJustified = false;
+  // To make edge cases easier:
+  fPositions[info.glyphCount] = fOffset + fAdvance;
+  fClusterIndexes[info.glyphCount] = info.utf8Range.end();
 }
 
 SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
@@ -56,12 +59,8 @@ SkScalar SkRun::calculateWidth(size_t start, size_t end) const {
     offset = fOffsets[end - 1] - fOffsets[start];
   }
 
-  auto startX = fPositions[start].fX;
-  if (end == size()) {
-    return fAdvance.fX + fPositions[0].fX - startX + offset;
-  } else {
-   return fPositions[end].fX - startX + offset;
-  }
+ return fPositions[end].fX - fPositions[start].fX + offset;
+
 }
 
 void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const {
@@ -92,8 +91,7 @@ void SkRun::iterateThroughClusters(std::function<void(
     size_t cluster = this->clusterIndex(start);
     for (size_t glyph = 1; glyph <= this->size(); ++glyph) {
 
-      auto nextCluster =
-          glyph == this->size() ? this->fUtf8Range.end() : this->clusterIndex(glyph);
+      auto nextCluster = this->clusterIndex(glyph);
       if (nextCluster == cluster) {
         continue;
       }

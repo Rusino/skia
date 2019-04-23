@@ -743,7 +743,7 @@ class ParagraphView3 : public Sample {
     SkAutoCanvasRestore acr(canvas, true);
 
     canvas->clipRect(SkRect::MakeWH(w, h));
-    canvas->drawColor(SK_ColorRED);
+    canvas->drawColor(SK_ColorWHITE);
 
     SkScalar margin = 20;
 
@@ -830,22 +830,22 @@ class ParagraphView3 : public Sample {
 
     const std::string line = "World domination is such an ugly phrase - I prefer to call it world optimisation";
 
-    //drawLine(canvas, width, height, line, SkTextAlign::left, 1, false, SK_ColorLTGRAY);
+    drawLine(canvas, width, height, line, SkTextAlign::left, 1, false, SK_ColorLTGRAY);
     canvas->translate(width, 0);
-    //drawLine(canvas, width, height, line, SkTextAlign::right, 2, false, SK_ColorGRAY);
+    drawLine(canvas, width, height, line, SkTextAlign::right, 2, false, SK_ColorLTGRAY);
     canvas->translate(width, 0);
-    //drawLine(canvas, width, height, line, SkTextAlign::center, 3, false, SK_ColorCYAN);
+    drawLine(canvas, width, height, line, SkTextAlign::center, 3, false, SK_ColorLTGRAY);
     canvas->translate(width, 0);
-    //drawLine(canvas, width, height, line, SkTextAlign::justify, 4, false, SK_ColorBLUE);
+    drawLine(canvas, width, height, line, SkTextAlign::justify, 4, false, SK_ColorLTGRAY);
     canvas->translate(-width * 3, height);
 
-    //drawLine(canvas, width, height, line, SkTextAlign::left, 1, true, SK_ColorLTGRAY);
+    drawLine(canvas, width, height, line, SkTextAlign::left, 1, true, SK_ColorLTGRAY);
     canvas->translate(width, 0);
-    //drawLine(canvas, width, height, line, SkTextAlign::right, 2, true, SK_ColorGRAY);
+    drawLine(canvas, width, height, line, SkTextAlign::right, 2, true, SK_ColorLTGRAY);
     canvas->translate(width, 0);
-    //drawLine(canvas, width, height, line, SkTextAlign::left, 3, true, SK_ColorCYAN);
+    drawLine(canvas, width, height, line, SkTextAlign::center, 3, true, SK_ColorLTGRAY);
     canvas->translate(width, 0);
-    drawLine(canvas, width, height, line, SkTextAlign::justify, 4, true, SK_ColorBLUE);
+    drawLine(canvas, width, height, line, SkTextAlign::justify, 4, true, SK_ColorLTGRAY);
     canvas->translate(width, 0);
   }
 
@@ -1202,8 +1202,8 @@ class ParagraphView5 : public Sample {
 };
 //////////////////////////////////////////////////////////////////////////////
 
-//DEF_SAMPLE(return new ParagraphView1();)
-//DEF_SAMPLE(return new ParagraphView2();)
+DEF_SAMPLE(return new ParagraphView1();)
+DEF_SAMPLE(return new ParagraphView2();)
 DEF_SAMPLE(return new ParagraphView3();)
-//DEF_SAMPLE(return new ParagraphView4();)
-//DEF_SAMPLE(return new ParagraphView5();)
+DEF_SAMPLE(return new ParagraphView4();)
+DEF_SAMPLE(return new ParagraphView5();)

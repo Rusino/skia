@@ -89,10 +89,6 @@ void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
   // Build the picture lazily not until we actually have to paint (or never)
   if (nullptr == fPicture) {
 
-    // BEFORE the next call: we walk clusters via fCluster table
-    this->rearrangeLinesByBidi();
-    // AFTER the previous call: we walk clusters via visual runs
-
     this->formatLinesByWords(fWidth);
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
@@ -418,7 +414,7 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
   auto effectiveAlign = fParagraphStyle.effective_align();
   for (auto& line : fLines) {
 
-    SkScalar delta = maxWidth - line.fAdvance.fX;
+    SkScalar delta = maxWidth - line.width();
     if (delta <= 0) {
       // Delta can be < 0 if there are extra whitespaces at the end of the line;
       // This is a limitation of a current version
@@ -427,17 +423,17 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
     switch (effectiveAlign) {
       case SkTextAlign::left:
 
-        line.fShift = 0;
+        line.shiftTo(0);
         break;
       case SkTextAlign::right:
 
-        line.fAdvance.fX = maxWidth;
-        line.fShift = delta;
+        //line.setWidth(maxWidth);
+        line.shiftTo(delta);
         break;
       case SkTextAlign::center: {
 
-        line.fAdvance.fX = maxWidth;
-        line.fShift = delta / 2;
+        //line.setWidth(maxWidth);
+        line.shiftTo(delta / 2);
         break;
       }
       case SkTextAlign::justify: {
@@ -445,7 +441,7 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
         if (&line != &fLines.back()) {
           line.justify(maxWidth);
         } else {
-          line.fShift = 0;
+          line.shiftTo(0);
         }
 
         break;
@@ -468,7 +464,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
   // Add empty rectangles representing any newline characters within the range
   SkSpan<const char> text(fUtf8.begin() + start, end - start);
   for (auto& line : fLines) {
-    auto intersect = line.fText * text;
+    auto intersect = line.text() * text;
     if (intersect.size() == 0) continue;
 
     auto firstBox = results.size();
@@ -477,8 +473,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
       intersect,
       false,
       [&results, &maxClip, &line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
-        clip.offset(line.fShift, 0);
-        clip.offset(line.fOffset);
+        clip.offset(line.offset());
         results.emplace_back(clip, run->leftToRight() ? SkTextDirection::ltr : SkTextDirection::rtl);
         maxClip.join(clip);
         return true;
@@ -497,10 +492,10 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
 
         } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingMiddle) {
           rect.fTop = line.offset().fY;
-          rect.fBottom = line.offset().fY + line.advance().fY;
+          rect.fBottom = line.offset().fY + line.height();
 
         } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingBottom) {
-          rect.fBottom = line.offset().fY + line.advance().fY;
+          rect.fBottom = line.offset().fY + line.height();
         }
       }
     } else {
@@ -529,7 +524,9 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
 SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, double dy) {
   SkPositionWithAffinity result(0, Affinity::DOWNSTREAM);
   for (auto& line : fLines) {
-    if (line.fOffset.fY <= dy && dy < line.fOffset.fY + line.fAdvance.fY) {
+    auto offsetY = line.offset().fY;
+    auto advanceY = line.height();
+    if (offsetY <= dy && dy < offsetY + advanceY) {
       // Find the line
       line.iterateThroughRuns(
           line.text(),

@@ -39,6 +39,8 @@ SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const cha
 
 }
 
+SkTHashMap<SkFont, SkRun> SkLine::fEllipsisCache;
+
 SkLine::SkLine(const SkLine& other) {
   this->fText = other.fText;
   this->fWords.reset();
@@ -47,7 +49,7 @@ SkLine::SkLine(const SkLine& other) {
   this->fLogical = std::move(other.fLogical);
   this->fShift = other.fShift;
   this->fAdvance = other.fAdvance;
-  this->fWidth = other.fWidth;
+  //this->fWidth = other.fWidth;
   this->fOffset = other.fOffset;
   this->fEllipsis.reset(other.fEllipsis == nullptr ? nullptr : new SkRun(*other.fEllipsis));
   this->fSizes = other.sizes();
@@ -113,40 +115,19 @@ SkVector SkLine::measureText(SkSpan<const char> text) const {
       size.fY = SkTMax(size.fY, clip.height());
       return true;
     });
-/*
-  auto start = text.begin();
-  auto end = text.end() - 1;
-  for (auto& cluster : fClusters) {
 
-    if (cluster.fText.begin() >= text.end()) {
-      continue;
-    } else if (cluster.fText.end() <= text.begin()) {
-      break;
-    }
-
-    if (cluster.fText.begin() <= start && cluster.fText.end() > start) {
-      size.fX -= cluster.sizeToChar(start);
-    }
-    if (cluster.fText.begin() < end && cluster.fText.end() >= end) {
-      size.fX += cluster.sizeFromChar(end);
-    } else {
-      size.fX += cluster.fWidth;
-    }
-
-    size.fY = SkTMax(size.fY, cluster.fHeight);
-  }
-*/
   return size;
 }
 
-// TODO: Implement justification correctly, but only if it's needed
+// TODO: Optimize the process (calculate delta/step while breaking the lines)
 void SkLine::justify(SkScalar maxWidth) {
 
   SkScalar len = 0;
+  SkDebugf("breakLineByWords1:\n");
   this->breakLineByWords(UBRK_LINE, [this, &len](SkWord& word) {
-    word.fAdvance = this->measureText(word.text());
-    word.fShift = len;
-    len += word.fAdvance.fX;
+    auto size = this->measureText(word.text());
+    len += size.fX;
+    SkDebugf("Word +%f =%f: '%s'\n", size.fX, len, toString(word.text()).c_str());
     return true;
   });
 
@@ -163,33 +144,80 @@ void SkLine::justify(SkScalar maxWidth) {
   SkScalar step = delta / softLineBreaks;
   SkScalar shift = 0;
 
-  SkWord* last = nullptr;
-  for (auto& word : this->fWords) {
 
-    if (last != nullptr) {
-      --softLineBreaks;
-      last->expand(step);
-      shift += step;
+  // Walk through the runs in the logical order
+  SkDebugf("breakLineByWords2 %f = %f / %d:\n", step, delta, softLineBreaks);
+  for (auto run : fLogical) {
+
+    // Find the intersection between the text and the run
+    SkSpan<const char> intersect = run->text() * this->fText;
+    if (intersect.empty()) {
+      continue;
     }
 
-    last = &word;
-    word.shift(shift);
-    // Correct all runs and position for all the glyphs in the word
-    this->iterateThroughRuns(word.text(), false,
-                             [shift, word](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar) {
-                               SkDebugf("Word '%s': +%f =%f\n", toString(word.text()).c_str(), shift, clip.width());
-                               for (auto i = pos; i < pos + size; ++i) {
-                                 run->fOffsets[i] = shift;
-                               }
-                               //run->fAdvance.fX += shift;
-                               run->fJustified = true;
-                               return true;
-                             });
+    // Walk through the clusters in the logical order
+    if (run->leftToRight()) {
+      for (auto cluster = run->clusters().begin(); cluster != run->clusters().end(); ++cluster) {
+        if (cluster->fText.end() <= this->fText.begin() ||
+            cluster->fText.begin() >= this->fText.end()) {
+          continue;
+        }
+        for (auto i = cluster->fStart; i != cluster->fEnd; ++i) {
+          run->fOffsets[i] += shift;
+        }
+        if (cluster->fBreakType == SkCluster::SoftLineBreak) {
+          --softLineBreaks;
+          shift += step;
+        }
+      }
+    } else {
+      for (auto cluster = run->clusters().end() - 1; cluster >= run->clusters().begin(); --cluster) {
+        if (cluster->fText.end() <= this->fText.begin() ||
+            cluster->fText.begin() >= this->fText.end()) {
+          continue;
+        }
+        for (auto i = cluster->fStart; i != cluster->fEnd; ++i) {
+          run->fOffsets[i] += shift;
+        }
+        if (cluster->fBreakType == SkCluster::SoftLineBreak) {
+          --softLineBreaks;
+          shift += step;
+        }
+      }
+    }
+    run->fJustified = true;
   }
 
+  SkASSERT(softLineBreaks == 0);
   this->fShift = 0;
   this->fAdvance.fX = maxWidth;
-  this->fWidth = maxWidth;
+  //this->fWidth = maxWidth;
+}
+
+void SkLine::iterateThroughClusters(bool reverse, std::function<bool(const SkCluster* cluster)> apply) const {
+
+  for (size_t r = 0; r != fLogical.size(); ++r) {
+    auto& run = fLogical[reverse ? fLogical.size() - r - 1 : r];
+    // Find the intersection between the text and the run
+    SkSpan<const char> intersect = run->text() * this->fText;
+    if (intersect.empty()) {
+      continue;
+    }
+
+    // Walk through the clusters in the logical order
+    auto start = run->leftToRight() != reverse ? run->clusters().begin() : run->clusters().end();
+    auto end = run->leftToRight() != reverse ? run->clusters().end() : run->clusters().begin();
+
+    for (auto cluster = start; cluster != end; run->leftToRight() != reverse ? ++cluster : --cluster) {
+      if (cluster->fText.end() <= this->fText.begin() ||
+          cluster->fText.begin() >= this->fText.end()) {
+        continue;
+      }
+      if (!apply(cluster)) {
+        return;
+      }
+    }
+  }
 }
 
 SkRect SkLine::measureText(SkSpan<const char> text, SkRun* run, size_t& pos, size_t& size) const {
@@ -200,6 +228,7 @@ SkRect SkLine::measureText(SkSpan<const char> text, SkRun* run, size_t& pos, siz
   SkCluster* start = nullptr;
   SkCluster* end = nullptr;
 
+  // TODO: Make the search more effective
   for (auto& cluster : fClusters) {
     if (cluster.fText.begin() <= first && cluster.fText.end() >= first) {
       start = &cluster;
@@ -216,6 +245,7 @@ SkRect SkLine::measureText(SkSpan<const char> text, SkRun* run, size_t& pos, siz
   auto lineOffset = run->position(0).fX;
   size = end->fEnd - start->fStart;
   pos = start->fStart;
+
   SkRect clip = SkRect::MakeXYWH( run->position(start->fStart).fX - lineOffset,
                                   run->sizes().diff(sizes()),
                                   run->calculateWidth(start->fStart, end->fEnd),
@@ -245,13 +275,6 @@ SkScalar SkLine::iterateThroughRuns(
   }
 
   SkScalar width = 0;
-  if (!fLeftToRight && this->ellipsis() != nullptr) {
-    auto ellipsis = this->ellipsis();
-    apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft);
-    runOffset += ellipsis->advance().fX;
-    width += ellipsis->advance().fX;
-  }
-
   // Walk through the runs in the logical order
   for (auto run : fLogical) {
 
@@ -270,6 +293,9 @@ SkScalar SkLine::iterateThroughRuns(
     auto shift2 = runOffset - clip.fLeft - lineOffset;
     clip.offset(shift1, 0);
     //SkDebugf("%f -%f - %f = %f (%f)\n", runOffset, clip.fLeft, lineOffset, shift2, clip.width());
+    if (clip.fRight > fAdvance.fX) {
+      clip.fRight = fAdvance.fX;
+    }
     apply(run, pos, size, clip, shift2);
 
     width += clip.width();
@@ -277,7 +303,7 @@ SkScalar SkLine::iterateThroughRuns(
   }
 
   // TODO: calculate the ellipse for the last visual run
-  if (fLeftToRight && this->ellipsis() != nullptr) {
+  if (this->ellipsis() != nullptr) {
     auto ellipsis = this->ellipsis();
     apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft);
   }
@@ -345,7 +371,6 @@ void SkLine::iterateThroughStyles(
     //SkDebugf("!!!\n");
   }
 }
-
 
 SkScalar SkLine::paintText(
     SkCanvas* canvas,
@@ -572,4 +597,81 @@ SkScalar SkLine::paintDecorations(
         }
         return true;
       });
+}
+
+void SkLine::createEllipsis(SkScalar maxWidth, const std::string& ellipsis, bool) {
+
+  // Replace some clusters with the ellipsis
+  // Go through the clusters in the reverse logical order
+  // taking off cluster by cluster until the ellipsis fits
+  SkScalar width = fAdvance.fX;
+  iterateThroughClusters(true, [this, &width, ellipsis, maxWidth](const SkCluster* cluster) {
+
+    if (cluster->isWhitespaces()) {
+      width -= cluster->fWidth;
+      return true;
+    }
+
+    // Shape the ellipsis
+    SkRun* cached = fEllipsisCache.find(cluster->fRun->font());
+    if (cached == nullptr) {
+      cached = shapeEllipsis(ellipsis, cluster->fRun);
+    }
+
+    fEllipsis = std::make_unique<SkRun>(*cached);
+
+    // See if it fits
+    if (width + fEllipsis->advance().fX > maxWidth) {
+      width -= cluster->fWidth;
+      return true;
+    }
+
+    fEllipsis->shift(width, 0);
+    fAdvance.fX = width; // + fEllipsis->fAdvance.fX;
+
+    return false;
+  });
+}
+
+SkRun* SkLine::shapeEllipsis(const std::string& ellipsis, SkRun* run) {
+
+  class ShapeHandler final : public SkShaper::RunHandler {
+
+   public:
+    ShapeHandler() : fRun(nullptr) { }
+    SkRun* run() { return fRun; }
+
+   private:
+
+    void beginLine() override { }
+
+    void runInfo(const RunInfo&) override { }
+
+    void commitRunInfo() override { }
+
+    Buffer runBuffer(const RunInfo& info) override {
+
+      fRun = fEllipsisCache.set(info.fFont, SkRun(SkSpan<const char>(), info, 0, 0));
+      return fRun->newRunBuffer();
+    }
+
+    void commitRunBuffer(const RunInfo& info) override {
+      fRun->fAdvance.fX = info.fAdvance.fX;
+      fRun->fAdvance.fY = fRun->descent() + fRun->leading() - fRun->ascent();
+    }
+
+    void commitLine() override { }
+
+    SkRun* fRun;
+  };
+
+  ShapeHandler handler;
+  std::unique_ptr<SkShaper> shaper = SkShaper::MakeShapeThenWrap();
+  shaper->shape(ellipsis.data(), ellipsis.size(),
+                run->font(),
+                true,
+                std::numeric_limits<SkScalar>::max(),
+                &handler);
+
+  return handler.run();
 }

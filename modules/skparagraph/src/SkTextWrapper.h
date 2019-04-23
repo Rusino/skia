@@ -15,6 +15,8 @@
 class SkParagraphImpl;
 class SkTextWrapper {
 
+ public:
+
   class Position {
     std::string toString(SkSpan<const char> text) {
       icu::UnicodeString
@@ -92,8 +94,6 @@ class SkTextWrapper {
     const SkCluster* fTrimmedEnd;
   };
 
- public:
-
   SkTextWrapper(SkParagraphImpl* parent)
   : fParent(parent), fClosestBreak(nullptr), fAfterBreak(nullptr) { reset(); }
   void formatText(SkSpan<SkCluster> clusters,
@@ -119,10 +119,7 @@ class SkTextWrapper {
  private:
 
   bool endOfText() const { return fLineStart == fClusters.end(); }
-
-  std::unique_ptr<SkRun> createEllipsis(Position& pos, bool ltr);
   bool addLine(Position& pos);
-  SkRun* shapeEllipsis(SkRun* run);
 
   SkParagraphImpl* fParent;
   SkSpan<SkCluster> fClusters;
@@ -135,7 +132,4 @@ class SkTextWrapper {
   SkScalar fWidth;
   SkScalar fHeight;
   SkScalar fMinIntrinsicWidth;
-
-  // TODO: make a static cache?
-  SkTHashMap<SkFont, SkRun> fEllipsisCache; // All found so far shapes of ellipsis
 };
