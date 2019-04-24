@@ -39,15 +39,11 @@ class SkWord {
 
   SkWord(SkSpan<const char> text)
       : fText(text)
-      , fShift(0)
       , fAdvance(SkVector::Make(0, 0)) {
     setIsWhiteSpaces();
   }
 
   inline SkSpan<const char> text() const { return fText; }
-  //inline SkVector advance() const { return fAdvance; }
-  //inline SkScalar offset() const { return fShift; }
-  inline void shift(SkScalar shift) { fShift += shift; }
   inline void expand(SkScalar step) { fAdvance.fX += step; }
   inline bool empty() const { return fText.empty(); }
   inline bool isWhiteSpace() const { return fWhiteSpaces; }
@@ -71,7 +67,6 @@ class SkWord {
   }
 
   SkSpan<const char> fText;
-  SkScalar fShift;    // For justification
   SkVector fAdvance;  // Size
   bool fWhiteSpaces;
 };
@@ -99,7 +94,6 @@ class SkLine {
       , fLogical()
       , fShift(0)
       , fAdvance(advance)
-      //, fWidth(advance.fX)
       , fOffset(offset)
       , fEllipsis(nullptr)
       , fSizes(sizes)
@@ -122,7 +116,8 @@ class SkLine {
   SkRect measureTextInsideOneRun(SkSpan<const char> text,
                                  SkRun* run,
                                  size_t& pos,
-                                 size_t& size) const;
+                                 size_t& size,
+                                 bool& clippingNeeded) const;
   SkVector measureWordAcrossAllRuns(SkSpan<const char> text) const;
   void justify(SkScalar maxWidth);
   void setEllipsis(std::unique_ptr<SkRun> ellipsis) { fEllipsis = std::move(ellipsis); }
@@ -138,10 +133,10 @@ class SkLine {
   SkScalar iterateThroughRuns(
       SkSpan<const char> text,
       SkScalar offsetX,
-      std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const;
+      std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const;
 
-  void iterateThroughClustersInGlyphsOrder(bool reverse,
-                                           std::function<bool(const SkCluster* cluster)> apply) const;
+  void iterateThroughClustersInGlyphsOrder(
+      bool reverse, std::function<bool(const SkCluster* cluster)> apply) const;
 
   void paint(SkCanvas* canvas, SkSpan<SkBlock> blocks);
   SkScalar paintText(
@@ -171,7 +166,6 @@ class SkLine {
   SkTArray<SkWord, true> fWords; // Text broken into words by ICU word breaker
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size
-  //SkScalar fWidth;
   SkVector fOffset;   // Text position on the screen
   std::unique_ptr<SkRun> fEllipsis;   // In case the line ends with the ellipsis
   SkRunMetrics fSizes;

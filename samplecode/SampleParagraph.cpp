@@ -1021,13 +1021,14 @@ class ParagraphView4 : public Sample {
       canvas->translate(0, h + margin);
     }
   }
+
   void onDrawContent(SkCanvas* canvas) override {
 
     canvas->drawColor(SK_ColorWHITE);
     SkScalar width = this->width();
     SkScalar height = this->height();
 
-    drawFlutter(canvas, width, height/2);//, "sans-serif", 30);
+    drawFlutter(canvas, width, height/2);
   }
 
  private:
@@ -1200,6 +1201,216 @@ class ParagraphView5 : public Sample {
   sk_sp<TestFontProvider> testFontProvider;
   sk_sp<SkFontCollection> fontCollection;
 };
+
+class ParagraphView6 : public Sample {
+ public:
+  ParagraphView6() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+    LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+
+    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
+        "fonts/HangingS.ttf"));
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+  }
+
+  ~ParagraphView6() {
+  }
+ protected:
+  bool onQuery(Sample::Event* evt) override {
+    if (Sample::TitleQ(*evt)) {
+      Sample::TitleR(evt, "Paragraph4");
+      return true;
+    }
+    return this->INHERITED::onQuery(evt);
+  }
+
+  SkTextStyle style(SkPaint paint) {
+    SkTextStyle style;
+    paint.setAntiAlias(true);
+    style.setForegroundColor(paint);
+    style.setFontFamily("monospace");
+    style.setFontSize(30);
+
+    return style;
+  }
+
+  void hangingS(SkCanvas* canvas, SkScalar w, SkScalar h, SkScalar fs = 60.0) {
+
+    auto ff = "HangingS";
+
+    canvas->drawColor(SK_ColorLTGRAY);
+
+    SkPaint black;
+    black.setAntiAlias(true);
+    black.setColor(SK_ColorBLACK);
+
+    SkPaint blue;
+    blue.setAntiAlias(true);
+    blue.setColor(SK_ColorBLUE);
+
+    SkPaint red;
+    red.setAntiAlias(true);
+    red.setColor(SK_ColorRED);
+
+    SkPaint green;
+    green.setAntiAlias(true);
+    green.setColor(SK_ColorGREEN);
+
+    SkPaint gray;
+    gray.setColor(SK_ColorCYAN);
+
+    SkPaint yellow;
+    yellow.setColor(SK_ColorYELLOW);
+
+    SkPaint magenta;
+    magenta.setAntiAlias(true);
+    magenta.setColor(SK_ColorMAGENTA);
+
+    SkTextStyle style;
+    style.setFontFamily(ff);
+    style.setFontSize(fs);
+
+    SkTextStyle style0;
+    style0.setForegroundColor(black);
+    style0.setBackgroundColor(gray);
+    style0.setFontFamily(ff);
+    style0.setFontSize(fs);
+
+    SkTextStyle style1;
+    style1.setForegroundColor(blue);
+    style1.setBackgroundColor(yellow);
+    style1.setFontFamily(ff);
+    style1.setFontSize(fs);
+
+    SkTextStyle style2;
+    style2.setForegroundColor(red);
+    style2.setFontFamily(ff);
+    style2.setFontSize(fs);
+
+    SkTextStyle style3;
+    style3.setForegroundColor(green);
+    style3.setFontFamily(ff);
+    style3.setFontSize(fs);
+
+    SkTextStyle style4;
+    style4.setForegroundColor(magenta);
+    style4.setFontFamily(ff);
+    style4.setFontSize(fs);
+
+    SkParagraphStyle paraStyle;
+    paraStyle.setTextStyle(style);
+
+    fontCollection->setTestFontManager(testFontProvider);
+
+    const std::string logo1 = "S";
+    const std::string logo2 = "kia";
+    const std::string logo3 = "Sk";
+    const std::string logo4 = "ia";
+    const std::string logo5 = "Ski";
+    const std::string logo6 = "a";
+    {
+      SkParagraphBuilder builder(paraStyle, fontCollection);
+
+      builder.pushStyle(style0);
+      builder.addText(logo1);
+      builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(logo2);
+      builder.pop();
+
+      builder.addText("   ");
+
+      builder.pushStyle(style0);
+      builder.addText(logo3);
+      builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(logo4);
+      builder.pop();
+
+      builder.addText("   ");
+
+      builder.pushStyle(style0);
+      builder.addText(logo5);
+      builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(logo6);
+      builder.pop();
+
+      auto paragraph = builder.Build();
+      paragraph->layout(w);
+      paragraph->paint(canvas, 40, 40);
+      canvas->translate(0, h);
+    }
+
+    const std::string logo11 = "S";
+    const std::string logo12 = "S";
+    const std::string logo13 = "S";
+    const std::string logo14 = "S";
+    const std::string logo15 = "S";
+    const std::string logo16 = "S";
+    {
+      SkParagraphBuilder builder(paraStyle, fontCollection);
+
+      builder.pushStyle(style0);
+      builder.addText(logo11);
+      builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(logo12);
+      builder.pop();
+
+      builder.addText("   ");
+
+      builder.pushStyle(style0);
+      builder.addText(logo13);
+      builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(logo14);
+      builder.pop();
+
+      builder.addText("   ");
+
+      builder.pushStyle(style0);
+      builder.addText(logo15);
+      builder.pop();
+      builder.pushStyle(style1);
+      builder.addText(logo16);
+      builder.pop();
+
+      auto paragraph = builder.Build();
+      paragraph->layout(w);
+      paragraph->paint(canvas, 40, h);
+      canvas->translate(0, h);
+    }
+  }
+
+  void onDrawContent(SkCanvas* canvas) override {
+
+    canvas->drawColor(SK_ColorWHITE);
+    SkScalar width = this->width();
+    SkScalar height = this->height()/4;
+
+    hangingS(canvas, width, height);
+
+    return;
+  }
+
+ private:
+  typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
+};
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_SAMPLE(return new ParagraphView1();)
@@ -1207,3 +1418,4 @@ DEF_SAMPLE(return new ParagraphView2();)
 DEF_SAMPLE(return new ParagraphView3();)
 DEF_SAMPLE(return new ParagraphView4();)
 DEF_SAMPLE(return new ParagraphView5();)
+DEF_SAMPLE(return new ParagraphView6();)

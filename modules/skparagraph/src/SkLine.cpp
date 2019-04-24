@@ -105,12 +105,15 @@ SkScalar SkLine::paintText(
   auto shiftDown = this->sizes().leading() / 2 - this->sizes().ascent();
   return this->iterateThroughRuns(
     text, offsetX,
-    [paint, canvas, shiftDown](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
+    [paint, canvas, shiftDown]
+    (SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
 
       SkTextBlobBuilder builder;
       run->copyTo(builder, SkToU32(pos), size, SkVector::Make(0, shiftDown));
       canvas->save();
-      canvas->clipRect(clip);
+      if (clippingNeeded) {
+        canvas->clipRect(clip);
+      }
       canvas->translate(shift, 0);
       canvas->drawTextBlob(builder.make(), 0, 0, paint);
       canvas->restore();
@@ -128,11 +131,11 @@ SkScalar SkLine::paintBackground(
     // Still need to calculate text advance
     return iterateThroughRuns(
       text, offsetX,
-      [](SkRun*, int32_t, size_t, SkRect, SkScalar) { return true; });
+      [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
   }
   return this->iterateThroughRuns(
     text, offsetX,
-    [canvas, style](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
+    [canvas, style](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
       canvas->drawRect(clip, style.getBackground());
       return true;
     });
@@ -148,7 +151,7 @@ SkScalar SkLine::paintShadow(
     // Still need to calculate text advance
     return iterateThroughRuns(
         text, offsetX,
-        [](SkRun*, int32_t, size_t, SkRect, SkScalar) { return true; });
+        [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
   }
 
   SkScalar result = 0;
@@ -166,12 +169,15 @@ SkScalar SkLine::paintShadow(
     auto shiftDown = this->sizes().leading() / 2 - this->sizes().ascent();
     result = this->iterateThroughRuns(
       text, offsetX,
-      [canvas, shadow, paint, shiftDown](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
+      [canvas, shadow, paint, shiftDown]
+      (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
         SkTextBlobBuilder builder;
         run->copyTo(builder, pos, size, SkVector::Make(0, shiftDown));
         canvas->save();
         clip.offset(shadow.fOffset);
-        canvas->clipRect(clip);
+        if (clippingNeeded) {
+          canvas->clipRect(clip);
+        }
         canvas->translate(shift, 0);
         canvas->drawTextBlob(builder.make(), shadow.fOffset.x(), shadow.fOffset.y(), paint);
         canvas->restore();
@@ -192,12 +198,13 @@ SkScalar SkLine::paintDecorations(
     // Still need to calculate text advance
     return iterateThroughRuns(
         text, offsetX,
-        [](SkRun*, int32_t, size_t, SkRect, SkScalar) { return true; });
+        [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
   }
 
   return this->iterateThroughRuns(
     text, offsetX,
-    [this, canvas, style](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift) {
+    [this, canvas, style]
+    (SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
 
       SkScalar thickness = style.getDecorationThicknessMultiplier();
       SkScalar position;
@@ -361,10 +368,10 @@ void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord
   }
 }
 
-// TODO: Use UBRK_WORD instead of UBRK_LINE to avoid any work with spaces
 void SkLine::justify(SkScalar maxWidth) {
 
   SkScalar len = 0;
+  // TODO: Use UBRK_WORD instead of UBRK_LINE to avoid any work with spaces
   this->breakLineByWords(UBRK_LINE, [this, &len](SkWord& word) {
     auto size = this->measureWordAcrossAllRuns(word.text());
     len += size.fX;
@@ -399,8 +406,8 @@ void SkLine::justify(SkScalar maxWidth) {
       if (!cluster.belongs(intersect)) {
         continue;
       }
-      for (auto i = cluster.startPos(); i != cluster.endPos(); ++i) {
-        run->fOffsets[i] += shift;
+      for (auto j = cluster.startPos(); j != cluster.endPos(); ++j) {
+        run->fOffsets[j] += shift;
       }
       if (cluster.breakType() == SkCluster::SoftLineBreak) {
         --softLineBreaks;
@@ -414,7 +421,6 @@ void SkLine::justify(SkScalar maxWidth) {
   SkASSERT(softLineBreaks == 0);
   this->fShift = 0;
   this->fAdvance.fX = maxWidth;
-  //this->fWidth = maxWidth;
 }
 
 void SkLine::createEllipsis(SkScalar maxWidth, const std::string& ellipsis, bool) {
@@ -509,7 +515,8 @@ SkVector SkLine::measureWordAcrossAllRuns(SkSpan<const char> word) const {
 
     size_t pos;
     size_t size;
-    SkRect clip = this->measureTextInsideOneRun(intersect, run, pos, size);
+    bool clippingNeeded;
+    SkRect clip = this->measureTextInsideOneRun(intersect, run, pos, size, clippingNeeded);
     wordSize.fX += clip.width();
     wordSize.fY = SkTMax(wordSize.fY, clip.height());
   }
@@ -519,7 +526,8 @@ SkVector SkLine::measureWordAcrossAllRuns(SkSpan<const char> word) const {
 SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
                                        SkRun* run,
                                        size_t& pos,
-                                       size_t& size) const {
+                                       size_t& size,
+                                       bool& clippingNeeded) const {
 
   SkASSERT(!(text * run->text()).empty());
 
@@ -543,8 +551,11 @@ SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
   // TODO: This is where we get smart about selecting a part of a cluster
   //  by shaping each grapheme separately and then use the result sizes
   //  to calculate the proportions
-  clip.fLeft += start->sizeToChar(text.begin());
-  clip.fRight -= end->sizeFromChar(text.end() - 1);
+  auto leftCorrection = start->sizeToChar(text.begin());
+  auto rightCorrection = end->sizeFromChar(text.end() - 1);
+  clip.fLeft  += leftCorrection;
+  clip.fRight -= rightCorrection;
+  clippingNeeded = leftCorrection != 0 || rightCorrection != 0;
 
   return clip;
 }
@@ -578,7 +589,7 @@ void SkLine::iterateThroughClustersInGlyphsOrder(
 SkScalar SkLine::iterateThroughRuns(
     SkSpan<const char> text,
     SkScalar runOffset,
-    std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift)> apply) const {
+    std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const {
 
   if (text.empty()) {
     return 0;
@@ -586,7 +597,7 @@ SkScalar SkLine::iterateThroughRuns(
 
   SkScalar width = 0;
   // Walk through the runs in the logical order
-  for (auto run : fLogical) {
+  for (auto& run : fLogical) {
 
     // Find the intersection between the text and the run
     SkSpan<const char> intersect = run->text() * text;
@@ -596,14 +607,18 @@ SkScalar SkLine::iterateThroughRuns(
 
     size_t pos;
     size_t size;
-    SkRect clip = this->measureTextInsideOneRun(intersect, run, pos, size);
+    bool clippingNeeded;
+    SkRect clip = this->measureTextInsideOneRun(intersect, run, pos, size, clippingNeeded);
 
     auto shift = runOffset - clip.fLeft;
     clip.offset(shift, 0);
     if (clip.fRight > fAdvance.fX) {
-      clip.fRight = fAdvance.fX; // Correct the clip in case there was an ellipsis
+      clip.fRight = fAdvance.fX;
+      clippingNeeded = true; // Correct the clip in case there was an ellipsis
+    } else if (run == fLogical.back() && this->ellipsis() != nullptr) {
+      clippingNeeded = true; // To avoid trouble
     }
-    apply(run, pos, size, clip, shift - run->position(0).fX);
+    apply(run, pos, size, clip, shift - run->position(0).fX, clippingNeeded);
 
     width += clip.width();
     runOffset += clip.width();
@@ -611,7 +626,7 @@ SkScalar SkLine::iterateThroughRuns(
 
   if (this->ellipsis() != nullptr) {
     auto ellipsis = this->ellipsis();
-    apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft);
+    apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft, false);
     width += ellipsis->clip().width();
   }
 

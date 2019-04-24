@@ -430,7 +430,8 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     line.iterateThroughRuns(
       intersect,
       false,
-      [&results, &maxClip, &line](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
+      [&results, &maxClip, &line]
+      (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
         clip.offset(line.offset());
         results.emplace_back(clip, run->leftToRight() ? SkTextDirection::ltr : SkTextDirection::rtl);
         maxClip.join(clip);
@@ -489,7 +490,8 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx
       line.iterateThroughRuns(
           line.text(),
           false,
-          [dx, &result](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift) {
+          [dx, &result]
+          (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
             auto offset = run->offset();
             auto advance = run->advance();
             if (offset.fX <= dx && dx < offset.fX + advance.fX) {

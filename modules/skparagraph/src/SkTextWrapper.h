@@ -46,7 +46,7 @@ class SkTextWrapper {
       fSizes.clean();
     }
 
-    SkScalar add(Position& other) {
+    SkScalar moveTo(Position& other) {
 
       auto result = other.fWidth;
       this->fWidth += this->fWhitespaces.fX + other.fWidth;
@@ -59,7 +59,7 @@ class SkTextWrapper {
       return result;
     }
 
-    void add(const SkCluster& cluster) {
+    void moveTo(const SkCluster& cluster) {
       if (cluster.isWhitespaces()) {
         fWhitespaces.fX += cluster.width();
         fWhitespaces.fY = SkTMax(fWhitespaces.fY, cluster.run()->calculateHeight());
@@ -90,7 +90,7 @@ class SkTextWrapper {
   };
 
   SkTextWrapper(SkParagraphImpl* parent)
-  : fParent(parent), fClosestBreak(nullptr), fAfterBreak(nullptr) { reset(); }
+  : fParent(parent), fLastBreak(nullptr), fLastPosition(nullptr) { reset(); }
 
   void formatText(SkSpan<SkCluster> clusters,
                   SkScalar maxWidth,
@@ -104,8 +104,8 @@ class SkTextWrapper {
 
   void reset() {
     fLineStart = nullptr;
-    fClosestBreak.clean(nullptr);
-    fAfterBreak.clean(nullptr);
+    fLastBreak.clean(nullptr);
+    fLastPosition.clean(nullptr);
     fMinIntrinsicWidth = 0;
     fOffsetY = 0;
     fWidth = 0;
@@ -117,7 +117,7 @@ class SkTextWrapper {
  private:
 
   bool endOfText() const { return fLineStart == fClusters.end(); }
-  bool addLine(Position& pos);
+  bool addLineUpToTheLastBreak();
   bool reachedLinesLimit() const {
     return fMaxLines != std::numeric_limits<size_t>::max() && fLineNumber >= fMaxLines;
   }
@@ -126,8 +126,8 @@ class SkTextWrapper {
   SkSpan<SkCluster> fClusters;
   std::string fEllipsis;
   const SkCluster* fLineStart;
-  Position fClosestBreak;
-  Position fAfterBreak;
+  Position fLastBreak;
+  Position fLastPosition;
   SkScalar fOffsetY;
   size_t fLineNumber;
   size_t fMaxLines;

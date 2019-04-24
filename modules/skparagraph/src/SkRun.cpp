@@ -109,6 +109,8 @@ void SkRun::iterateThroughClustersInTextOrder(std::function<void(
     SkScalar width,
     SkScalar height)> apply) {
 
+  // Can't figure out how to do it with one code for both cases without 100 ifs
+  // Can't go through clusters because there are no cluster table yet
   if (leftToRight()) {
     size_t start = 0;
     size_t cluster = this->clusterIndex(start);
