@@ -15,31 +15,37 @@ bool SkTextWrapper::addLine(Position& pos) {
     return true;
   }
 
-  // TODO: Set the ellipsis direction accordingly to text direction... or text alignment?..
+  // TODO: Place the ellipsis to the left or to the right of the line
+  //  in case there is only one text direction on the line
+  //  (in addition to the current approach that always places it to the right)
   auto& line = fParent->addLine(
-    SkVector::Make(0, fCurrentLineOffset.fY), // offset
+    SkVector::Make(0, fOffsetY), // offset
     SkVector::Make(pos.trimmedWidth(), pos.height()), // advance
     pos.trimmedText(fLineStart), // text
     pos.sizes()); // metrics
+  ++fLineNumber;
 
   line.reorderRuns();
 
-  if (fParent->reachedLinesLimit(0) && pos.end() != fClusters.end() - 1 && !fEllipsis.empty()) {
+  if (reachedLinesLimit() && pos.end() != fClusters.end() - 1 && !fEllipsis.empty()) {
     // We must be on the last line and not at the end of the text
     line.createEllipsis(fMaxWidth, fEllipsis, true);
+  } else {
+    // Cut the spaces at the beginning of the line if there was no hard line break before
+    fLineStart = pos.end() + 1;
+    if (!pos.end()->isHardBreak()) {
+      while (fLineStart < fClusters.end() &&
+          fLineStart->isWhitespaces()) { fLineStart += 1; }
+    }
   }
 
   fWidth =  SkMaxScalar(fWidth, pos.trimmedWidth());
   fHeight += pos.height();
+  fOffsetY += pos.height();
 
-  fLineStart = pos.end() + 1;
-  if (!pos.end()->isHardBreak()) {
-    while (fLineStart < fClusters.end() &&
-        fLineStart->isWhitespaces()) { fLineStart += 1; }
-  }
-  fCurrentLineOffset.fY += pos.height();
   pos.clean(fLineStart);
-  return !fParent->reachedLinesLimit(0);
+
+  return !reachedLinesLimit();
 }
 
 void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
@@ -52,10 +58,12 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
   fLineStart = fClusters.begin();
   fClosestBreak.clean(fLineStart);
   fAfterBreak.clean(fLineStart);
-  fCurrentLineOffset = SkVector::Make(0, 0);
+  fOffsetY = 0;
   fWidth = 0;
   fHeight = 0;
   fMinIntrinsicWidth = 0;
+  fLineNumber = 0;
+  fMaxLines = maxLines;
 
   // Iterate through all the clusters in the text
   SkScalar wordLength = 0;
@@ -99,7 +107,7 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
     }
   };
   // Make sure nothing left
-  if (!endOfText() && !fParent->reachedLinesLimit(0)) {
+  if (!endOfText() && reachedLinesLimit()) {
     fMinIntrinsicWidth = SkTMax(fMinIntrinsicWidth, wordLength);
     fClosestBreak.add(fAfterBreak);
     addLine(fClosestBreak);

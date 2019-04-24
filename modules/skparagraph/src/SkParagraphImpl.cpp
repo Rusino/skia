@@ -26,15 +26,29 @@ namespace {
     utf16.toUTF8String(str);
     return str;
   }
-/*
-  void print(const std::string& label, const SkCluster* cluster) {
-    SkDebugf("%s[%d:%f]: '%s'\n",
-        label.c_str(),
-        cluster->fStart,
-        cluster->fRun->position(cluster->fStart).fX, toString(cluster->fText).c_str());
+
+  void print(const SkCluster& cluster) {
+
+    auto type = cluster.fBreakType == SkCluster::BreakType::HardLineBreak
+                ? "!"
+                : (cluster.fBreakType == SkCluster::BreakType::SoftLineBreak ? "?" : " ");
+    SkDebugf("Cluster %s%s", type, cluster.isWhitespaces() ? "*" : " ");
+    SkDebugf("[%d:%d) ", cluster.fStart, cluster.fEnd);
+
+    SkDebugf("'");
+    for (auto ch = cluster.fText.begin(); ch != cluster.fText.end(); ++ch) {
+      SkDebugf("%c", *ch);
+    }
+    SkDebugf("'");
+
+    if (cluster.fText.size() != 1) {
+      SkDebugf("(%d)\n", cluster.fText.size());
+    } else {
+      SkDebugf("\n");
+    }
   }
-*/
-SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
+
+  SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
     auto begin = SkTMax(a.begin(), b.begin());
     auto end = SkTMin(a.end(), b.end());
     return SkSpan<const char>(begin, end > begin ? end - begin : 0);
@@ -60,86 +74,26 @@ SkParagraph::SkParagraph(const std::u16string& utf16text, SkParagraphStyle style
 
 SkParagraphImpl::~SkParagraphImpl() = default;
 
-bool SkParagraphImpl::layout(double doubleWidth) {
-
-  auto width = SkDoubleToScalar(doubleWidth);
+void SkParagraphImpl::layout(SkScalar width) {
 
   this->resetContext();
 
-  this->shapeTextIntoEndlessLine(fUtf8, SkSpan<SkBlock>(fTextStyles.begin(), fTextStyles.size()));
+  this->shapeTextIntoEndlessLine();
 
   this->buildClusterTable();
 
   this->breakShapedTextIntoLines(width);
-
-  // The next call does not do the formatting
-  // (it's postponed until/if the actual painting happened)
-  // but does correct the paragraph width as formatting requires
-  this->formatLinesByText(width);
-
-  return true;
 }
 
-void SkParagraphImpl::paint(SkCanvas* canvas, double x, double y) {
+void SkParagraphImpl::paint(SkCanvas* canvas, SkScalar x, SkScalar y) {
 
-  if (fRuns.empty()) {
-    return;
-  }
-
-  // Build the picture lazily not until we actually have to paint (or never)
   if (nullptr == fPicture) {
-
+    // Build the picture lazily not until we actually have to paint (or never)
     this->formatLinesByWords(fWidth);
-    SkPictureRecorder recorder;
-    SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
-
-    auto blocks = SkSpan<SkBlock>(fTextStyles.begin(), fTextStyles.size());
-    for (auto& line : fLines) {
-
-      if (line.empty()) continue;
-
-      textCanvas->save();
-      textCanvas->translate(line.offset().fX, line.offset().fY);
-
-      line.iterateThroughStyles(
-          SkStyleType::Background,
-          blocks,
-         [textCanvas, &line](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-           return line.paintBackground(textCanvas, text, style, offsetX);
-         });
-
-      line.iterateThroughStyles(
-          SkStyleType::Shadow,
-          blocks,
-         [textCanvas, &line](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-           return line.paintShadow(textCanvas, text, style, offsetX);
-         });
-
-      line.iterateThroughStyles(
-          SkStyleType::Foreground,
-          blocks,
-         [textCanvas, &line](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-           return line.paintText(textCanvas, text, style, offsetX);
-         });
-
-      line.iterateThroughStyles(
-          SkStyleType::Decorations,
-          blocks,
-         [textCanvas, &line](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-           return line.paintDecorations(textCanvas, text, style, offsetX);
-         });
-
-      textCanvas->restore();
-
-      if (line.ellipsis() != nullptr) {
-        break;
-      }
-    }
-
-    fPicture = recorder.finishRecordingAsPicture();
+    this->paintLinesIntoPicture();
   }
 
-  SkMatrix matrix = SkMatrix::MakeTrans(SkDoubleToScalar(x), SkDoubleToScalar(y));
+  SkMatrix matrix = SkMatrix::MakeTrans(x, y);
   canvas->drawPicture(fPicture, &matrix, nullptr);
 }
 
@@ -160,36 +114,27 @@ void SkParagraphImpl::resetContext() {
   fTextWrapper.reset();
 }
 
-// Cluster table goes in text order (ignoring bidi)
-// so we can walk the table as if we walk the text
+// Clusters in the order of the input text
 void SkParagraphImpl::buildClusterTable() {
 
-  // Find all clusters with line breaks
+  // Find all possible (soft) line breaks
   SkTextBreaker breaker;
   if (!breaker.initialize(fUtf8, UBRK_LINE)) {
     return;
   }
-
   size_t currentPos = breaker.first();
   SkTHashMap<const char*, bool> map;
-  SkDebugf("Line breaks: %d ", currentPos);
   while (!breaker.eof()) {
     currentPos = breaker.next();
-    if (breaker.status() != 0) {
-      SkDebugf("[%d] ", breaker.status());
-    }
     const char* ch = currentPos + fUtf8.begin();
     map.set(ch, breaker.status() == UBRK_LINE_HARD);
-    SkDebugf("%d:%c ", currentPos, *ch);
   }
-  SkDebugf("\n");
 
+  // Walk through all the run in the natural order
   for (auto& run : fRuns) {
 
-    SkDebugf("Run #%d:\n", run.index());
-
     auto runStart = fClusters.size();
-    // Walk through the glyph in the correct direction
+    // Walk through the glyph in the direction of input text
     run.iterateThroughClusters(
         [&run, this, &map](size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size) {
 
@@ -206,30 +151,14 @@ void SkParagraphImpl::buildClusterTable() {
         cluster.setIsWhiteSpaces();
       }
 
-      auto type = cluster.fBreakType == SkCluster::BreakType::HardLineBreak
-          ? "!"
-          : (cluster.fBreakType == SkCluster::BreakType::SoftLineBreak ? "?" : " ");
-      SkDebugf("Cluster %s%s", type, cluster.isWhitespaces() ? "*" : " ");
-      SkDebugf("[%d:%d) %f ", cluster.fStart, cluster.fEnd, size.fX);
-
-      SkDebugf("'");
-      for (auto ch = cluster.fText.begin(); ch != cluster.fText.end(); ++ch) {
-        SkDebugf("%c", *ch);
-      }
-      SkDebugf("'");
-
-      if (cluster.fText.size() != 1) {
-        SkDebugf("(%d)\n", cluster.fText.size());
-      } else {
-        SkDebugf("\n");
-      }
+      print(cluster);
     });
     run.setClusters(SkSpan<SkCluster>(&fClusters[runStart], fClusters.size() - runStart));
   }
   fClusters.back().setBreakType(SkCluster::BreakType::HardLineBreak);
 }
 
-void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles) {
+void SkParagraphImpl::shapeTextIntoEndlessLine() {
 
  class MultipleFontRunIterator final : public SkShaper::FontRunIterator {
    public:
@@ -367,16 +296,18 @@ void SkParagraphImpl::shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<S
     SkVector fAdvance;
   };
 
-  MultipleFontRunIterator font(text, styles, fFontCollection, fParagraphStyle.hintingIsOn());
+
+  SkSpan<SkBlock> styles(fTextStyles.begin(), fTextStyles.size());
+  MultipleFontRunIterator font(fUtf8, styles, fFontCollection, fParagraphStyle.hintingIsOn());
   ShapeHandler handler(*this);
   std::unique_ptr<SkShaper> shaper = SkShaper::MakeShapeThenWrap();
 
   auto bidi = SkShaper::MakeIcuBiDiRunIterator(fUtf8.begin(), fUtf8.size(),
-                          fParagraphStyle.getTextDirection() == SkTextDirection::ltr ? 2 : 1);
+                          fParagraphStyle.getTextDirection() == SkTextDirection::ltr ? (uint8_t)2 : (uint8_t)1);
   auto script = SkShaper::MakeHbIcuScriptRunIterator(fUtf8.begin(), fUtf8.size());
   auto lang = SkShaper::MakeStdLanguageRunIterator(fUtf8.begin(), fUtf8.size());
 
-  shaper->shape(text.begin(), text.size(),
+  shaper->shape(fUtf8.begin(), fUtf8.size(),
                font,
                *bidi,
                *script,
@@ -395,18 +326,8 @@ void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
       fParagraphStyle.getMaxLines(),
       fParagraphStyle.getEllipsis());
   fHeight = fTextWrapper.height();
-  fWidth = fTextWrapper.width();
+  fWidth = maxWidth; //fTextWrapper.width();
   fMinIntrinsicWidth = fTextWrapper.intrinsicWidth();
-}
-
-void SkParagraphImpl::formatLinesByText(SkScalar maxWidth) {
-
-  auto effectiveAlign = fParagraphStyle.effective_align();
-  if (effectiveAlign == SkTextAlign::justify) {
-    fWidth = maxWidth;
-  } else {
-    fWidth = maxWidth;
-  }
 }
 
 void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
@@ -450,6 +371,29 @@ void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
         break;
     }
   }
+}
+
+void SkParagraphImpl::paintLinesIntoPicture() {
+
+  SkPictureRecorder recorder;
+  SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
+
+  auto blocks = SkSpan<SkBlock>(fTextStyles.begin(), fTextStyles.size());
+  for (auto& line : fLines) {
+    if (!line.paint(textCanvas, blocks)) break;
+  }
+
+  fPicture = recorder.finishRecordingAsPicture();
+}
+
+SkLine& SkParagraphImpl::addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkFontSizes sizes) {
+  return fLines.emplace_back
+      (offset,
+       advance,
+       SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
+       text,
+       sizes,
+       true);
 }
 
 // Returns a vector of bounding boxes that enclose all text between
@@ -521,7 +465,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
   return results;
 }
 
-SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(double dx, double dy) {
+SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx, SkScalar dy) {
   SkPositionWithAffinity result(0, Affinity::DOWNSTREAM);
   for (auto& line : fLines) {
     auto offsetY = line.offset().fY;

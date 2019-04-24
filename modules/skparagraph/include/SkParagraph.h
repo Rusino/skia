@@ -34,23 +34,23 @@ class SkParagraph {
 
   virtual ~SkParagraph() = default;
 
-  double getMaxWidth() { return SkScalarToDouble(fWidth); }
+  SkScalar getMaxWidth() { return fWidth; }
 
-  double getHeight() { return SkScalarToDouble(fHeight); }
+  SkScalar getHeight() { return fHeight; }
 
-  double getMinIntrinsicWidth() { return SkScalarToDouble(fMinIntrinsicWidth); }
+  SkScalar getMinIntrinsicWidth() { return fMinIntrinsicWidth; }
 
-  double getMaxIntrinsicWidth() { return SkScalarToDouble(fMaxIntrinsicWidth); }
+  SkScalar getMaxIntrinsicWidth() { return fMaxIntrinsicWidth; }
 
-  double getAlphabeticBaseline() { return SkScalarToDouble(fAlphabeticBaseline); }
+  SkScalar getAlphabeticBaseline() { return fAlphabeticBaseline; }
 
-  double getIdeographicBaseline() { return SkScalarToDouble(fIdeographicBaseline); }
+  SkScalar getIdeographicBaseline() { return fIdeographicBaseline; }
 
   virtual bool didExceedMaxLines() = 0;
 
-  virtual bool layout(double width) = 0;
+  virtual void layout(SkScalar width) = 0;
 
-  virtual void paint(SkCanvas* canvas, double x, double y) = 0;
+  virtual void paint(SkCanvas* canvas, SkScalar x, SkScalar y) = 0;
 
   // Returns a vector of bounding boxes that enclose all text between
   // start and end glyph indexes, including start and excluding end
@@ -63,7 +63,7 @@ class SkParagraph {
   // Returns the index of the glyph that corresponds to the provided coordinate,
   // with the top left corner as the origin, and +y direction as down
   virtual SkPositionWithAffinity
-  getGlyphPositionAtCoordinate(double dx, double dy) = 0;
+  getGlyphPositionAtCoordinate(SkScalar dx, SkScalar dy) = 0;
 
   // Finds the first and last glyphs that define a word containing
   // the glyph at index offset

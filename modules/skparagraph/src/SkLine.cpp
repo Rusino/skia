@@ -675,3 +675,44 @@ SkRun* SkLine::shapeEllipsis(const std::string& ellipsis, SkRun* run) {
 
   return handler.run();
 }
+
+bool SkLine::paint(SkCanvas* textCanvas, SkSpan<SkBlock> blocks) {
+  
+  if (!this->empty()) {
+
+    textCanvas->save();
+    textCanvas->translate(this->offset().fX, this->offset().fY);
+
+    this->iterateThroughStyles(
+        SkStyleType::Background,
+        blocks,
+        [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+          return this->paintBackground(textCanvas, text, style, offsetX);
+        });
+
+    this->iterateThroughStyles(
+        SkStyleType::Shadow,
+        blocks,
+        [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+          return this->paintShadow(textCanvas, text, style, offsetX);
+        });
+
+    this->iterateThroughStyles(
+        SkStyleType::Foreground,
+        blocks,
+        [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+          return this->paintText(textCanvas, text, style, offsetX);
+        });
+
+    this->iterateThroughStyles(
+        SkStyleType::Decorations,
+        blocks,
+        [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+          return this->paintDecorations(textCanvas, text, style, offsetX);
+        });
+
+    textCanvas->restore();
+  }
+
+  return (this->ellipsis() == nullptr);
+}

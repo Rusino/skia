@@ -140,6 +140,7 @@ class SkLine {
   void iterateThroughClusters(bool reverse,
                               std::function<bool(const SkCluster* cluster)> apply) const;
 
+  bool paint(SkCanvas* canvas, SkSpan<SkBlock> blocks);
   SkScalar paintText(
       SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
   SkScalar paintBackground(

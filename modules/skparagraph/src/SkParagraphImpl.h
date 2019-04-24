@@ -127,39 +127,24 @@ class SkParagraphImpl final: public SkParagraph {
 
   ~SkParagraphImpl() override;
 
-  bool layout(double width) override;
-  void paint(SkCanvas* canvas, double x, double y) override;
+  void layout(SkScalar width) override;
+  void paint(SkCanvas* canvas, SkScalar x, SkScalar y) override;
   std::vector<SkTextBox> getRectsForRange(
       unsigned start,
       unsigned end,
       RectHeightStyle rectHeightStyle,
       RectWidthStyle rectWidthStyle) override;
   SkPositionWithAffinity
-  getGlyphPositionAtCoordinate(double dx, double dy) override;
+  getGlyphPositionAtCoordinate(SkScalar dx, SkScalar dy) override;
   SkRange<size_t> getWordBoundary(unsigned offset) override;
   bool didExceedMaxLines() override {
     return !fParagraphStyle.unlimited_lines()
         && fLines.size() > fParagraphStyle.getMaxLines();
   }
 
-  SkLine& addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkFontSizes sizes) {
-    return fLines.emplace_back
-       (offset,
-        advance,
-        SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
-        text,
-        sizes,
-        true);
-  }
-
-  bool reachedLinesLimit(int32_t delta) const {
-    return !fParagraphStyle.unlimited_lines() && fLines.size() >= fParagraphStyle.getMaxLines() + delta;
-  }
+  SkLine& addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkFontSizes sizes);
 
   inline SkSpan<const char> text() const { return fUtf8; }
-
-  bool isLeftToRight() { return /*fParagraphStyle.getTextDirection() == SkTextDirection::ltr;*/
-        this->fParagraphStyle.effective_align() != SkTextAlign::right; }
 
  private:
 
@@ -167,10 +152,10 @@ class SkParagraphImpl final: public SkParagraph {
 
   void resetContext();
   void buildClusterTable();
-  void shapeTextIntoEndlessLine(SkSpan<const char> text, SkSpan<SkBlock> styles);
+  void shapeTextIntoEndlessLine();
   void breakShapedTextIntoLines(SkScalar maxWidth);
-  void formatLinesByText(SkScalar maxWidth);
   void formatLinesByWords(SkScalar maxWidth);
+  void paintLinesIntoPicture();
 
   // Input
   SkTArray<SkBlock, true> fTextStyles;
