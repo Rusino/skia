@@ -15,16 +15,14 @@
 
 class SkRun;
 
-class SkFontSizes {
+class SkRunMetrics {
   SkScalar fAscent;
   SkScalar fDescent;
   SkScalar fLeading;
 
  public:
-  SkFontSizes() {
-    clean();
-  }
-  SkFontSizes(SkScalar a, SkScalar d, SkScalar l) {
+  SkRunMetrics() { clean(); }
+  SkRunMetrics(SkScalar a, SkScalar d, SkScalar l) {
     fAscent = a;
     fDescent = a;
     fLeading = l;
@@ -34,7 +32,7 @@ class SkFontSizes {
     fDescent = SkTMax(fDescent, d);
     fLeading = SkTMax(fLeading, l);
   }
-  void add (SkFontSizes other) {
+  void add (SkRunMetrics other) {
     add(other.fAscent, other.fDescent, other.fLeading);
   }
   void clean() {
@@ -42,8 +40,8 @@ class SkFontSizes {
     fDescent = 0;
     fLeading = 0;
   }
-  SkScalar diff(SkFontSizes maxSizes) const {
-    return ascent() - maxSizes.ascent() - leading() / 2;
+  SkScalar diff(SkRunMetrics lineMetrics) const {
+    return ascent() - lineMetrics.ascent() - leading() / 2;
   }
   SkScalar height() const {
     return fDescent - fAscent + fLeading;
@@ -53,8 +51,9 @@ class SkFontSizes {
   SkScalar descent() const { return fDescent; }
 };
 
-struct SkCluster {
+class SkCluster {
 
+ public:
   enum BreakType {
     None,
     WordBoundary,             // calculated for all clusters (UBRK_WORD)
@@ -64,7 +63,14 @@ struct SkCluster {
     HardLineBreak,            // calculated for all clusters (UBRK_LINE)
   };
 
-  SkCluster() : fRun(nullptr), fWhiteSpaces(false), fIgnore(false), fBreakType(None) { }
+  SkCluster()
+  : fRun(nullptr)
+  , fStart(0)
+  , fEnd()
+  , fWidth()
+  , fHeight()
+  , fWhiteSpaces(false)
+  , fBreakType(None) { }
   SkCluster(SkRun* run, size_t start, size_t end, SkSpan<const char> text, SkScalar width, SkScalar height)
     : fText(text), fRun(run)
     , fStart(start), fEnd(end)
@@ -94,14 +100,18 @@ struct SkCluster {
     return fWidth * ratio;
   }
   inline void setBreakType(BreakType type) { fBreakType = type; }
-  inline BreakType getBreakType() const { return fBreakType; }
   inline void setIsWhiteSpaces(bool ws) { fWhiteSpaces = ws; }
   inline bool isWhitespaces() const { return fWhiteSpaces; }
-  inline bool isIgnored() const { return fIgnore; }
-  void ignore() { fIgnore = true; }
   bool canBreakLineAfter() const { return fBreakType == SoftLineBreak ||
                                           fBreakType == HardLineBreak; }
   bool isHardBreak() const { return fBreakType == HardLineBreak; }
+  SkRun* run() const { return fRun; }
+  size_t startPos() const { return fStart; }
+  size_t endPos() const { return fEnd; }
+  SkScalar width() const { return fWidth; }
+  SkScalar height() const { return fHeight; }
+  SkSpan<const char> text() const { return fText; }
+  BreakType breakType() const { return fBreakType; }
 
   void setIsWhiteSpaces() {
     auto pos = fText.end();
@@ -116,6 +126,11 @@ struct SkCluster {
     fWhiteSpaces = true;
   }
 
+  bool contains(const char* ch) {
+    return ch >= fText.begin() && ch < fText.end();
+  }
+
+ private:
   SkSpan<const char> fText;
 
   SkRun* fRun;
@@ -124,10 +139,8 @@ struct SkCluster {
 
   SkScalar fWidth;
   SkScalar fHeight;
-  SkScalar fShift;
 
   bool fWhiteSpaces;
-  bool fIgnore;
 
   BreakType fBreakType;
 };
@@ -172,19 +185,26 @@ class SkRun {
   }
   inline SkSpan<SkCluster> clusters() const { return fClusters; }
   inline void setClusters(SkSpan<SkCluster> clusters) { fClusters = clusters; }
-  SkRect clip() {
+  SkRect clip() const {
     return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
   }
 
   SkScalar calculateHeight() const;
   SkScalar calculateWidth(size_t start, size_t end) const;
 
-  SkFontSizes sizes() const { return { fFontMetrics.fAscent, fFontMetrics.fDescent, fFontMetrics.fLeading }; }
+  SkRunMetrics sizes() const { return { fFontMetrics.fAscent, fFontMetrics.fDescent, fFontMetrics.fLeading }; }
 
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 
-  void iterateThroughClusters(std::function<void(
-      size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size)> apply);
+  void iterateThroughClustersInTextOrder(std::function<void(
+      size_t glyphStart,
+      size_t glyphEnd,
+      size_t charStart,
+      size_t charEnd,
+      SkScalar width,
+      SkScalar height)> apply);
+
+  std::tuple<bool, SkCluster*, SkCluster*> findClusters(SkSpan<const char> text);
 
  private:
 

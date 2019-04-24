@@ -29,20 +29,20 @@ namespace {
 
   void print(const SkCluster& cluster) {
 
-    auto type = cluster.fBreakType == SkCluster::BreakType::HardLineBreak
+    auto type = cluster.breakType() == SkCluster::BreakType::HardLineBreak
                 ? "!"
-                : (cluster.fBreakType == SkCluster::BreakType::SoftLineBreak ? "?" : " ");
+                : (cluster.breakType()  == SkCluster::BreakType::SoftLineBreak ? "?" : " ");
     SkDebugf("Cluster %s%s", type, cluster.isWhitespaces() ? "*" : " ");
-    SkDebugf("[%d:%d) ", cluster.fStart, cluster.fEnd);
+    SkDebugf("[%d:%d) ", cluster.startPos(), cluster.endPos());
 
     SkDebugf("'");
-    for (auto ch = cluster.fText.begin(); ch != cluster.fText.end(); ++ch) {
+    for (auto ch = cluster.text().begin(); ch != cluster.text().end(); ++ch) {
       SkDebugf("%c", *ch);
     }
     SkDebugf("'");
 
-    if (cluster.fText.size() != 1) {
-      SkDebugf("(%d)\n", cluster.fText.size());
+    if (cluster.text().size() != 1) {
+      SkDebugf("(%d)\n", cluster.text().size());
     } else {
       SkDebugf("\n");
     }
@@ -131,30 +131,45 @@ void SkParagraphImpl::buildClusterTable() {
   }
 
   // Walk through all the run in the natural order
+  std::vector<std::tuple<SkRun*, size_t, size_t>> toUpdate;
   for (auto& run : fRuns) {
 
     auto runStart = fClusters.size();
     // Walk through the glyph in the direction of input text
-    run.iterateThroughClusters(
-        [&run, this, &map](size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size) {
+    run.iterateThroughClustersInTextOrder(
+      [&run, this, &map](size_t glyphStart,
+                         size_t glyphEnd,
+                         size_t charStart,
+                         size_t charEnd,
+                         SkScalar width,
+                         SkScalar height) {
 
-      SkASSERT(charEnd >= charStart);
-      SkSpan<const char> text(fUtf8.begin() + charStart, charEnd - charStart);
+        SkASSERT(charEnd >= charStart);
+        SkSpan<const char>
+            text(fUtf8.begin() + charStart, charEnd - charStart);
 
-      auto& cluster = fClusters.emplace_back(&run, glyphStart, glyphEnd, text, size.fX, size.fY);
-      // Mark line breaks
-      auto found = map.find(cluster.fText.end());
-      if (found) {
-        cluster.fBreakType = *found
-                             ? SkCluster::BreakType::HardLineBreak
-                             : SkCluster::BreakType::SoftLineBreak;
-        cluster.setIsWhiteSpaces();
-      }
+        auto& cluster = fClusters.emplace_back
+            (&run, glyphStart, glyphEnd, text, width, height);
+        // Mark line breaks
+        auto found = map.find(cluster.text().end());
+        if (found) {
+          cluster.setBreakType(*found
+                               ? SkCluster::BreakType::HardLineBreak
+                               : SkCluster::BreakType::SoftLineBreak);
+          cluster.setIsWhiteSpaces();
+        }
 
-      print(cluster);
-    });
-    run.setClusters(SkSpan<SkCluster>(&fClusters[runStart], fClusters.size() - runStart));
+        print(cluster);
+      });
+    toUpdate.emplace_back(&run, runStart, fClusters.size() - runStart);
   }
+  for (auto update : toUpdate) {
+    auto run = std::get<0>(update);
+    auto start = std::get<1>(update);
+    auto size = std::get<2>(update);
+    run->setClusters(SkSpan<SkCluster>(&fClusters[start], size));
+  }
+
   fClusters.back().setBreakType(SkCluster::BreakType::HardLineBreak);
 }
 
@@ -256,7 +271,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
     bool fHintingOn;
   };
 
-  class ShapeHandler final : public SkShaper::RunHandler {
+ class ShapeHandler final : public SkShaper::RunHandler {
 
    public:
     explicit ShapeHandler(SkParagraphImpl& paragraph)
@@ -294,8 +309,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
 
     SkParagraphImpl* fParagraph;
     SkVector fAdvance;
-  };
-
+ };
 
   SkSpan<SkBlock> styles(fTextStyles.begin(), fTextStyles.size());
   MultipleFontRunIterator font(fUtf8, styles, fFontCollection, fParagraphStyle.hintingIsOn());
@@ -386,7 +400,7 @@ void SkParagraphImpl::paintLinesIntoPicture() {
   fPicture = recorder.finishRecordingAsPicture();
 }
 
-SkLine& SkParagraphImpl::addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkFontSizes sizes) {
+SkLine& SkParagraphImpl::addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkRunMetrics sizes) {
   return fLines.emplace_back
       (offset,
        advance,

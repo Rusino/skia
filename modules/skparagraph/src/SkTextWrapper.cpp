@@ -25,7 +25,7 @@ bool SkTextWrapper::addLine(Position& pos) {
     pos.sizes()); // metrics
   ++fLineNumber;
 
-  line.reorderRuns();
+  line.reorderVisualRuns();
 
   if (reachedLinesLimit() && pos.end() != fClusters.end() - 1 && !fEllipsis.empty()) {
     // We must be on the last line and not at the end of the text
@@ -69,23 +69,25 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
   SkScalar wordLength = 0;
   for (auto& cluster : clusters) {
     if (!cluster.isWhitespaces()) {
-      wordLength += cluster.fWidth;
-      if (fClosestBreak.width() + fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
+      wordLength += cluster.width();
+
+      if (fClosestBreak.width() + fAfterBreak.width() + cluster.width() > fMaxWidth) {
         // Cluster does not fit: add the line until the closest break
         if (!addLine(fClosestBreak)) break;
       }
-      if (fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
-        // Cluster does not fit yet: try to break the text by hyphen
-        // TODO: This is the place where we add the hypenation logic
+
+      if (fAfterBreak.width() + cluster.width() > fMaxWidth) {
+        // Cluster does not fit yet: try to break the text by hyphen?
       }
 
-      if (fAfterBreak.width() + cluster.fWidth > fMaxWidth) {
+      if (fAfterBreak.width() + cluster.width() > fMaxWidth) {
         // Cluster does not fit yet: add the line with the rest of clusters
         SkASSERT(fClosestBreak.width() == 0);
         fClosestBreak.add(fAfterBreak);
         if (!addLine(fClosestBreak)) break;
       }
-      if (cluster.fWidth > fMaxWidth) {
+
+      if (cluster.width() > fMaxWidth) {
         //  Cluster still does not fit: it's too long; let's clip it
         fClosestBreak.add(cluster);
         if (!addLine(fClosestBreak)) break;

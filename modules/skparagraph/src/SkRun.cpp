@@ -71,20 +71,48 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
                     fGlyphs.data() + pos,
                     size * sizeof(SkGlyphID));
 
-  for (size_t i = 0; i < size; ++i) {
-    auto point = fPositions[i + pos];
-    if (fJustified) {
-      point.fX += fOffsets[i + pos];
+  if (fJustified || offset.fX != 0 || offset.fY != 0) {
+    for (size_t i = 0; i < size; ++i) {
+      auto point = fPositions[i + pos];
+      if (fJustified) {
+        point.fX += fOffsets[i + pos];
+      }
+      blobBuffer.points()[i] = point + offset;
     }
-    blobBuffer.points()[i] = point + offset;
+  } else {
+    // Good for the first line
+    sk_careful_memcpy(blobBuffer.points(),
+                      fPositions.data() + pos,
+                      size * sizeof(SkPoint));
   }
-  //sk_careful_memcpy(blobBuffer.points(),
-  //                  fPositions.data() + pos,
-  //                  size * sizeof(SkPoint));
 }
 
-void SkRun::iterateThroughClusters(std::function<void(
-    size_t glyphStart, size_t glyphEnd, size_t charStart, size_t charEnd, SkVector size)> apply) {
+std::tuple<bool, SkCluster*, SkCluster*> SkRun::findClusters(SkSpan<const char> text) {
+
+  auto first = text.begin();
+  auto last = text.end() - 1;
+
+  // TODO: Make the search more effective
+  SkCluster* start = nullptr;
+  SkCluster* end = nullptr;
+  for (auto& cluster : fClusters) {
+    if (cluster.contains(first)) start = &cluster;
+    if (cluster.contains(last)) end = &cluster;
+  }
+  if (!leftToRight()) {
+    std::swap(start, end);
+  }
+
+  return std::make_tuple(start != nullptr && end != nullptr, start, end);
+}
+
+void SkRun::iterateThroughClustersInTextOrder(std::function<void(
+    size_t glyphStart,
+    size_t glyphEnd,
+    size_t charStart,
+    size_t charEnd,
+    SkScalar width,
+    SkScalar height)> apply) {
 
   if (leftToRight()) {
     size_t start = 0;
@@ -96,8 +124,7 @@ void SkRun::iterateThroughClusters(std::function<void(
         continue;
       }
 
-      SkVector size = SkVector::Make(this->calculateWidth(start, glyph), this->calculateHeight());
-      apply(start, glyph, cluster, nextCluster, size);
+      apply(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph), this->calculateHeight());
 
       start = glyph;
       cluster = nextCluster;
@@ -113,13 +140,10 @@ void SkRun::iterateThroughClusters(std::function<void(
         continue;
       }
 
-      SkVector size = SkVector::Make(this->calculateWidth(start, glyph), this->calculateHeight());
-      apply(start, glyph, cluster, nextCluster, size);
+      apply(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph), this->calculateHeight());
 
       glyph = start;
       cluster = nextCluster;
     }
   }
-
-
 }
