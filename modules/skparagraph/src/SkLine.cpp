@@ -15,7 +15,7 @@
 #include "SkMaskFilter.h"
 
 namespace {
-
+/*
 std::string toString(SkSpan<const char> text) {
   icu::UnicodeString
       utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
@@ -23,14 +23,7 @@ std::string toString(SkSpan<const char> text) {
   utf16.toUTF8String(str);
   return str;
 }
-/*
-  void print(const std::string& label, const SkCluster* cluster) {
-    SkDebugf("%s[%d:%f]: '%s'\n",
-        label.c_str(),
-        cluster->fStart,
-        cluster->fRun->position(cluster->fStart).fX, toString(cluster->fText).c_str());
-  }
- */
+*/
 SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
   auto begin = SkTMax(a.begin(), b.begin());
   auto end = SkTMin(a.end(), b.end());
@@ -56,45 +49,44 @@ SkLine::SkLine(const SkLine& other) {
 }
 
 // Paint parts of each style separately
-bool SkLine::paint(SkCanvas* textCanvas, SkSpan<SkBlock> blocks) {
+void SkLine::paint(SkCanvas* textCanvas, SkSpan<SkBlock> blocks) {
 
-  if (!this->empty()) {
-
-    textCanvas->save();
-    textCanvas->translate(this->offset().fX, this->offset().fY);
-
-    this->iterateThroughStyles(
-        SkStyleType::Background,
-        blocks,
-        [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-          return this->paintBackground(textCanvas, text, style, offsetX);
-        });
-
-    this->iterateThroughStyles(
-        SkStyleType::Shadow,
-        blocks,
-        [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-          return this->paintShadow(textCanvas, text, style, offsetX);
-        });
-
-    this->iterateThroughStyles(
-        SkStyleType::Foreground,
-        blocks,
-        [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-          return this->paintText(textCanvas, text, style, offsetX);
-        });
-
-    this->iterateThroughStyles(
-        SkStyleType::Decorations,
-        blocks,
-        [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-          return this->paintDecorations(textCanvas, text, style, offsetX);
-        });
-
-    textCanvas->restore();
+  if (this->empty()) {
+    return;
   }
 
-  return (this->ellipsis() == nullptr);
+  textCanvas->save();
+  textCanvas->translate(this->offset().fX, this->offset().fY);
+
+  this->iterateThroughStylesInTextOrder(
+      SkStyleType::Background, blocks,
+      [textCanvas, this]
+      (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+        return this->paintBackground(textCanvas, text, style, offsetX);
+      });
+
+  this->iterateThroughStylesInTextOrder(
+      SkStyleType::Shadow, blocks,
+      [textCanvas, this]
+      (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+        return this->paintShadow(textCanvas, text, style, offsetX);
+      });
+
+  this->iterateThroughStylesInTextOrder(
+      SkStyleType::Foreground, blocks,
+      [textCanvas, this]
+      (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+        return this->paintText(textCanvas, text, style, offsetX);
+      });
+
+  this->iterateThroughStylesInTextOrder(
+      SkStyleType::Decorations, blocks,
+      [textCanvas, this]
+      (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+        return this->paintDecorations(textCanvas, text, style, offsetX);
+      });
+
+  textCanvas->restore();
 }
 
 SkScalar SkLine::paintText(
@@ -369,15 +361,13 @@ void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord
   }
 }
 
-// TODO: Optimize the process (calculate delta/step while breaking the lines)
+// TODO: Use UBRK_WORD instead of UBRK_LINE to avoid any work with spaces
 void SkLine::justify(SkScalar maxWidth) {
 
   SkScalar len = 0;
-  SkDebugf("breakLineByWords1:\n");
   this->breakLineByWords(UBRK_LINE, [this, &len](SkWord& word) {
     auto size = this->measureWordAcrossAllRuns(word.text());
     len += size.fX;
-    SkDebugf("Word +%f =%f: '%s'\n", size.fX, len, toString(word.text()).c_str());
     return true;
   });
 
@@ -394,9 +384,7 @@ void SkLine::justify(SkScalar maxWidth) {
   SkScalar step = delta / softLineBreaks;
   SkScalar shift = 0;
 
-
   // Walk through the runs in the logical order
-  SkDebugf("breakLineByWords2 %f = %f / %d:\n", step, delta, softLineBreaks);
   for (auto run : fLogical) {
 
     // Find the intersection between the text and the run
@@ -406,35 +394,20 @@ void SkLine::justify(SkScalar maxWidth) {
     }
 
     // Walk through the clusters in the logical order
-    if (run->leftToRight()) {
-      for (auto cluster = run->clusters().begin(); cluster != run->clusters().end(); ++cluster) {
-        if (cluster->text().end() <= this->fText.begin() ||
-            cluster->text().begin() >= this->fText.end()) {
-          continue;
-        }
-        for (auto i = cluster->startPos(); i != cluster->endPos(); ++i) {
-          run->fOffsets[i] += shift;
-        }
-        if (cluster->breakType() == SkCluster::SoftLineBreak) {
-          --softLineBreaks;
-          shift += step;
-        }
+    for (size_t i = 0; i < run->clusters().size(); ++i) {
+      auto& cluster = run->leftToRight() ? run->clusters()[i] : run->clusters()[run->clusters().size() - i - 1];
+      if (!cluster.belongs(intersect)) {
+        continue;
       }
-    } else {
-      for (auto cluster = run->clusters().end() - 1; cluster >= run->clusters().begin(); --cluster) {
-        if (cluster->text().end() <= this->fText.begin() ||
-            cluster->text().begin() >= this->fText.end()) {
-          continue;
-        }
-        for (auto i = cluster->startPos(); i != cluster->endPos(); ++i) {
-          run->fOffsets[i] += shift;
-        }
-        if (cluster->breakType() == SkCluster::SoftLineBreak) {
-          --softLineBreaks;
-          shift += step;
-        }
+      for (auto i = cluster.startPos(); i != cluster.endPos(); ++i) {
+        run->fOffsets[i] += shift;
       }
-    }
+      if (cluster.breakType() == SkCluster::SoftLineBreak) {
+        --softLineBreaks;
+        shift += step;
+      }
+    };
+
     run->fJustified = true;
   }
 
@@ -639,15 +612,18 @@ SkScalar SkLine::iterateThroughRuns(
   if (this->ellipsis() != nullptr) {
     auto ellipsis = this->ellipsis();
     apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft);
+    width += ellipsis->clip().width();
   }
 
   return width;
 }
 
-void SkLine::iterateThroughStyles(
+void SkLine::iterateThroughStylesInTextOrder(
     SkStyleType styleType,
     SkSpan<SkBlock> blocks,
-    std::function<SkScalar(SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX)> apply) const {
+    std::function<SkScalar(SkSpan<const char> text,
+                           const SkTextStyle& style,
+                           SkScalar offsetX)> apply) const {
 
   const char* start = nullptr;
   size_t size = 0;
@@ -668,9 +644,6 @@ void SkLine::iterateThroughStyles(
     }
 
     auto style = block.style();
-    //auto begin = SkTMax(block.text().begin(), this->text().begin());
-    //auto end = SkTMin(block.text().end(), this->text().end());
-    //auto intersect = SkSpan<const char>(begin, end - begin);
     if (start != nullptr && style.matchOneAttribute(styleType, prevStyle)) {
       size += intersect.size();
       continue;
@@ -682,8 +655,7 @@ void SkLine::iterateThroughStyles(
       continue;
     }
 
-    auto text = SkSpan<const char>(start, size);
-    auto width = apply(text, prevStyle, offsetX);
+    auto width = apply(SkSpan<const char>(start, size), prevStyle, offsetX);
     offsetX += width;
 
     // Start all over again
@@ -693,11 +665,11 @@ void SkLine::iterateThroughStyles(
   }
 
   // The very last style
-  auto text = SkSpan<const char>(start, size);
-  auto width = apply(text, prevStyle, offsetX);
+  auto width = apply(SkSpan<const char>(start, size), prevStyle, offsetX);
   offsetX += width;
-  if (offsetX != this->width()) {
-    //SkDebugf("!!!\n");
-  }
+
+  // This is not a trivial assert!
+  // It asserts that 2 different ways of calculation come with the same results
+  SkASSERT(offsetX == this->width());
 }
 

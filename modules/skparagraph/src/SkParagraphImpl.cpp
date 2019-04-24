@@ -394,7 +394,7 @@ void SkParagraphImpl::paintLinesIntoPicture() {
 
   auto blocks = SkSpan<SkBlock>(fTextStyles.begin(), fTextStyles.size());
   for (auto& line : fLines) {
-    if (!line.paint(textCanvas, blocks)) break;
+    line.paint(textCanvas, blocks);
   }
 
   fPicture = recorder.finishRecordingAsPicture();

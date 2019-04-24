@@ -50,15 +50,10 @@ SkScalar SkRun::calculateHeight() const {
 SkScalar SkRun::calculateWidth(size_t start, size_t end) const {
 
   SkASSERT(start <= end);
-  if (start == end) {
-    return 0;
-  }
-
   SkScalar offset = 0;
   if (fJustified && end > start) {
     offset = fOffsets[end - 1] - fOffsets[start];
   }
-
  return fPositions[end].fX - fPositions[start].fX + offset;
 
 }

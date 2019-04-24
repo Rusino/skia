@@ -130,6 +130,10 @@ class SkCluster {
     return ch >= fText.begin() && ch < fText.end();
   }
 
+  bool belongs(SkSpan<const char> text) {
+    return fText.begin() >= text.begin() && fText.end() <= text.end();
+  }
+
  private:
   SkSpan<const char> fText;
 
