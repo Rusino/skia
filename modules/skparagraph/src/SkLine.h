@@ -31,46 +31,6 @@ class SkBlock {
   SkTextStyle fTextStyle;
 };
 
-class SkWord {
-
- public:
-
-  SkWord() { }
-
-  SkWord(SkSpan<const char> text)
-      : fText(text)
-      , fAdvance(SkVector::Make(0, 0)) {
-    setIsWhiteSpaces();
-  }
-
-  inline SkSpan<const char> text() const { return fText; }
-  inline void expand(SkScalar step) { fAdvance.fX += step; }
-  inline bool empty() const { return fText.empty(); }
-  inline bool isWhiteSpace() const { return fWhiteSpaces; }
-
- private:
-
-  friend class SkLine;
-
-  void setIsWhiteSpaces() {
-    fWhiteSpaces = false;
-    auto pos = fText.end();
-    while (--pos >= fText.begin()) {
-      auto ch = *pos;
-      if (!u_isspace(ch) &&
-          u_charType(ch) != U_CONTROL_CHAR &&
-          u_charType(ch) != U_NON_SPACING_MARK) {
-        return;
-      }
-    }
-    fWhiteSpaces = true;
-  }
-
-  SkSpan<const char> fText;
-  SkVector fAdvance;  // Size
-  bool fWhiteSpaces;
-};
-
 class SkLine {
 
  public:
@@ -79,9 +39,7 @@ class SkLine {
 
   SkLine(const SkLine&);
 
-  ~SkLine() {
-    fWords.reset();
-  }
+  ~SkLine() { }
 
   SkLine(SkVector offset
         , SkVector advance
@@ -105,7 +63,6 @@ class SkLine {
   inline SkRun* ellipsis() const { return fEllipsis.get(); }
   inline SkRunMetrics sizes() const { return fSizes; }
   inline bool empty() const { return fText.empty(); }
-  void breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply);
   void reorderVisualRuns();
   SkScalar height() const { return fAdvance.fX; }
   SkScalar width() const { return fAdvance.fX + (fEllipsis != nullptr ? fEllipsis->fAdvance.fX : 0); }
@@ -163,7 +120,6 @@ class SkLine {
   SkSpan<const char> fText;
   SkSpan<SkCluster> fClusters;
   SkTArray<SkRun*, true> fLogical;
-  SkTArray<SkWord, true> fWords; // Text broken into words by ICU word breaker
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size
   SkVector fOffset;   // Text position on the screen

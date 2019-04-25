@@ -31,7 +31,7 @@ namespace {
 
     auto type = cluster.breakType() == SkCluster::BreakType::HardLineBreak
                 ? "!"
-                : (cluster.breakType()  == SkCluster::BreakType::SoftLineBreak ? "?" : " ");
+                : (cluster.isSoftBreak() ? "?" : " ");
     SkDebugf("Cluster %s%s", type, cluster.isWhitespaces() ? "*" : " ");
     SkDebugf("[%d:%d) ", cluster.startPos(), cluster.endPos());
 

@@ -64,13 +64,11 @@ class SkCluster {
   };
 
   SkCluster()
-  : fRun(nullptr)
-  , fStart(0)
-  , fEnd()
-  , fWidth()
-  , fHeight()
-  , fWhiteSpaces(false)
-  , fBreakType(None) { }
+  : fText(nullptr, 0), fRun(nullptr)
+  , fStart(0), fEnd()
+  , fWidth(), fHeight()
+  , fWhiteSpaces(false), fBreakType(None) { }
+
   SkCluster(SkRun* run, size_t start, size_t end, SkSpan<const char> text, SkScalar width, SkScalar height)
     : fText(text), fRun(run)
     , fStart(start), fEnd(end)
@@ -105,6 +103,7 @@ class SkCluster {
   bool canBreakLineAfter() const { return fBreakType == SoftLineBreak ||
                                           fBreakType == HardLineBreak; }
   bool isHardBreak() const { return fBreakType == HardLineBreak; }
+  bool isSoftBreak() const { return fBreakType == SoftLineBreak; }
   SkRun* run() const { return fRun; }
   size_t startPos() const { return fStart; }
   size_t endPos() const { return fEnd; }
@@ -140,12 +139,9 @@ class SkCluster {
   SkRun* fRun;
   size_t fStart;
   size_t fEnd;
-
   SkScalar fWidth;
   SkScalar fHeight;
-
   bool fWhiteSpaces;
-
   BreakType fBreakType;
 };
 

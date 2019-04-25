@@ -35,8 +35,6 @@ SkTHashMap<SkFont, SkRun> SkLine::fEllipsisCache;
 
 SkLine::SkLine(const SkLine& other) {
   this->fText = other.fText;
-  this->fWords.reset();
-  this->fWords = std::move(other.fWords);
   this->fLogical.reset();
   this->fLogical = std::move(other.fLogical);
   this->fShift = other.fShift;
@@ -347,78 +345,63 @@ void SkLine::reorderVisualRuns() {
   }
 }
 
-void SkLine::breakLineByWords(UBreakIteratorType type, std::function<void(SkWord& word)> apply) {
-
-  // TODO: do not create more breakers that we have to
-  SkTextBreaker breaker;
-  if (!breaker.initialize(fText, type)) {
-    return;
-  }
-  fWords.reset();
-  size_t currentPos = breaker.first();
-  while (true) {
-    auto start = currentPos;
-    currentPos = breaker.next();
-    if (breaker.eof()) {
-      break;
-    }
-    SkSpan<const char> text(fText.begin() + start, currentPos - start);
-    fWords.emplace_back(text);
-    apply(fWords.back());
-  }
-}
-
 void SkLine::justify(SkScalar maxWidth) {
 
-  SkScalar len = 0;
-  // TODO: Use UBRK_WORD instead of UBRK_LINE to avoid any work with spaces
-  this->breakLineByWords(UBRK_LINE, [this, &len](SkWord& word) {
-    auto size = this->measureWordAcrossAllRuns(word.text());
-    len += size.fX;
+  size_t words = 0;
+  SkScalar textLen = 0;
+  bool wereWhitespaces = false;
+  this->iterateThroughClustersInGlyphsOrder(false,
+  [&words, &textLen, &wereWhitespaces](const SkCluster* cluster) {
+    if (cluster->isWhitespaces()) {
+      if (!wereWhitespaces) {
+        ++words;
+      }
+      wereWhitespaces = true;
+    } else {
+      wereWhitespaces = false;
+      textLen += cluster->width();
+    }
     return true;
   });
 
-  auto delta = maxWidth - len;
-  auto softLineBreaks = this->fWords.size() - 1;
-  if (softLineBreaks == 0) {
-    auto word = this->fWords.begin();
-    word->expand(delta);
+  if (words == 0) {
     this->fShift = 0;
     this->fAdvance.fX = maxWidth;
     return;
   }
 
-  SkScalar step = delta / softLineBreaks;
+  SkScalar step = (maxWidth - textLen) / words;
   SkScalar shift = 0;
 
   // Walk through the runs in the logical order
-  for (auto run : fLogical) {
-
-    // Find the intersection between the text and the run
-    SkSpan<const char> intersect = run->text() * this->fText;
-    if (intersect.empty()) {
-      continue;
-    }
-
-    // Walk through the clusters in the logical order
-    for (size_t i = 0; i < run->clusters().size(); ++i) {
-      auto& cluster = run->leftToRight() ? run->clusters()[i] : run->clusters()[run->clusters().size() - i - 1];
-      if (!cluster.belongs(intersect)) {
-        continue;
+  wereWhitespaces = false;
+  SkScalar whitespaceLen = 0;
+  this->iterateThroughClustersInGlyphsOrder(false,
+    [&shift, step, &wereWhitespaces, &words, &whitespaceLen](const SkCluster* cluster) {
+      if (cluster->isWhitespaces()) {
+        if (!wereWhitespaces) {
+          // First whitespace (could be many in a row)
+          wereWhitespaces = true;
+          --words;
+        }
+        whitespaceLen += cluster->width();
+      } else {
+        // Shift the cluster
+        if (wereWhitespaces) {
+          // If it's the first character after the spaces, increase the shift
+          shift += step;
+        }
+        for (auto j = cluster->startPos(); j != cluster->endPos(); ++j) {
+          cluster->run()->fOffsets[j] = shift - whitespaceLen;
+        }
+        wereWhitespaces = false;
       }
-      for (auto j = cluster.startPos(); j != cluster.endPos(); ++j) {
-        run->fOffsets[j] += shift;
-      }
-      if (cluster.breakType() == SkCluster::SoftLineBreak) {
-        --softLineBreaks;
-        shift += step;
-      }
-    };
+      cluster->run()->fJustified = true;
+      return true;
+    });
 
-    run->fJustified = true;
-  }
-
-  SkASSERT(softLineBreaks == 0);
+  SkAssertResult(shift == maxWidth - textLen);
+  SkASSERT(words == 0);
   this->fShift = 0;
   this->fAdvance.fX = maxWidth;
 }
@@ -565,16 +548,17 @@ void SkLine::iterateThroughClustersInGlyphsOrder(
 
   for (size_t r = 0; r != fLogical.size(); ++r) {
     auto& run = fLogical[reverse ? fLogical.size() - r - 1 : r];
+    /*
     // Find the intersection between the text and the run
     SkSpan<const char> intersect = run->text() * this->fText;
     if (intersect.empty()) {
       continue;
     }
-
+    */
     // Walk through the clusters in the logical order (or reverse)
     auto normalOrder = run->leftToRight() != reverse;
-    auto start = normalOrder ? run->clusters().begin() : run->clusters().end();
-    auto end = normalOrder ? run->clusters().end() : run->clusters().begin();
+    auto start = normalOrder ? run->clusters().begin() : run->clusters().end() - 1;
+    auto end = normalOrder ? run->clusters().end() : run->clusters().begin() - 1;
     for (auto cluster = start; cluster != end; normalOrder ? ++cluster : --cluster) {
       if (!this->contains(cluster)) {
         continue;
