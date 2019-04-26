@@ -25,7 +25,6 @@
 #include "SkPaint.h"
 #include "SkFont.h"
 #include "SkDartTypes.h"
-#include "SkSpan.h"
 
 // Multiple decorations can be applied at once. Ex: Underline and overline is
 // (0x1 | 0x2)
@@ -179,19 +178,3 @@ class SkTextStyle {
   sk_sp<SkTypeface> fTypeface;
 };
 
-// Comes from the paragraph
-struct StyledText {
-
-  StyledText(SkSpan<const char> text, SkTextStyle style)
-      : fText(text), fStyle(style) {}
-
-  bool operator==(const StyledText& rhs) const {
-
-    return fText.begin() == rhs.fText.begin() &&
-        fText.end() == rhs.fText.end() && // TODO: Can we have == on SkSpan?
-        fStyle == rhs.fStyle;
-  }
-
-  SkSpan<const char> fText;
-  SkTextStyle fStyle;
-};

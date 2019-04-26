@@ -13,9 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-#include <list>
-#include <algorithm>
-
 #include "SkParagraphBuilder.h"
 #include "SkParagraphStyle.h"
 #include "SkPaint.h"

@@ -25,12 +25,9 @@ class SkParagraph {
   };
 
  public:
-  SkParagraph(const std::string& text, SkParagraphStyle style, sk_sp<SkFontCollection> fonts)
+  SkParagraph(SkParagraphStyle style, sk_sp<SkFontCollection> fonts)
       : fFontCollection(std::move(fonts))
-      , fParagraphStyle(style)
-      , fUtf8(text.data(), text.size()) { }
-
-  SkParagraph(const std::u16string& utf16text, SkParagraphStyle style, sk_sp<SkFontCollection> fonts);
+      , fParagraphStyle(style) { }
 
   virtual ~SkParagraph() = default;
 
@@ -75,7 +72,6 @@ class SkParagraph {
 
   sk_sp<SkFontCollection> fFontCollection;
   SkParagraphStyle fParagraphStyle;
-  SkSpan<const char> fUtf8;
 
   // Things for Flutter
   SkScalar fAlphabeticBaseline;

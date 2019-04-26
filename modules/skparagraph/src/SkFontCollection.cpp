@@ -15,15 +15,6 @@
  */
 
 #include "SkFontCollection.h"
-
-#include <list>
-#include <memory>
-#include <mutex>
-#include <set>
-#include <string>
-#include <unordered_map>
-#include <vector>
-
 #include "SkTextStyle.h"
 
 // TODO: Extract the platform dependent part
@@ -130,8 +121,10 @@ sk_sp<SkTypeface> SkFontCollection::findTypeface(const std::string& familyName, 
 
   if (typeface == nullptr && fEnableFontFallback) {
       typeface.reset(fDefaultFontManager->matchFamilyStyle(fDefaultFamilyName.c_str(), fontStyle));
-      SkDebugf("Using default %s instead of %s (%d %s)\n",
+      SkDebugf("Using default %s (%d %s) instead of %s (%d %s)\n",
                fDefaultFamilyName.c_str(),
+               (int)typeface.get()->fontStyle().weight(),
+               typeface.get()->fontStyle().slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic",
                familyName.c_str(),
                (int)fontStyle.weight(),
                fontStyle.slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic");

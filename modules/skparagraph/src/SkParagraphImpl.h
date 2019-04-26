@@ -101,7 +101,8 @@ class SkParagraphImpl final: public SkParagraph {
                   SkParagraphStyle style,
                   std::vector<Block> blocks,
                   sk_sp<SkFontCollection> fonts)
-      : SkParagraph(text, style, std::move(fonts))
+      : SkParagraph(style, std::move(fonts))
+      , fUtf8(text.data(), text.size())
       , fTextWrapper(this)
       , fPicture(nullptr) {
     fTextStyles.reserve(blocks.size());
@@ -115,9 +116,15 @@ class SkParagraphImpl final: public SkParagraph {
                   SkParagraphStyle style,
                   std::vector<Block> blocks,
                   sk_sp<SkFontCollection> fonts)
-      : SkParagraph(utf16text, style, std::move(fonts))
+      : SkParagraph(style, std::move(fonts))
       , fTextWrapper(this)
       , fPicture(nullptr) {
+
+    icu::UnicodeString unicode((UChar*) utf16text.data(), SkToS32(utf16text.size()));
+    std::string str;
+    unicode.toUTF8String(str);
+    fUtf8 = SkSpan<const char>(str.data(), str.size());
+
     fTextStyles.reserve(blocks.size());
     for (auto& block : blocks) {
       fTextStyles.emplace_back(SkSpan<const char>(fUtf8.begin() + block.fStart, block.fEnd - block.fStart),
@@ -159,6 +166,7 @@ class SkParagraphImpl final: public SkParagraph {
 
   // Input
   SkTArray<SkBlock, true> fTextStyles;
+  SkSpan<const char> fUtf8;
 
   // Internal structures
   SkTArray<SkRun> fRuns;

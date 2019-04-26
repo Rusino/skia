@@ -63,15 +63,6 @@ namespace {
   }
 }
 
-SkParagraph::SkParagraph(const std::u16string& utf16text, SkParagraphStyle style, sk_sp<SkFontCollection> fonts)
-    : fFontCollection(std::move(fonts))
-    , fParagraphStyle(style) {
-  icu::UnicodeString unicode((UChar*) utf16text.data(), SkToS32(utf16text.size()));
-  std::string str;
-  unicode.toUTF8String(str);
-  fUtf8 = SkSpan<const char>(str.data(), str.size());
-}
-
 SkParagraphImpl::~SkParagraphImpl() = default;
 
 void SkParagraphImpl::layout(SkScalar width) {

@@ -6,7 +6,6 @@
  */
 
 #include <unicode/brkiter.h>
-#include <algorithm>
 #include <unicode/ubidi.h>
 #include "SkLine.h"
 #include "SkParagraphImpl.h"
@@ -15,7 +14,7 @@
 #include "SkMaskFilter.h"
 
 namespace {
-/*
+
 std::string toString(SkSpan<const char> text) {
   icu::UnicodeString
       utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
@@ -23,7 +22,7 @@ std::string toString(SkSpan<const char> text) {
   utf16.toUTF8String(str);
   return str;
 }
-*/
+
 SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
   auto begin = SkTMax(a.begin(), b.begin());
   auto end = SkTMin(a.end(), b.end());
@@ -219,7 +218,7 @@ SkScalar SkLine::paintDecorations(
         }
         default:
           position = 0;
-          SkASSERT(false);
+          // TODO: a combination of several decorations
           break;
       }
 
@@ -308,7 +307,7 @@ void SkLine::computeDecorationPaint(
 
       int wave_count = 0;
       SkScalar x_start = 0;
-      SkScalar wavelength = 2 * scaleFactor;
+      SkScalar wavelength = scaleFactor * style.getDecorationThicknessMultiplier();
       auto width = clip.width();
       path.moveTo(0, 0);
       while (x_start + wavelength * 2 < width) {
@@ -400,7 +399,7 @@ void SkLine::justify(SkScalar maxWidth) {
       return true;
     });
 
-  SkAssertResult(shift == maxWidth - textLen);
+  SkAssertResult(SkScalarNearlyEqual(shift, maxWidth - textLen));
   SkASSERT(words == 0);
   this->fShift = 0;
   this->fAdvance.fX = maxWidth;
@@ -669,6 +668,9 @@ void SkLine::iterateThroughStylesInTextOrder(
 
   // This is not a trivial assert!
   // It asserts that 2 different ways of calculation come with the same results
-  SkASSERT(offsetX == this->width());
+  if (!SkScalarNearlyEqual(offsetX, this->width())) {
+    SkDebugf("ASSERT: %f != %f '%s'\n", offsetX, this->width(), toString(fText).c_str());
+  }
+  SkASSERT(SkScalarNearlyEqual(offsetX, this->width()));
 }
 

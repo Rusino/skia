@@ -5,12 +5,9 @@
  * found in the LICENSE file.
  */
 
-#include <vector>
 #include "SkParagraphBuilder.h"
 #include "Sample.h"
-#include <string>
-#include <locale>
-#include <codecvt>
+
 
 #include "Resources.h"
 #include "SkBlurMaskFilter.h"
@@ -760,7 +757,7 @@ class ParagraphView3 : public Sample {
     SkTextStyle style;
     style.setBackgroundColor(gray);
     style.setForegroundColor(paint);
-    style.setFontFamily("Arial");
+    style.setFontFamily("sans-serif");
     style.setFontSize(30);
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
@@ -1277,36 +1274,44 @@ class ParagraphView6 : public Sample {
     magenta.setAntiAlias(true);
     magenta.setColor(SK_ColorMAGENTA);
 
+    SkFontStyle fontStyle(SkFontStyle::kBold_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kItalic_Slant);
+
     SkTextStyle style;
     style.setFontFamily(ff);
     style.setFontSize(fs);
+    style.setFontStyle(fontStyle);
 
     SkTextStyle style0;
     style0.setForegroundColor(black);
     style0.setBackgroundColor(gray);
     style0.setFontFamily(ff);
     style0.setFontSize(fs);
+    style0.setFontStyle(fontStyle);
 
     SkTextStyle style1;
     style1.setForegroundColor(blue);
     style1.setBackgroundColor(yellow);
     style1.setFontFamily(ff);
     style1.setFontSize(fs);
+    style1.setFontStyle(fontStyle);
 
     SkTextStyle style2;
     style2.setForegroundColor(red);
     style2.setFontFamily(ff);
     style2.setFontSize(fs);
+    style2.setFontStyle(fontStyle);
 
     SkTextStyle style3;
     style3.setForegroundColor(green);
     style3.setFontFamily(ff);
     style3.setFontSize(fs);
+    style3.setFontStyle(fontStyle);
 
     SkTextStyle style4;
     style4.setForegroundColor(magenta);
     style4.setFontFamily(ff);
     style4.setFontSize(fs);
+    style4.setFontStyle(fontStyle);
 
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
@@ -1411,6 +1416,162 @@ class ParagraphView6 : public Sample {
   sk_sp<TestFontProvider> testFontProvider;
   sk_sp<SkFontCollection> fontCollection;
 };
+
+class ParagraphView7 : public Sample {
+ public:
+  ParagraphView7() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+    LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+  }
+
+  ~ParagraphView7() {
+  }
+ protected:
+  bool onQuery(Sample::Event* evt) override {
+    if (Sample::TitleQ(*evt)) {
+      Sample::TitleR(evt, "Paragraph7");
+      return true;
+    }
+    return this->INHERITED::onQuery(evt);
+  }
+
+  void onDrawContent(SkCanvas* canvas) override {
+
+    //SetResourcePath
+    //("/usr/local/google/home/jlavrova/Sources/flutter/engine/src/flutter/third_party/txt/third_party/fonts");
+    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/Roboto-Regular.ttf"));
+    fontCollection->setTestFontManager(testFontProvider);
+
+    SkParagraphStyle paragraphStyle;
+    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setMaxLines(10);
+    SkTextStyle textStyle;
+    textStyle.setFontFamily("Roboto");
+    textStyle.setFontSize(50);
+    textStyle.setColor(SK_ColorBLACK);
+    textStyle.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
+
+    SkParagraphBuilder builder(paragraphStyle, fontCollection);
+    builder.pushStyle(textStyle);
+    builder.addText("12345,  \"67890\" 12345 67890 12345 67890 12345 67890 12345 67890 12345 67890 12345");
+    builder.pop();
+
+    auto paragraph = builder.Build();
+    paragraph->layout(550);
+
+    canvas->drawColor(SK_ColorWHITE);
+    canvas->translate(20, 20);
+
+    RectHeightStyle heightStyle = RectHeightStyle::kMax;
+    RectWidthStyle widthStyle = RectWidthStyle::kTight;
+    {
+      auto result = paragraph->getRectsForRange(0, 0, heightStyle, widthStyle);
+      SkASSERT(result.size() == 0);
+    }
+
+    {
+      auto result = paragraph->getRectsForRange(0, 1, heightStyle, widthStyle);
+      SkASSERT(result.size() == 1);
+      SkPaint red; red.setColor(SK_ColorRED);
+      canvas->drawRect(result[0].rect, red);
+      //SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 0));
+      //SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 0.40625));
+      //SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 28.417969));
+      //SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 59));
+    }
+/*
+    {
+      auto result = paragraph->getRectsForRange(2, 8, heightStyle, widthStyle);
+      SkASSERT(result.size() == 1);
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 56.835938));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 0.40625));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 177.97266));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 59));
+    }
+
+    {
+      auto result = paragraph->getRectsForRange(8, 21, heightStyle, widthStyle);
+      SkASSERT(result.size() == 1);
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 177.97266));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 0.40625));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 507.02344));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 59));
+    }
+
+    {
+      auto result = paragraph->getRectsForRange(8, 21, heightStyle, widthStyle);
+      SkASSERT(result.size() == 4);
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 211.375));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 59.40625));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 463.61719));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 118));
+      // TODO(garyq): The following set of vals are definetly wrong and
+      // end of paragraph handling needs to be fixed in a later patch.
+      SkASSERT(SkScalarNearlyEqual(result[3].rect.left(), 0));
+      SkASSERT(SkScalarNearlyEqual(result[3].rect.top(), 236.40625));
+      SkASSERT(SkScalarNearlyEqual(result[3].rect.right(), 142.08984));
+      SkASSERT(SkScalarNearlyEqual(result[3].rect.bottom(), 295));
+    }
+
+    {
+      auto result = paragraph->getRectsForRange(19, 22, heightStyle, widthStyle);
+      SkASSERT(result.size() == 1);
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 450.1875));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 0.40625));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 519.47266));
+      SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 59));
+    }
+
+    {
+      auto result = paragraph->getRectsForRange(21, 21, heightStyle, widthStyle);
+      SkASSERT(result.size() == 0);
+    }
+*/
+    paragraph->paint(canvas, 0, 0);
+    return;
+  }
+
+ private:
+  typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
+};
+
+/*
+ *                       ui.TextStyle textStyle = ui.TextStyle(
+                        fontFamily: "Roboto",
+                        fontSize: 50,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black,
+                        height: 1
+                      );
+
+                      ui.ParagraphBuilder builder = ui.ParagraphBuilder(
+                          ui.ParagraphStyle(textAlign: TextAlign.left, maxLines: 10));
+                      builder.pushStyle(textStyle);
+                      builder.addText('12345,  "67890" 12345 67890 12345 67890 12345 67890 12345 67890 12345 67890 12345');
+                      builder.pop();
+
+                      var paragraph = builder.build();
+                      paragraph.layout(ui.ParagraphConstraints(width: 550));
+
+                      var result1 =
+                        paragraph.getBoxesForRange(0, 1,
+                            boxHeightStyle: ui.BoxHeightStyle.max, boxWidthStyle: ui.BoxWidthStyle.tight);
+ */
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_SAMPLE(return new ParagraphView1();)
@@ -1419,3 +1580,4 @@ DEF_SAMPLE(return new ParagraphView3();)
 DEF_SAMPLE(return new ParagraphView4();)
 DEF_SAMPLE(return new ParagraphView5();)
 DEF_SAMPLE(return new ParagraphView6();)
+DEF_SAMPLE(return new ParagraphView7();)
