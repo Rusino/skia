@@ -38,13 +38,13 @@ class SkFontCollection : public SkRefCnt {
     void setDefaultFontManager(sk_sp<SkFontMgr> fontManager, const std::string& defaultFamilyName);
 
     sk_sp<SkTypeface> findTypeface(const std::string& familyName, SkFontStyle fontStyle);
+    sk_sp<SkTypeface> matchTypeface(const std::string& familyName, SkFontStyle fontStyle);
+    sk_sp<SkTypeface> defaultFallback(const std::string& familyName, SkFontStyle fontStyle);
+
 
     void disableFontFallback();
 
   private:
-
-    sk_sp<SkTypeface>
-    findByFamilyName(const std::string& familyName, SkFontStyle fontStyle);
 
     std::vector<sk_sp<SkFontMgr>> getFontManagerOrder() const;
 

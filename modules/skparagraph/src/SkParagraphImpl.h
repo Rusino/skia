@@ -152,6 +152,11 @@ class SkParagraphImpl final: public SkParagraph {
   SkLine& addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkRunMetrics sizes);
 
   inline SkSpan<const char> text() const { return fUtf8; }
+  inline SkSpan<SkRun> runs() { return SkSpan<SkRun>(fRuns.data(), fRuns.size()); }
+  inline SkSpan<SkBlock> styles() { return SkSpan<SkBlock>(fTextStyles.data(), fTextStyles.size()); }
+  inline SkSpan<SkLine> lines() { return SkSpan<SkLine>(fLines.data(), fLines.size()); }
+  inline SkParagraphStyle paragraphStyle() { return fParagraphStyle; }
+  void formatLinesByWords(SkScalar maxWidth);
 
  private:
 
@@ -161,7 +166,6 @@ class SkParagraphImpl final: public SkParagraph {
   void buildClusterTable();
   void shapeTextIntoEndlessLine();
   void breakShapedTextIntoLines(SkScalar maxWidth);
-  void formatLinesByWords(SkScalar maxWidth);
   void paintLinesIntoPicture();
 
   // Input

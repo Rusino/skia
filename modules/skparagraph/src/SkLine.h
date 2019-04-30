@@ -109,6 +109,9 @@ class SkLine {
 
   void createEllipsis(SkScalar maxWidth, const std::string& ellipsis, bool ltr);
 
+  void scanStyles(SkStyleType style, SkSpan<SkBlock> blocks,
+                  std::function<void(SkTextStyle, SkScalar)> apply);
+
  private:
 
   SkRun* shapeEllipsis(const std::string& ellipsis, SkRun* run);

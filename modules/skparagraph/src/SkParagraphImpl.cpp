@@ -5,8 +5,6 @@
  * found in the LICENSE file.
  */
 
-#include <algorithm>
-#include <stack>
 #include <unicode/brkiter.h>
 #include <SkBlurTypes.h>
 #include <SkFontMgr.h>
@@ -18,7 +16,7 @@
 #include "SkUTF.h"
 
 namespace {
-
+/*
   std::string toString(SkSpan<const char> text) {
     icu::UnicodeString
         utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
@@ -26,14 +24,15 @@ namespace {
     utf16.toUTF8String(str);
     return str;
   }
-
+  */
   void print(const SkCluster& cluster) {
-
+/*
     auto type = cluster.breakType() == SkCluster::BreakType::HardLineBreak
                 ? "!"
                 : (cluster.isSoftBreak() ? "?" : " ");
     SkDebugf("Cluster %s%s", type, cluster.isWhitespaces() ? "*" : " ");
     SkDebugf("[%d:%d) ", cluster.startPos(), cluster.endPos());
+    SkDebugf(" %f ", cluster.width());
 
     SkDebugf("'");
     for (auto ch = cluster.text().begin(); ch != cluster.text().end(); ++ch) {
@@ -46,20 +45,18 @@ namespace {
     } else {
       SkDebugf("\n");
     }
+    */
   }
-
+  /*
   SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
     auto begin = SkTMax(a.begin(), b.begin());
     auto end = SkTMin(a.end(), b.end());
     return SkSpan<const char>(begin, end > begin ? end - begin : 0);
   }
-
+*/
   static inline SkUnichar utf8_next(const char** ptr, const char* end) {
     SkUnichar val = SkUTF::NextUTF8(ptr, end);
-    if (val < 0) {
-      return 0xFFFD;  // REPLACEMENT CHARACTER
-    }
-    return val;
+    return val < 0 ? 0xFFFD : val;
   }
 }
 
@@ -176,89 +173,102 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
         : fText(utf8)
         , fCurrentChar(utf8.begin())
         , fCurrentStyle(styles.begin())
-        , fLast(styles.end())
+        , fStyles(styles)
         , fFontCollection(fonts)
         , fHintingOn(hintingOn) {
+
+      resolveFonts();
+    }
+
+    bool existsInFont(sk_sp<SkTypeface> typeface, SkUnichar u) {
+      return typeface->unicharToGlyph(u) != 0;
+    }
+
+    // TODO: Resolve fonts via harfbuzz
+    void resolveFonts() {
+      fResolvedFont.reset();
+
+      sk_sp<SkTypeface> prevTypeface = nullptr;
+      SkScalar prevFontSize = 0;
+      while (fCurrentChar != fText.end()) {
+
+        const char* current = fCurrentChar;
+        SkUnichar u = utf8_next(&fCurrentChar, fText.end());
+
+        // Find the first typeface from the collection that exists in the current text style
+        sk_sp<SkTypeface> typeface = nullptr;
+        for (auto& fontFamily : fCurrentStyle->style().getFontFamilies()) {
+          typeface = fFontCollection->matchTypeface(fontFamily, fCurrentStyle->style().getFontStyle());
+          if (existsInFont(typeface, u)) {
+            if (!SkTypeface::Equal(typeface.get(), prevTypeface.get()) ||
+                prevFontSize != fCurrentStyle->style().getFontSize()) {
+              fResolvedFont.set(current, makeFont(typeface, fCurrentStyle->style().getFontSize()));
+              prevTypeface = typeface;
+              prevFontSize = fCurrentStyle->style().getFontSize();
+            }
+            break;
+          }
+        }
+        if (prevTypeface == nullptr) {
+          prevTypeface = fFontCollection->defaultFallback("", fCurrentStyle->style().getFontStyle());
+          fResolvedFont.set(current, makeFont(prevTypeface, fCurrentStyle->style().getFontSize()));
+          prevFontSize = fCurrentStyle->style().getFontSize();
+        }
+
+        // Find the text style that contains the next character
+        while (fCurrentStyle != fStyles.end() && fCurrentStyle->text().end() < fCurrentChar) {
+          ++fCurrentStyle;
+        }
+      }
+
+      fCurrentChar = fText.begin();
+      fCurrentStyle = fStyles.begin();
     }
 
     void consume() override {
 
-      auto start = fCurrentChar;
-      char ch = *fCurrentChar;
-      SkUnichar u = utf8_next(&fCurrentChar, fText.end());
-      auto currentStyle = fCurrentStyle->style();
+      SkASSERT(fCurrentChar < fText.end());
 
-      // Find the font
-      for (auto& fontFamily : currentStyle.getFontFamilies()) {
-        sk_sp<SkTypeface> typeface = fFontCollection->findTypeface(fontFamily, currentStyle.getFontStyle());
-        if (typeface == nullptr) {
-          continue;
-        }
+      auto found = fResolvedFont.find(fCurrentChar);
+      if (found == nullptr) {
+        fFont = SkFont();
+      } else {
         // Get the font
-        fFont = SkFont(typeface, currentStyle.getFontSize());
-        fFont.setEdging(SkFont::Edging::kAntiAlias);
-        if (!fHintingOn) {
-          fFont.setHinting(SkFontHinting::kSlight);
-          fFont.setSubpixel(true);
-        }
-        fFontFamilyName = fontFamily;
-        fFontStyle = currentStyle.getFontStyle();
-        if (ignored(ch) || fFont.unicharToGlyph(u)) {
-          // If the current font can handle this character, use it
+        fFont = *found;
+      }
+
+      // Find the first character (index) that cannot be resolved with the current font
+      while (++fCurrentChar != fText.end()) {
+        found = fResolvedFont.find(fCurrentChar);
+        if (found != nullptr) {
           break;
         }
       }
+    }
 
-      // Find the character that cannot be shown in that font
-      while (fCurrentChar != fText.end() &&
-                currentFontListedInCurrentStyle() &&
-                    currentCharExistsInCurrentFont()) {
-        // Move the style iterator along with the character
-        if (fCurrentChar == fCurrentStyle->text().end()) {
-          ++fCurrentStyle;
-        }
+    SkFont makeFont(sk_sp<SkTypeface> typeface, SkScalar size) {
+      SkFont font(typeface, size);
+      font.setEdging(SkFont::Edging::kAntiAlias);
+      if (!fHintingOn) {
+        font.setHinting(SkFontHinting::kSlight);
+        font.setSubpixel(true);
       }
-      if (false) {
-        SkSpan<const char> text(start, fCurrentChar - start);
-        SkDebugf("%s,%f : '%s'\n", fFontFamilyName.c_str(), fFont.getSize(), toString(text).c_str());
-      }
+
+      return font;
     }
 
     size_t endOfCurrentRun() const override { return fCurrentChar - fText.begin(); }
     bool atEnd() const override { return fCurrentChar == fText.end(); }
     const SkFont& currentFont() const override { return fFont; }
 
-    bool currentFontListedInCurrentStyle() {
-
-      auto currentStyle = fCurrentStyle->style();
-      return currentStyle.getFontStyle() == fFontStyle &&
-             currentStyle.getFontSize() == fFont.getSize() &&
-             currentStyle.getFontFamilies()[0] == fFontFamilyName;
-    }
-
-    bool ignored(char ch) {
-      return u_charType(ch) == U_CONTROL_CHAR ||
-             u_charType(ch) == U_NON_SPACING_MARK;
-    }
-
-    bool currentCharExistsInCurrentFont() {
-      if (ignored(*fCurrentChar)) {
-        ++fCurrentChar;
-        return true;
-      }
-      SkUnichar u = utf8_next(&fCurrentChar, fText.end());
-      return fFont.unicharToGlyph(u) != 0;
-    }
-
    private:
     SkSpan<const char> fText;
     const char* fCurrentChar;
     SkFont fFont;
-    std::string fFontFamilyName;
-    SkFontStyle fFontStyle;
     SkBlock* fCurrentStyle;
-    SkBlock* fLast;
+    SkSpan<SkBlock> fStyles;
     sk_sp<SkFontCollection> fFontCollection;
+    SkTHashMap<const char*, SkFont> fResolvedFont;
     bool fHintingOn;
   };
 
@@ -410,22 +420,41 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     RectWidthStyle rectWidthStyle) {
 
   std::vector<SkTextBox> results;
-  // Add empty rectangles representing any newline characters within the range
-  SkSpan<const char> text(fUtf8.begin() + start, end - start);
+  size_t index = 0;
   for (auto& line : fLines) {
-    auto intersect = line.text() * text;
-    if (intersect.size() == 0) continue;
+
+    if (index > end) {
+      break;
+    }
 
     auto firstBox = results.size();
     SkRect maxClip = SkRect::MakeXYWH(0, 0, 0, 0);
     line.iterateThroughRuns(
-      intersect,
+      line.text(),
       false,
-      [&results, &maxClip, &line]
+      [&results, &maxClip, &line, &index, start, end]
       (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
+        if (index + size <= start) {
+          // Keep going
+          return true;
+        } else if (index >= end) {
+          // Done with the range
+          return false;
+        }
+
+        // Correct the clip in case it does not
+        if (start > index) {
+          clip.fLeft += run->position(start - index).fX - run->position(pos).fX;
+        }
+        if (end < index + size) {
+          clip.fRight -= run->position(pos + size).fX - run->position(end - index).fX;
+        }
+
         clip.offset(line.offset());
+        clip.offset(-shift, 0);
         results.emplace_back(clip, run->leftToRight() ? SkTextDirection::ltr : SkTextDirection::rtl);
         maxClip.join(clip);
+        index += size;
         return true;
       });
 
@@ -483,15 +512,15 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx
           false,
           [dx, &result]
           (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
-            auto offset = run->offset();
-            auto advance = run->advance();
-            if (offset.fX <= dx && dx < offset.fX + advance.fX) {
+            if (run->position(pos).fX <= dx && dx < run->position(pos + size).fX) {
               // Find the run
               size_t pos = 0;
               for (size_t i = 0; i < run->size(); ++i) {
-                if (run->position(i).fX < dx) {
+                if (run->position(i).fX <= dx) {
                   // Find the position
                   pos = i;
+                } else {
+                  break;
                 }
               }
               if (pos == 0) {

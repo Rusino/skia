@@ -6,6 +6,7 @@
  */
 
 #include "SkParagraphBuilder.h"
+#include "SkParagraphImpl.h"
 #include "Sample.h"
 
 
@@ -242,7 +243,7 @@ class ParagraphView1 : public Sample {
     for (auto i = 1; i < 5; ++i) {
       paraStyle.getTextStyle().setFontSize(24 * i);
       SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
-      builder.addText("Paragraph:");
+      builder.addText("Paragraph: " + std::to_string(24 * i));
       for (auto para : gParagraph) {
         SkTextStyle style;
         style.setBackgroundColor(background);
@@ -279,7 +280,7 @@ class ParagraphView1 : public Sample {
         }
         builder.pushStyle(style);
         std::string name = " " +
-            std::get<0>(para) +
+            std::get<0>(para) + " " +
             (std::get<1>(para) ? ", bold" : "") +
             (std::get<2>(para) ? ", italic" : "") + " " +
             std::to_string(std::get<3>(para) * i) +
@@ -1449,100 +1450,56 @@ class ParagraphView7 : public Sample {
 
   void onDrawContent(SkCanvas* canvas) override {
 
-    //SetResourcePath
-    //("/usr/local/google/home/jlavrova/Sources/flutter/engine/src/flutter/third_party/txt/third_party/fonts");
-    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/Roboto-Regular.ttf"));
-    fontCollection->setTestFontManager(testFontProvider);
-
-    SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::left);
-    paragraphStyle.setMaxLines(10);
-    SkTextStyle textStyle;
-    textStyle.setFontFamily("Roboto");
-    textStyle.setFontSize(50);
-    textStyle.setColor(SK_ColorBLACK);
-    textStyle.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
-
-    SkParagraphBuilder builder(paragraphStyle, fontCollection);
-    builder.pushStyle(textStyle);
-    builder.addText("12345,  \"67890\" 12345 67890 12345 67890 12345 67890 12345 67890 12345 67890 12345");
-    builder.pop();
-
-    auto paragraph = builder.Build();
-    paragraph->layout(550);
-
     canvas->drawColor(SK_ColorWHITE);
     canvas->translate(20, 20);
 
-    RectHeightStyle heightStyle = RectHeightStyle::kMax;
-    RectWidthStyle widthStyle = RectWidthStyle::kTight;
-    {
-      auto result = paragraph->getRectsForRange(0, 0, heightStyle, widthStyle);
-      SkASSERT(result.size() == 0);
-    }
+    fontCollection = sk_make_sp<SkFontCollection>();
+    testFontProvider =
+        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
+            "fonts/Roboto-Medium.ttf"));
+    fontCollection->setTestFontManager(testFontProvider);
 
-    {
-      auto result = paragraph->getRectsForRange(0, 1, heightStyle, widthStyle);
-      SkASSERT(result.size() == 1);
-      SkPaint red; red.setColor(SK_ColorRED);
-      canvas->drawRect(result[0].rect, red);
-      //SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 0));
-      //SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 0.40625));
-      //SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 28.417969));
-      //SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 59));
-    }
-/*
-    {
-      auto result = paragraph->getRectsForRange(2, 8, heightStyle, widthStyle);
-      SkASSERT(result.size() == 1);
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 56.835938));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 0.40625));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 177.97266));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 59));
-    }
+    const char* text =
+        "This is a very long sentence to test if the text will properly wrap "
+        "around and go to the next line. Sometimes, short sentence. Longer "
+        "sentences are okay too because they are nessecary. Very short. "
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+        "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+        "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+        "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+        "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+        "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+        "mollit anim id est laborum. "
+        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
+        "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
+        "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
+        "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
+        "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
+        "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
+        "mollit anim id est laborum.";
 
-    {
-      auto result = paragraph->getRectsForRange(8, 21, heightStyle, widthStyle);
-      SkASSERT(result.size() == 1);
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 177.97266));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 0.40625));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 507.02344));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 59));
-    }
+    SkParagraphStyle paragraph_style;
+    paragraph_style.setMaxLines(14);
+    paragraph_style.setTextAlign(SkTextAlign::left);
+    SkParagraphBuilder builder(paragraph_style, fontCollection);
 
-    {
-      auto result = paragraph->getRectsForRange(8, 21, heightStyle, widthStyle);
-      SkASSERT(result.size() == 4);
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 211.375));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 59.40625));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 463.61719));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 118));
-      // TODO(garyq): The following set of vals are definetly wrong and
-      // end of paragraph handling needs to be fixed in a later patch.
-      SkASSERT(SkScalarNearlyEqual(result[3].rect.left(), 0));
-      SkASSERT(SkScalarNearlyEqual(result[3].rect.top(), 236.40625));
-      SkASSERT(SkScalarNearlyEqual(result[3].rect.right(), 142.08984));
-      SkASSERT(SkScalarNearlyEqual(result[3].rect.bottom(), 295));
-    }
+    SkTextStyle text_style;
+    text_style.setFontFamilies(std::vector<std::string>(1, "Roboto"));
+    text_style.setFontSize(26);
+    text_style.setLetterSpacing(1);
+    text_style.setWordSpacing(5);
+    text_style.setColor(SK_ColorBLACK);
+    text_style.setHeight(1);
+    text_style.setDecoration(SkTextDecoration::kUnderline);
+    text_style.setDecorationColor(SK_ColorBLACK);
+    builder.pushStyle(text_style);
+    builder.addText(text);
+    builder.pop();
 
-    {
-      auto result = paragraph->getRectsForRange(19, 22, heightStyle, widthStyle);
-      SkASSERT(result.size() == 1);
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.left(), 450.1875));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.top(), 0.40625));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.right(), 519.47266));
-      SkASSERT(SkScalarNearlyEqual(result[0].rect.bottom(), 59));
-    }
-
-    {
-      auto result = paragraph->getRectsForRange(21, 21, heightStyle, widthStyle);
-      SkASSERT(result.size() == 0);
-    }
-*/
+    auto paragraph = builder.Build();
+    paragraph->layout(1000 - 100);
     paragraph->paint(canvas, 0, 0);
-    return;
   }
-
  private:
   typedef Sample INHERITED;
 
@@ -1550,28 +1507,6 @@ class ParagraphView7 : public Sample {
   sk_sp<SkFontCollection> fontCollection;
 };
 
-/*
- *                       ui.TextStyle textStyle = ui.TextStyle(
-                        fontFamily: "Roboto",
-                        fontSize: 50,
-                        fontWeight: FontWeight.w500,
-                        color: Colors.black,
-                        height: 1
-                      );
-
-                      ui.ParagraphBuilder builder = ui.ParagraphBuilder(
-                          ui.ParagraphStyle(textAlign: TextAlign.left, maxLines: 10));
-                      builder.pushStyle(textStyle);
-                      builder.addText('12345,  "67890" 12345 67890 12345 67890 12345 67890 12345 67890 12345 67890 12345');
-                      builder.pop();
-
-                      var paragraph = builder.build();
-                      paragraph.layout(ui.ParagraphConstraints(width: 550));
-
-                      var result1 =
-                        paragraph.getBoxesForRange(0, 1,
-                            boxHeightStyle: ui.BoxHeightStyle.max, boxWidthStyle: ui.BoxWidthStyle.tight);
- */
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_SAMPLE(return new ParagraphView1();)

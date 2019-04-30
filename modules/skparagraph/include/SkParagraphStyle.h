@@ -44,6 +44,7 @@ struct SkParagraphStyle {
     fDefaultTextStyle = textStyle;
   }
   void setTextAlign(SkTextAlign align) { fTextAlign = align; }
+  SkTextAlign getTextAlign() const { return fTextAlign; }
   void setTextDirection(SkTextDirection direction) {
 
     fTextDirection = direction;

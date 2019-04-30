@@ -24,7 +24,7 @@ class SkRunMetrics {
   SkRunMetrics() { clean(); }
   SkRunMetrics(SkScalar a, SkScalar d, SkScalar l) {
     fAscent = a;
-    fDescent = a;
+    fDescent = d;
     fLeading = l;
   }
   void add(SkScalar a, SkScalar d, SkScalar l) {
@@ -41,10 +41,13 @@ class SkRunMetrics {
     fLeading = 0;
   }
   SkScalar diff(SkRunMetrics lineMetrics) const {
-    return ascent() - lineMetrics.ascent() - leading() / 2;
+    return ascent() - lineMetrics.ascent() - leading() / 2 + delta();
   }
   SkScalar height() const {
-    return fDescent - fAscent + fLeading;
+    return  SkScalarRoundToInt(fDescent - fAscent + fLeading);
+  }
+  SkScalar delta() const {
+    return height() - (fDescent - fAscent + fLeading);
   }
   SkScalar leading() const { return fLeading; }
   SkScalar ascent() const { return fAscent; }

@@ -31,9 +31,7 @@ class SkTextWrapper {
     }
     inline SkScalar width() const { return fWidth + fWhitespaces.fX; }
     inline SkScalar trimmedWidth() const { return fWidth; }
-    inline SkScalar height() const {
-      return fWidth == 0 ? fWhitespaces.fY : fSizes.height();
-    }
+    inline SkScalar height() const { return fSizes.height(); }
     inline const SkCluster* trimmed() const { return fTrimmedEnd; }
     inline const SkCluster* end() const { return fEnd; }
     inline SkRunMetrics sizes() const { return fSizes; }
@@ -67,8 +65,8 @@ class SkTextWrapper {
         fTrimmedEnd = &cluster;
         fWidth += cluster.width() + fWhitespaces.fX;
         fWhitespaces = SkVector::Make(0, 0);
-        fSizes.add(cluster.run()->ascent(), cluster.run()->descent(), cluster.run()->leading());
       }
+      fSizes.add(cluster.run()->ascent(), cluster.run()->descent(), cluster.run()->leading());
       fEnd = &cluster;
     }
 
@@ -100,7 +98,6 @@ class SkTextWrapper {
   inline SkScalar height() const { return fHeight; }
   inline SkScalar width() const { return fWidth; }
   inline SkScalar intrinsicWidth() const { return fMinIntrinsicWidth; }
-
 
   void reset() {
     fLineStart = nullptr;

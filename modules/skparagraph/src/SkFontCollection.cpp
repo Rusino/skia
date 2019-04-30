@@ -94,6 +94,17 @@ std::vector<sk_sp<SkFontMgr>> SkFontCollection::getFontManagerOrder() const {
 // TODO: locale
 sk_sp<SkTypeface> SkFontCollection::findTypeface(const std::string& familyName, SkFontStyle fontStyle) {
 
+  auto typeface = matchTypeface(familyName, fontStyle);
+
+  if (typeface == nullptr && fEnableFontFallback) {
+    return defaultFallback(familyName, fontStyle);
+  }
+
+  return typeface;
+}
+
+sk_sp<SkTypeface> SkFontCollection::matchTypeface(const std::string& familyName, SkFontStyle fontStyle) {
+
   // Look inside the font collections cache first
   FamilyKey familyKey(familyName, "en", fontStyle);
   auto found = fTypefaces.find(familyKey);
@@ -115,24 +126,26 @@ sk_sp<SkTypeface> SkFontCollection::findTypeface(const std::string& familyName, 
     sk_sp<SkTypeface> match(set->matchStyle(fontStyle));
     if (match) {
       typeface = std::move(match);
-      break;
+      fTypefaces.set(familyKey, typeface);
+      return typeface;
     }
   }
 
-  if (typeface == nullptr && fEnableFontFallback) {
-      typeface.reset(fDefaultFontManager->matchFamilyStyle(fDefaultFamilyName.c_str(), fontStyle));
-      SkDebugf("Using default %s (%d %s) instead of %s (%d %s)\n",
-               fDefaultFamilyName.c_str(),
-               (int)typeface.get()->fontStyle().weight(),
-               typeface.get()->fontStyle().slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic",
-               familyName.c_str(),
-               (int)fontStyle.weight(),
-               fontStyle.slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic");
-      return typeface;
-  }
+  return nullptr;
+}
 
-  fTypefaces.set(familyKey, typeface);
-
+sk_sp<SkTypeface> SkFontCollection::defaultFallback(const std::string& familyName, SkFontStyle fontStyle) {
+  FamilyKey familyKey(familyName, "en", fontStyle);
+  sk_sp<SkTypeface> typeface;
+  typeface.reset(fDefaultFontManager->matchFamilyStyle(fDefaultFamilyName.c_str(), fontStyle));
+  SkDebugf("Instead of %s (%d %s) ",
+           familyName.c_str(),
+           (int)fontStyle.weight(),
+           fontStyle.slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic");
+  SkDebugf("Using default %s (%d %s)\n",
+           fDefaultFamilyName.c_str(),
+           (int)typeface.get()->fontStyle().weight(),
+           typeface.get()->fontStyle().slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic");
   return typeface;
 }
 

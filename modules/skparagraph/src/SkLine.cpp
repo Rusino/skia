@@ -86,6 +86,24 @@ void SkLine::paint(SkCanvas* textCanvas, SkSpan<SkBlock> blocks) {
   textCanvas->restore();
 }
 
+// Scan parts of each style separately
+void SkLine::scanStyles(SkStyleType style, SkSpan<SkBlock> blocks,
+                        std::function<void(SkTextStyle, SkScalar)> apply) {
+
+  if (this->empty()) {
+    return;
+  }
+
+  this->iterateThroughStylesInTextOrder(
+      style, blocks,
+      [this, apply](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+        apply(style, offsetX);
+        return this->iterateThroughRuns(
+            text, offsetX,
+            [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
+      });
+}
+
 SkScalar SkLine::paintText(
     SkCanvas* canvas,
     SkSpan<const char> text,
@@ -525,7 +543,7 @@ SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
 
   // Calculate the clipping rectangle for the text with cluster edges
   SkRect clip = SkRect::MakeXYWH( run->position(start->startPos()).fX - run->position(0).fX,
-                                  run->sizes().diff(sizes()),
+                                  run->sizes().diff(sizes()), // leading/2
                                   run->calculateWidth(start->startPos(), end->endPos()),
                                   run->calculateHeight());
 
