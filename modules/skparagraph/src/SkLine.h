@@ -45,8 +45,7 @@ class SkLine {
         , SkVector advance
         , SkSpan<SkCluster> clusters
         , SkSpan<const char> text
-        , SkRunMetrics sizes
-        , bool ltr)
+        , SkRunMetrics sizes)
       : fText(text)
       , fClusters(clusters)
       , fLogical()
@@ -54,8 +53,7 @@ class SkLine {
       , fAdvance(advance)
       , fOffset(offset)
       , fEllipsis(nullptr)
-      , fSizes(sizes)
-      , fLeftToRight(ltr) { }
+      , fSizes(sizes) { }
 
   inline SkSpan<const char> text() const { return fText; }
   inline SkSpan<SkCluster> clusters() const { return fClusters; }
@@ -69,6 +67,9 @@ class SkLine {
   void setWidth(SkScalar width) { fAdvance.fX = width - (fEllipsis != nullptr ? fEllipsis->fAdvance.fX : 0); }
   SkScalar shift() const { return fShift; }
   void shiftTo(SkScalar shift) { fShift = shift; }
+
+  SkScalar alphabeticBaseline() const { return - fSizes.ascent() + fSizes.leading() / 2;  }
+  SkScalar ideographicBaseline() const { return fSizes.descent() - fSizes.ascent() + fSizes.leading() / 2;  }
 
   SkRect measureTextInsideOneRun(SkSpan<const char> text,
                                  SkRun* run,
@@ -129,7 +130,6 @@ class SkLine {
   SkVector fOffset;   // Text position on the screen
   std::unique_ptr<SkRun> fEllipsis;   // In case the line ends with the ellipsis
   SkRunMetrics fSizes;
-  bool fLeftToRight;
 
   static SkTHashMap<SkFont, SkRun> fEllipsisCache; // All found so far shapes of ellipsis
 };

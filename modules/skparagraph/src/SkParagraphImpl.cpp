@@ -193,7 +193,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
       while (fCurrentChar != fText.end()) {
 
         SkFontStyle currentFontStyle = fCurrentStyle->style().getFontStyle();
-        SkScalar currentFontSize = fCurrentStyle->style().getFontSize();
+        SkScalar currentFontSize = fCurrentStyle->style().getFontSize() * fCurrentStyle->style().getHeight();
 
         const char* current = fCurrentChar;
         SkUnichar u = utf8_next(&fCurrentChar, fText.end());
@@ -304,7 +304,11 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
 
     Buffer runBuffer(const RunInfo& info) override {
 
-      auto& run = fParagraph->fRuns.emplace_back(fParagraph->text(), info, fParagraph->fRuns.count(), fAdvance.fX);
+      auto& run = fParagraph->fRuns.emplace_back(
+          fParagraph->text(),
+          info,
+          fParagraph->fRuns.count(),
+          fAdvance.fX);
       return run.newRunBuffer();
     }
 
@@ -356,6 +360,8 @@ void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
   fHeight = fTextWrapper.height();
   fWidth = maxWidth; //fTextWrapper.width();
   fMinIntrinsicWidth = fTextWrapper.intrinsicWidth();
+  fAlphabeticBaseline = fLines.empty() ? 0 : fLines.front().alphabeticBaseline();
+  fIdeographicBaseline = fLines.empty() ? 0 : fLines.front().ideographicBaseline();
 }
 
 void SkParagraphImpl::formatLinesByWords(SkScalar maxWidth) {
@@ -420,8 +426,7 @@ SkLine& SkParagraphImpl::addLine (SkVector offset, SkVector advance, SkSpan<cons
        advance,
        SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
        text,
-       sizes,
-       true);
+       sizes);
 }
 
 // Returns a vector of bounding boxes that enclose all text between

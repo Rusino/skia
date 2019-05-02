@@ -27,7 +27,7 @@ struct SkParagraphStyle {
 
   bool operator==(const SkParagraphStyle& rhs) const {
 
-    return this->fLineHeight == rhs.fLineHeight &&
+    return this->fHeight == rhs.fHeight &&
         this->fEllipsis == rhs.fEllipsis &&
         this->fTextDirection == rhs.fTextDirection &&
         this->fTextAlign == rhs.fTextAlign &&
@@ -51,7 +51,8 @@ struct SkParagraphStyle {
   }
   void setMaxLines(size_t maxLines) { fLinesLimit = maxLines; }
   void setEllipsis(const std::u16string& ellipsis);
-  void setLineHeight(SkScalar lineHeight) { fLineHeight = lineHeight; }
+  void setHeight(SkScalar height) { fHeight = height; }
+  SkScalar getHeight() const { return fHeight; }
 
   inline bool unlimited_lines() const { return fLinesLimit == std::numeric_limits<size_t>::max(); }
   inline bool ellipsized() const { return !fEllipsis.empty(); }
@@ -67,6 +68,6 @@ struct SkParagraphStyle {
   SkTextDirection fTextDirection;
   size_t fLinesLimit;
   std::string fEllipsis;
-  SkScalar fLineHeight;
+  SkScalar fHeight;
   bool fHintingIsOn;
 };

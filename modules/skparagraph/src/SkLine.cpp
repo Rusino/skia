@@ -42,7 +42,6 @@ SkLine::SkLine(const SkLine& other) {
   this->fEllipsis.reset(other.fEllipsis == nullptr ? nullptr : new SkRun(*other.fEllipsis));
   this->fSizes = other.sizes();
   this->fClusters = other.fClusters;
-  this->fLeftToRight = other.fLeftToRight;
 }
 
 // Paint parts of each style separately
@@ -553,7 +552,7 @@ SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
 
   // Calculate the clipping rectangle for the text with cluster edges
   SkRect clip = SkRect::MakeXYWH( run->position(start->startPos()).fX - run->position(0).fX,
-                                  run->sizes().diff(sizes()), // leading/2
+                                  run->sizes().diff(sizes()),
                                   run->calculateWidth(start->startPos(), end->endPos()),
                                   run->calculateHeight());
 

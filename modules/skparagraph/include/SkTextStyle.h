@@ -126,8 +126,8 @@ class SkTextStyle {
   inline std::vector<std::string> getFontFamilies() const { return fFontFamilies; }
   inline void setFontFamilies(const std::vector<std::string> families) { fFontFamilies = families; }
 
-  inline void setHeight(SkScalar height) { fFontHeight = height; }
-  inline SkScalar getHeight() const { return fFontHeight; }
+  inline void setHeight(SkScalar height) { fHeight = height; }
+  inline SkScalar getHeight() const { return fHeight; }
 
   inline void setLetterSpacing(SkScalar letterSpacing) {
     fLetterSpacing = letterSpacing;
@@ -160,7 +160,7 @@ class SkTextStyle {
   //std::string fFontFamily;
   SkScalar fFontSize;
 
-  SkScalar fFontHeight;
+  SkScalar fHeight;
   std::string fLocale;
   SkScalar fLetterSpacing;
   SkScalar fWordSpacing;

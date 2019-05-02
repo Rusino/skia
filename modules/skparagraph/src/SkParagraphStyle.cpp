@@ -22,7 +22,7 @@ SkParagraphStyle::SkParagraphStyle() {
     fTextDirection = SkTextDirection::ltr;
     fLinesLimit = std::numeric_limits<size_t>::max();
     //_ellipsis = u"\u2026";
-    fLineHeight = 1;
+    fHeight = 1;
     fHintingIsOn = true;
 }
 

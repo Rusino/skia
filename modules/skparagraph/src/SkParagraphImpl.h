@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <vector>
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
 #include "SkLine.h"

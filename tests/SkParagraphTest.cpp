@@ -1041,22 +1041,23 @@ DEF_TEST(SkParagraph_DecorationsParagraph, reporter) {
           REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
           REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 2.0);
           break;
-        case 1:
+        case 1: // The style appears on 2 lines so it has 2 pieces
+        case 2:
           REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kDouble);
           REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLUE);
           REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 1.0);
           break;
-        case 2:
+        case 3:
           REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kDotted);
           REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
           REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 1.0);
           break;
-        case 3:
+        case 4:
           REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kDashed);
           REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
           REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 3.0);
           break;
-        case 4:
+        case 5:
           REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kWavy);
           REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorRED);
           REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 1.0);
@@ -1532,4 +1533,63 @@ DEF_TEST(SkParagraph_FontFallbackParagraph, reporter) {
   REPORTER_ASSERT(reporter, impl->runs()[3].sizes().descent() != impl->runs()[5].sizes().descent());
   REPORTER_ASSERT(reporter, impl->runs()[1].sizes().ascent() != impl->runs()[5].sizes().ascent());
   REPORTER_ASSERT(reporter, impl->runs()[1].sizes().descent() != impl->runs()[5].sizes().descent());
+}
+
+DEF_TEST(SkParagraph_BaselineParagraph, reporter) {
+  sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
+  sk_sp<TestFontProvider> testFontProvider =
+      sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
+          "fonts/SourceHanSerifCN-Regular.otf"));
+  fontCollection->setTestFontManager(testFontProvider);
+
+  const char* text =
+      "左線読設Byg後碁給能上目秘使約。満毎冠行来昼本可必図将発確年。今属場育"
+      "図情闘陰野高備込制詩西校客。審対江置講今固残必託地集済決維駆年策。立得";
+
+  SkParagraphStyle paragraph_style;
+  paragraph_style.turnHintingOff();
+  paragraph_style.setMaxLines(14);
+  paragraph_style.setTextAlign(SkTextAlign::justify);
+  paragraph_style.setHeight(1.5);
+  SkParagraphBuilder builder(paragraph_style, fontCollection);
+
+  SkTextStyle text_style;
+  text_style.setFontFamilies({ "Source Han Serif CN" });
+  text_style.setColor(SK_ColorBLACK);
+  text_style.setFontSize(55);
+  text_style.setLetterSpacing(2);
+  text_style.setDecorationStyle(SkTextDecorationStyle::kSolid);
+  text_style.setDecorationColor(SK_ColorBLACK);
+  builder.pushStyle(text_style);
+  builder.addText(text);
+  builder.pop();
+
+  auto paragraph = builder.Build();
+  paragraph->layout(TestCanvasWidth - 100);
+
+  //auto impl = static_cast<SkParagraphImpl*>(paragraph.get());
+
+  SkScalar epsilon = 0.01;
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(paragraph->getIdeographicBaseline(), 79.035000801086426, epsilon));
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(paragraph->getAlphabeticBaseline(), 63.305000305175781, epsilon));
+}
+
+DEF_TEST(SkParagraph_2, reporter) {
+  sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
+  sk_sp<TestFontProvider> testFontProvider =
+      sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
+          "fonts/Roboto-Medium.ttf"));
+  fontCollection->setTestFontManager(testFontProvider);
+
+  REPORTER_ASSERT(reporter, true);
+}
+
+DEF_TEST(SkParagraph_3, reporter) {
+  sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
+  sk_sp<TestFontProvider> testFontProvider =
+      sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
+          "fonts/Roboto-Medium.ttf"));
+  fontCollection->setTestFontManager(testFontProvider);
+
+  REPORTER_ASSERT(reporter, true);
 }

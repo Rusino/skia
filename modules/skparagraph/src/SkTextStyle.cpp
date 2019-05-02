@@ -36,7 +36,7 @@ SkTextStyle::SkTextStyle()
     fFontSize = 14.0;
     fLetterSpacing = 0.0;
     fWordSpacing = 0.0;
-    fFontHeight = 1.0;
+    fHeight = 1.0;
     fHasBackground = false;
     fHasForeground = false;
 }
@@ -71,7 +71,7 @@ bool SkTextStyle::equals(const SkTextStyle& other) const {
     if (fWordSpacing != other.fWordSpacing) {
         return false;
     }
-    if (fFontHeight != other.fFontHeight) {
+    if (fHeight != other.fHeight) {
         return false;
     }
     if (fFontSize != other.fFontSize) {
