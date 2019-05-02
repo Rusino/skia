@@ -64,7 +64,7 @@ class SkLine {
   inline SkRunMetrics sizes() const { return fSizes; }
   inline bool empty() const { return fText.empty(); }
   void reorderVisualRuns();
-  SkScalar height() const { return fAdvance.fX; }
+  SkScalar height() const { return fAdvance.fY; }
   SkScalar width() const { return fAdvance.fX + (fEllipsis != nullptr ? fEllipsis->fAdvance.fX : 0); }
   void setWidth(SkScalar width) { fAdvance.fX = width - (fEllipsis != nullptr ? fEllipsis->fAdvance.fX : 0); }
   SkScalar shift() const { return fShift; }
@@ -90,7 +90,7 @@ class SkLine {
   SkScalar iterateThroughRuns(
       SkSpan<const char> text,
       SkScalar offsetX,
-      std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const;
+      std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const;
 
   void iterateThroughClustersInGlyphsOrder(
       bool reverse, std::function<bool(const SkCluster* cluster)> apply) const;
@@ -111,6 +111,7 @@ class SkLine {
 
   void scanStyles(SkStyleType style, SkSpan<SkBlock> blocks,
                   std::function<void(SkTextStyle, SkScalar)> apply);
+  void scanRuns(std::function<void(SkRun*, int32_t, size_t, SkRect)> apply);
 
  private:
 

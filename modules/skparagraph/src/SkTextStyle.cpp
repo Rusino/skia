@@ -74,11 +74,17 @@ bool SkTextStyle::equals(const SkTextStyle& other) const {
     if (fFontHeight != other.fFontHeight) {
         return false;
     }
+    if (fFontSize != other.fFontSize) {
+        return false;
+    }
     if (fLocale != other.fLocale) {
         return false;
     }
-    if (fForeground != other.fForeground) {
+    if (fHasForeground != other.fHasForeground || fForeground != other.fForeground) {
         return false;
+    }
+    if (fHasBackground != other.fHasBackground || fBackground != other.fBackground) {
+      return false;
     }
     if (fTextShadows.size() != other.fTextShadows.size()) {
         return false;

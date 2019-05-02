@@ -188,9 +188,12 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
     void resolveFonts() {
       fResolvedFont.reset();
 
-      sk_sp<SkTypeface> prevTypeface = nullptr;
+      sk_sp<SkTypeface> prevTypeface;
       SkScalar prevFontSize = 0;
       while (fCurrentChar != fText.end()) {
+
+        SkFontStyle currentFontStyle = fCurrentStyle->style().getFontStyle();
+        SkScalar currentFontSize = fCurrentStyle->style().getFontSize();
 
         const char* current = fCurrentChar;
         SkUnichar u = utf8_next(&fCurrentChar, fText.end());
@@ -198,25 +201,36 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
         // Find the first typeface from the collection that exists in the current text style
         sk_sp<SkTypeface> typeface = nullptr;
         for (auto& fontFamily : fCurrentStyle->style().getFontFamilies()) {
-          typeface = fFontCollection->matchTypeface(fontFamily, fCurrentStyle->style().getFontStyle());
-          if (existsInFont(typeface, u)) {
-            if (!SkTypeface::Equal(typeface.get(), prevTypeface.get()) ||
-                prevFontSize != fCurrentStyle->style().getFontSize()) {
-              fResolvedFont.set(current, makeFont(typeface, fCurrentStyle->style().getFontSize()));
+          typeface = fFontCollection->matchTypeface(fontFamily, currentFontStyle);
+          if (typeface.get() != nullptr && existsInFont(typeface, u)) {
+            if (!SkTypeface::Equal(typeface.get(), prevTypeface.get()) || prevFontSize != currentFontSize) {
+              fResolvedFont.set(current, makeFont(typeface, currentFontSize));
               prevTypeface = typeface;
-              prevFontSize = fCurrentStyle->style().getFontSize();
+              prevFontSize = currentFontSize;
             }
             break;
           }
         }
-        if (prevTypeface == nullptr) {
-          prevTypeface = fFontCollection->defaultFallback("", fCurrentStyle->style().getFontStyle());
-          fResolvedFont.set(current, makeFont(prevTypeface, fCurrentStyle->style().getFontSize()));
-          prevFontSize = fCurrentStyle->style().getFontSize();
+        if (prevTypeface.get() == nullptr) {
+          // We didn't find anything
+          SkTypeface* candidate = fFontCollection->geFallbackManager()->matchFamilyStyleCharacter(
+                  nullptr, currentFontStyle, nullptr, 0, u);
+          if (candidate) {
+            // We found a font with this character
+            prevTypeface.reset(candidate);
+          } else if (typeface != nullptr && typeface.get() != nullptr) {
+            // We cannot resolve the character we may as well continue with the current font
+            prevTypeface = typeface;
+          } else {
+            // Anything...
+            prevTypeface = SkTypeface::MakeDefault();
+          }
+          fResolvedFont.set(current, makeFont(prevTypeface, currentFontSize));
+          prevFontSize = currentFontSize;
         }
 
         // Find the text style that contains the next character
-        while (fCurrentStyle != fStyles.end() && fCurrentStyle->text().end() < fCurrentChar) {
+        while (fCurrentStyle != fStyles.end() && fCurrentStyle->text().end() <= fCurrentChar) {
           ++fCurrentStyle;
         }
       }
@@ -253,7 +267,6 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
         font.setHinting(SkFontHinting::kSlight);
         font.setSubpixel(true);
       }
-
       return font;
     }
 
@@ -423,7 +436,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
   size_t index = 0;
   for (auto& line : fLines) {
 
-    if (index > end) {
+    if (index >= end) {
       break;
     }
 
@@ -436,6 +449,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
       (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
         if (index + size <= start) {
           // Keep going
+          index += size;
           return true;
         } else if (index >= end) {
           // Done with the range
@@ -444,14 +458,13 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
 
         // Correct the clip in case it does not
         if (start > index) {
-          clip.fLeft += run->position(start - index).fX - run->position(pos).fX;
+          clip.fLeft += run->position(start).fX - run->position(pos).fX;
         }
         if (end < index + size) {
-          clip.fRight -= run->position(pos + size).fX - run->position(end - index).fX;
+          clip.fRight -= run->position(pos + size).fX - run->position(end).fX;
         }
 
         clip.offset(line.offset());
-        clip.offset(-shift, 0);
         results.emplace_back(clip, run->leftToRight() ? SkTextDirection::ltr : SkTextDirection::rtl);
         maxClip.join(clip);
         index += size;

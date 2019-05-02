@@ -37,6 +37,8 @@ class SkFontCollection : public SkRefCnt {
     void setTestFontManager(sk_sp<SkFontMgr> fontManager);
     void setDefaultFontManager(sk_sp<SkFontMgr> fontManager, const std::string& defaultFamilyName);
 
+  sk_sp<SkFontMgr> geFallbackManager() const { return fDefaultFontManager; }
+
     sk_sp<SkTypeface> findTypeface(const std::string& familyName, SkFontStyle fontStyle);
     sk_sp<SkTypeface> matchTypeface(const std::string& familyName, SkFontStyle fontStyle);
     sk_sp<SkTypeface> defaultFallback(const std::string& familyName, SkFontStyle fontStyle);

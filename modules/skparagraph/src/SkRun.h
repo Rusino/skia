@@ -178,14 +178,7 @@ class SkRun {
 
   inline SkSpan<const char> text() const { return fText; }
   inline size_t clusterIndex(size_t pos) const { return fClusterIndexes[pos]; }
-  inline SkPoint position(size_t pos) const {
-    if (pos < size()) {
-      return fPositions[pos];
-    }
-    return SkVector::Make(
-        fAdvance.fX - (fPositions[size() - 1].fX - fPositions[0].fX),
-        fAdvance.fY);
-  }
+  inline SkPoint position(size_t pos) const { return fPositions[pos]; }
   inline SkSpan<SkCluster> clusters() const { return fClusters; }
   inline void setClusters(SkSpan<SkCluster> clusters) { fClusters = clusters; }
   SkRect clip() const {

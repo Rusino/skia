@@ -1452,52 +1452,68 @@ class ParagraphView7 : public Sample {
 
     canvas->drawColor(SK_ColorWHITE);
     canvas->translate(20, 20);
-
     fontCollection = sk_make_sp<SkFontCollection>();
-    testFontProvider =
-        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
-            "fonts/Roboto-Medium.ttf"));
-    fontCollection->setTestFontManager(testFontProvider);
+    sk_sp<TestFontProvider> testFontProvider1 =
+        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/NotoSansCJK-Regular.ttc"));
+    fontCollection->setTestFontManager(testFontProvider1);
+    sk_sp<TestFontProvider> testFontProvider2 =
+        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/SourceHanSerifCN-Regular.otf"));
+    fontCollection->setDynamicFontManager(testFontProvider1);
 
-    const char* text =
-        "This is a very long sentence to test if the text will properly wrap "
-        "around and go to the next line. Sometimes, short sentence. Longer "
-        "sentences are okay too because they are nessecary. Very short. "
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
-        "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
-        "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
-        "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
-        "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
-        "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
-        "mollit anim id est laborum. "
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod "
-        "tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim "
-        "veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea "
-        "commodo consequat. Duis aute irure dolor in reprehenderit in voluptate "
-        "velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint "
-        "occaecat cupidatat non proident, sunt in culpa qui officia deserunt "
-        "mollit anim id est laborum.";
+    const char* text1 = "Roboto 字典 ";
+    const char* text2 = "Homemade Apple 字典";
+    const char* text3 = "Chinese 字典";
 
     SkParagraphStyle paragraph_style;
-    paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
     SkTextStyle text_style;
-    text_style.setFontFamilies(std::vector<std::string>(1, "Roboto"));
-    text_style.setFontSize(26);
-    text_style.setLetterSpacing(1);
-    text_style.setWordSpacing(5);
+    text_style.setFontFamilies({
+                                   "Not a real font",
+                                   "Also a fake font",
+                                   "So fake it is obvious",
+                                   "Next one should be a real font...",
+                                   "Roboto",
+                                   "another fake one in between",
+                                   "Homemade Apple"
+                               });
     text_style.setColor(SK_ColorBLACK);
-    text_style.setHeight(1);
-    text_style.setDecoration(SkTextDecoration::kUnderline);
-    text_style.setDecorationColor(SK_ColorBLACK);
     builder.pushStyle(text_style);
-    builder.addText(text);
+    builder.addText(text1);
+
+    text_style.setFontFamilies({
+                                   "Not a real font",
+                                   "Also a fake font",
+                                   "So fake it is obvious",
+                                   "Homemade Apple",
+                                   "Next one should be a real font...",
+                                   "Roboto",
+                                   "another fake one in between",
+                                   "Noto Sans CJK JP",
+                                   "Source Han Serif CN"
+                               });
+    builder.pushStyle(text_style);
+    builder.addText(text2);
+
+    text_style.setFontFamilies({
+                                   "Not a real font",
+                                   "Also a fake font",
+                                   "So fake it is obvious",
+                                   "Homemade Apple",
+                                   "Next one should be a real font...",
+                                   "Roboto",
+                                   "another fake one in between",
+                                   "Source Han Serif CN",
+                                   "Noto Sans CJK JP"
+                               });
+    builder.pushStyle(text_style);
+    builder.addText(text3);
+
     builder.pop();
 
     auto paragraph = builder.Build();
-    paragraph->layout(1000 - 100);
+    paragraph->layout(1000);
     paragraph->paint(canvas, 0, 0);
   }
  private:

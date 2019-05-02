@@ -104,6 +104,16 @@ void SkLine::scanStyles(SkStyleType style, SkSpan<SkBlock> blocks,
       });
 }
 
+void SkLine::scanRuns(std::function<void(SkRun*, int32_t, size_t, SkRect)> apply) {
+
+  this->iterateThroughRuns(
+      fText, 0,
+      [apply](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar, bool) {
+        apply(run, pos, size, clip);
+        return true;
+      });
+}
+
 SkScalar SkLine::paintText(
     SkCanvas* canvas,
     SkSpan<const char> text,
@@ -383,7 +393,7 @@ void SkLine::justify(SkScalar maxWidth) {
 
   if (words == 0) {
     this->fShift = 0;
-    this->fAdvance.fX = maxWidth;
+    //this->fAdvance.fX = maxWidth;
     return;
   }
 
@@ -498,7 +508,7 @@ SkRun* SkLine::shapeEllipsis(const std::string& ellipsis, SkRun* run) {
                 true,
                 std::numeric_limits<SkScalar>::max(),
                 &handler);
-
+  handler.run()->fText = SkSpan<const char>(ellipsis.data(), ellipsis.size());
   return handler.run();
 }
 
@@ -590,7 +600,7 @@ void SkLine::iterateThroughClustersInGlyphsOrder(
 SkScalar SkLine::iterateThroughRuns(
     SkSpan<const char> text,
     SkScalar runOffset,
-    std::function<void(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const {
+    std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const {
 
   if (text.empty()) {
     return 0;
@@ -619,7 +629,9 @@ SkScalar SkLine::iterateThroughRuns(
     } else if (run == fLogical.back() && this->ellipsis() != nullptr) {
       clippingNeeded = true; // To avoid trouble
     }
-    apply(run, pos, size, clip, shift - run->position(0).fX, clippingNeeded);
+    if (!apply(run, pos, size, clip, shift - run->position(0).fX, clippingNeeded)) {
+      return width;
+    }
 
     width += clip.width();
     runOffset += clip.width();
@@ -627,7 +639,9 @@ SkScalar SkLine::iterateThroughRuns(
 
   if (this->ellipsis() != nullptr) {
     auto ellipsis = this->ellipsis();
-    apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft, false);
+    if (!apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft, false)) {
+      return width;
+    }
     width += ellipsis->clip().width();
   }
 
