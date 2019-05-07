@@ -18,6 +18,7 @@
 
 #include <string>
 #include <vector>
+#include <SkFontMetrics.h>
 
 #include "SkFontStyle.h"
 #include "SkTextShadow.h"
@@ -44,7 +45,9 @@ enum SkStyleType {
   Foreground,
   Background,
   Shadow,
-  Decorations
+  Decorations,
+  LetterSpacing,
+  WordSpacing
 };
 
 class SkTextStyle {
@@ -116,6 +119,8 @@ class SkTextStyle {
   void getFontMetrics(SkFontMetrics* metrics) const {
     SkFont font(fTypeface, fFontSize);
     font.getMetrics(metrics);
+    metrics->fAscent = (metrics->fAscent - metrics->fLeading / 2) * (fHeight == 0 ? 1 : fHeight);
+    metrics->fDescent = (metrics->fDescent + metrics->fLeading / 2) * (fHeight == 0 ? 1 : fHeight);
   }
 
   inline SkScalar getFontSize() const { return fFontSize; }

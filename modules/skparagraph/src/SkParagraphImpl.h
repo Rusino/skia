@@ -148,14 +148,14 @@ class SkParagraphImpl final: public SkParagraph {
         && fLines.size() > fParagraphStyle.getMaxLines();
   }
 
-  SkLine& addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkRunMetrics sizes);
+  SkLine& addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkLineMetrics sizes);
 
   inline SkSpan<const char> text() const { return fUtf8; }
   inline SkSpan<SkRun> runs() { return SkSpan<SkRun>(fRuns.data(), fRuns.size()); }
   inline SkSpan<SkBlock> styles() { return SkSpan<SkBlock>(fTextStyles.data(), fTextStyles.size()); }
   inline SkSpan<SkLine> lines() { return SkSpan<SkLine>(fLines.data(), fLines.size()); }
   inline SkParagraphStyle paragraphStyle() { return fParagraphStyle; }
-  void formatLinesByWords(SkScalar maxWidth);
+  void formatLines(SkScalar maxWidth);
 
  private:
 

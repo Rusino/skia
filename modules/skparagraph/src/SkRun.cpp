@@ -9,9 +9,10 @@
 #include "SkRun.h"
 #include "SkSpan.h"
 
-SkRun::SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info, size_t index, SkScalar offsetX) {
+SkRun::SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info, SkScalar lineHeight, size_t index, SkScalar offsetX) {
 
   fFont = info.fFont;
+  fLineHeight = lineHeight;
   fBidiLevel = info.fBidiLevel;
   fAdvance = info.fAdvance;
   glyphCount = info.glyphCount;
@@ -26,13 +27,13 @@ SkRun::SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info,
   fClusterIndexes.push_back_n(info.glyphCount + 1);
   info.fFont.getMetrics(&fFontMetrics);
   fJustified = false;
+  fSpaced = false;
   // To make edge cases easier:
   fPositions[info.glyphCount] = fOffset + fAdvance;
   fClusterIndexes[info.glyphCount] = info.utf8Range.end();
 }
 
 SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
-
     return {
         fGlyphs.data(),
         fPositions.data(),
@@ -42,20 +43,14 @@ SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
     };
 }
 
-SkScalar SkRun::calculateHeight() const {
-  // The height of the run, not the height of the entire text (fInfo)
-  return fFontMetrics.fDescent - fFontMetrics.fAscent + fFontMetrics.fLeading;
-}
-
 SkScalar SkRun::calculateWidth(size_t start, size_t end) const {
 
   SkASSERT(start <= end);
   SkScalar offset = 0;
-  if (fJustified && end > start) {
+  if ((fJustified || fSpaced) && end > start) {
     offset = fOffsets[end - 1] - fOffsets[start];
   }
- return fPositions[end].fX - fPositions[start].fX + offset;
-
+  return fPositions[end].fX - fPositions[start].fX + offset;
 }
 
 void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const {
@@ -66,10 +61,10 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
                     fGlyphs.data() + pos,
                     size * sizeof(SkGlyphID));
 
-  if (fJustified || offset.fX != 0 || offset.fY != 0) {
+  if (fJustified || fSpaced || offset.fX != 0 || offset.fY != 0) {
     for (size_t i = 0; i < size; ++i) {
       auto point = fPositions[i + pos];
-      if (fJustified) {
+      if (fJustified || fSpaced) {
         point.fX += fOffsets[i + pos];
       }
       blobBuffer.points()[i] = point + offset;
@@ -98,7 +93,10 @@ std::tuple<bool, SkCluster*, SkCluster*> SkRun::findClusters(SkSpan<const char> 
     std::swap(start, end);
   }
 
-  return std::make_tuple(start != nullptr && end != nullptr, start, end);
+  if (start == nullptr || end == nullptr) {
+    return std::make_tuple(false, start, end);
+  }
+  return std::make_tuple(true, start, end);
 }
 
 void SkRun::iterateThroughClustersInTextOrder(std::function<void(

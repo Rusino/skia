@@ -1448,73 +1448,66 @@ class ParagraphView7 : public Sample {
     return this->INHERITED::onQuery(evt);
   }
 
-  void onDrawContent(SkCanvas* canvas) override {
+  void drawText(SkCanvas* canvas, SkColor background, SkScalar letterSpace, SkScalar w, SkScalar h) {
 
-    canvas->drawColor(SK_ColorWHITE);
-    canvas->translate(20, 20);
+    SkAutoCanvasRestore acr(canvas, true);
+    canvas->clipRect(SkRect::MakeWH(w, h));
+    canvas->drawColor(background);
+
     fontCollection = sk_make_sp<SkFontCollection>();
-    sk_sp<TestFontProvider> testFontProvider1 =
-        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/NotoSansCJK-Regular.ttc"));
-    fontCollection->setTestFontManager(testFontProvider1);
-    sk_sp<TestFontProvider> testFontProvider2 =
-        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/SourceHanSerifCN-Regular.otf"));
-    fontCollection->setDynamicFontManager(testFontProvider1);
+    const char* line = "World domination is such an ugly phrase - I prefer to call it world optimisation";
 
-    const char* text1 = "Roboto 字典 ";
-    const char* text2 = "Homemade Apple 字典";
-    const char* text3 = "Chinese 字典";
+    SkParagraphStyle paragraphStyle;
+    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setMaxLines(10);
+    paragraphStyle.turnHintingOff();
+    SkTextStyle textStyle;
+    textStyle.setFontFamily("Roboto");
+    textStyle.setFontSize(30);
+    textStyle.setLetterSpacing(letterSpace);
+    textStyle.setColor(SK_ColorBLACK);
+    textStyle.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
 
-    SkParagraphStyle paragraph_style;
-    paragraph_style.turnHintingOff();
-    SkParagraphBuilder builder(paragraph_style, fontCollection);
-
-    SkTextStyle text_style;
-    text_style.setFontFamilies({
-                                   "Not a real font",
-                                   "Also a fake font",
-                                   "So fake it is obvious",
-                                   "Next one should be a real font...",
-                                   "Roboto",
-                                   "another fake one in between",
-                                   "Homemade Apple"
-                               });
-    text_style.setColor(SK_ColorBLACK);
-    builder.pushStyle(text_style);
-    builder.addText(text1);
-
-    text_style.setFontFamilies({
-                                   "Not a real font",
-                                   "Also a fake font",
-                                   "So fake it is obvious",
-                                   "Homemade Apple",
-                                   "Next one should be a real font...",
-                                   "Roboto",
-                                   "another fake one in between",
-                                   "Noto Sans CJK JP",
-                                   "Source Han Serif CN"
-                               });
-    builder.pushStyle(text_style);
-    builder.addText(text2);
-
-    text_style.setFontFamilies({
-                                   "Not a real font",
-                                   "Also a fake font",
-                                   "So fake it is obvious",
-                                   "Homemade Apple",
-                                   "Next one should be a real font...",
-                                   "Roboto",
-                                   "another fake one in between",
-                                   "Source Han Serif CN",
-                                   "Noto Sans CJK JP"
-                               });
-    builder.pushStyle(text_style);
-    builder.addText(text3);
-
+    SkParagraphBuilder builder(paragraphStyle, fontCollection);
+    builder.pushStyle(textStyle);
+    builder.addText(line);
     builder.pop();
 
     auto paragraph = builder.Build();
-    paragraph->layout(1000);
-    paragraph->paint(canvas, 0, 0);
+    paragraph->layout(w - 20);
+    paragraph->paint(canvas, 10, 10);
+  }
+
+  void onDrawContent(SkCanvas* canvas) override {
+
+    canvas->drawColor(SK_ColorWHITE);
+
+    auto h = this->height() / 4;
+    auto w = this->width() / 2;
+
+    drawText(canvas, SK_ColorGRAY, 1, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorLTGRAY, 2, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorCYAN, 3, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorGRAY, 4, w, h);
+    canvas->translate(w, - 3 *h);
+
+    drawText(canvas, SK_ColorYELLOW, 5, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorGREEN, 10, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorRED, 15, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorBLUE, 20, w, h);
+    canvas->translate(0, h);
   }
  private:
   typedef Sample INHERITED;

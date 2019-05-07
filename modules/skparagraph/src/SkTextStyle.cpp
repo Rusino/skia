@@ -102,20 +102,20 @@ bool SkTextStyle::equals(const SkTextStyle& other) const {
 bool SkTextStyle::matchOneAttribute(SkStyleType styleType, const SkTextStyle& other) const {
 
   switch (styleType) {
-      case Foreground:
-          if (fHasForeground) {
-              return other.fHasForeground && fForeground == other.fForeground;
-          } else {
-            return !other.fHasForeground && fColor == other.fColor;
-          }
+    case Foreground:
+      if (fHasForeground) {
+          return other.fHasForeground && fForeground == other.fForeground;
+      } else {
+        return !other.fHasForeground && fColor == other.fColor;
+      }
 
-      case Background:
-        return (fHasBackground == other.fHasBackground && fBackground == other.fBackground);
+    case Background:
+      return (fHasBackground == other.fHasBackground && fBackground == other.fBackground);
 
-      case Shadow:
-          if (fTextShadows.size() != other.fTextShadows.size()) {
-              return false;
-          }
+    case Shadow:
+      if (fTextShadows.size() != other.fTextShadows.size()) {
+          return false;
+      }
 
       for (int32_t i = 0; i < SkToInt(fTextShadows.size()); ++i) {
           if (fTextShadows[i] != other.fTextShadows[i]) {
@@ -124,14 +124,20 @@ bool SkTextStyle::matchOneAttribute(SkStyleType styleType, const SkTextStyle& ot
       }
       return true;
 
-      case Decorations:
-          return fDecoration == other.fDecoration &&
-              fDecorationColor == other.fDecorationColor &&
-              fDecorationStyle == other.fDecorationStyle &&
-              fDecorationThicknessMultiplier == other.fDecorationThicknessMultiplier;
+    case Decorations:
+      return fDecoration == other.fDecoration &&
+          fDecorationColor == other.fDecorationColor &&
+          fDecorationStyle == other.fDecorationStyle &&
+          fDecorationThicknessMultiplier == other.fDecorationThicknessMultiplier;
 
-      default:
-          SkASSERT(false);
-      return false;
+    case LetterSpacing:
+      return fLetterSpacing == other.fLetterSpacing;
+
+    case WordSpacing:
+      return fWordSpacing == other.fWordSpacing;
+
+    default:
+        SkASSERT(false);
+    return false;
   }
 }

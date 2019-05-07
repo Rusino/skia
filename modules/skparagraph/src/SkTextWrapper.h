@@ -30,27 +30,36 @@ class SkTextWrapper {
       clean(start);
     }
     inline SkScalar width() const { return fWidth + fWhitespaces.fX; }
-    inline SkScalar trimmedWidth() const { return fWidth; }
+    SkScalar trimmedWidth() const {
+      return fWidth - fEnd->lastSpacing();
+    }
     inline SkScalar height() const { return fSizes.height(); }
     inline const SkCluster* trimmed() const { return fTrimmedEnd; }
     inline const SkCluster* end() const { return fEnd; }
-    inline SkRunMetrics sizes() const { return fSizes; }
+    inline SkLineMetrics sizes() const { return fSizes; }
 
     void clean(const SkCluster* start) {
+      if (fEnd != start) {
+        fSizes.clean();
+      }
       fEnd = start;
       fTrimmedEnd = start;
       fWidth = 0;
       fWhitespaces = SkVector::Make(0, 0);
-      fSizes.clean();
     }
 
     SkScalar moveTo(Position& other) {
 
       auto result = other.fWidth;
-      this->fWidth += this->fWhitespaces.fX + other.fWidth;
-      this->fTrimmedEnd = other.fTrimmedEnd;
-      this->fEnd = other.fEnd;
-      this->fWhitespaces = other.fWhitespaces;
+      if (other.fWidth > 0) {
+        this->fWidth += this->fWhitespaces.fX + other.fWidth;
+        this->fTrimmedEnd = other.fTrimmedEnd;
+        this->fEnd = other.fEnd;
+        this->fWhitespaces = other.fWhitespaces;
+      } else {
+        fWhitespaces.fX += other.fWhitespaces.fX;
+        fWhitespaces.fY = SkTMax(fWhitespaces.fY, other.fWhitespaces.fY);
+      }
       this->fSizes.add(other.fSizes);
       other.clean(other.fEnd);
 
@@ -63,10 +72,10 @@ class SkTextWrapper {
         fWhitespaces.fY = SkTMax(fWhitespaces.fY, cluster.run()->calculateHeight());
       } else {
         fTrimmedEnd = &cluster;
-        fWidth += cluster.width() + fWhitespaces.fX;
+        fWidth += fWhitespaces.fX + cluster.width();
         fWhitespaces = SkVector::Make(0, 0);
       }
-      fSizes.add(cluster.run()->ascent(), cluster.run()->descent(), cluster.run()->leading());
+      fSizes.add(cluster.run());
       fEnd = &cluster;
     }
 
@@ -81,7 +90,7 @@ class SkTextWrapper {
 
    private:
     SkScalar fWidth;
-    SkRunMetrics fSizes;
+    SkLineMetrics fSizes;
     SkVector fWhitespaces;
     const SkCluster* fEnd;
     const SkCluster* fTrimmedEnd;

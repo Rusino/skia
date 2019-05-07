@@ -45,7 +45,7 @@ class SkLine {
         , SkVector advance
         , SkSpan<SkCluster> clusters
         , SkSpan<const char> text
-        , SkRunMetrics sizes)
+        , SkLineMetrics sizes)
       : fText(text)
       , fClusters(clusters)
       , fLogical()
@@ -59,7 +59,7 @@ class SkLine {
   inline SkSpan<SkCluster> clusters() const { return fClusters; }
   inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
   inline SkRun* ellipsis() const { return fEllipsis.get(); }
-  inline SkRunMetrics sizes() const { return fSizes; }
+  inline SkLineMetrics sizes() const { return fSizes; }
   inline bool empty() const { return fText.empty(); }
   void reorderVisualRuns();
   SkScalar height() const { return fAdvance.fY; }
@@ -68,8 +68,9 @@ class SkLine {
   SkScalar shift() const { return fShift; }
   void shiftTo(SkScalar shift) { fShift = shift; }
 
-  SkScalar alphabeticBaseline() const { return - fSizes.ascent() + fSizes.leading() / 2;  }
-  SkScalar ideographicBaseline() const { return fSizes.descent() - fSizes.ascent() + fSizes.leading() / 2;  }
+  SkScalar alphabeticBaseline() const { return fSizes.alphabeticBaseline(); }
+  SkScalar ideographicBaseline() const { return fSizes.ideographicBaseline(); }
+  SkScalar baseline() const { return fSizes.baseline(); }
 
   SkRect measureTextInsideOneRun(SkSpan<const char> text,
                                  SkRun* run,
@@ -83,6 +84,7 @@ class SkLine {
   void iterateThroughStylesInTextOrder(
       SkStyleType styleType,
       SkSpan<SkBlock> blocks,
+      bool checkOffsets,
       std::function<SkScalar(
           SkSpan<const char> text,
           const SkTextStyle& style,
@@ -96,6 +98,7 @@ class SkLine {
   void iterateThroughClustersInGlyphsOrder(
       bool reverse, std::function<bool(const SkCluster* cluster)> apply) const;
 
+  void format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool last);
   void paint(SkCanvas* canvas, SkSpan<SkBlock> blocks);
   SkScalar paintText(
       SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
@@ -105,6 +108,8 @@ class SkLine {
       SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
   SkScalar paintDecorations(
       SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
+
+  void format();
 
   void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
 
@@ -129,7 +134,7 @@ class SkLine {
   SkVector fAdvance;  // Text on the line size
   SkVector fOffset;   // Text position on the screen
   std::unique_ptr<SkRun> fEllipsis;   // In case the line ends with the ellipsis
-  SkRunMetrics fSizes;
+  SkLineMetrics fSizes;
 
   static SkTHashMap<SkFont, SkRun> fEllipsisCache; // All found so far shapes of ellipsis
 };

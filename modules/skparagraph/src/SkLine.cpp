@@ -28,6 +28,15 @@ SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const cha
   auto end = SkTMin(a.end(), b.end());
   return SkSpan<const char>(begin, end > begin ? end - begin : 0);
 }
+
+int32_t intersects(SkSpan<const char> a, SkSpan<const char> b) {
+  if (a.begin() == nullptr || b.begin() == nullptr) {
+    return -1;
+  }
+  auto begin = SkTMax(a.begin(), b.begin());
+  auto end = SkTMin(a.end(), b.end());
+  return end - begin;
+}
 }
 
 SkTHashMap<SkFont, SkRun> SkLine::fEllipsisCache;
@@ -55,34 +64,73 @@ void SkLine::paint(SkCanvas* textCanvas, SkSpan<SkBlock> blocks) {
   textCanvas->translate(this->offset().fX, this->offset().fY);
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Background, blocks,
+      SkStyleType::Background, blocks, true,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintBackground(textCanvas, text, style, offsetX);
       });
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Shadow, blocks,
+      SkStyleType::Shadow, blocks, true,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintShadow(textCanvas, text, style, offsetX);
       });
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Foreground, blocks,
+      SkStyleType::Foreground, blocks, true,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintText(textCanvas, text, style, offsetX);
       });
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Decorations, blocks,
+      SkStyleType::Decorations, blocks, true,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintDecorations(textCanvas, text, style, offsetX);
       });
 
   textCanvas->restore();
+}
+
+void SkLine::format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool last) {
+  SkScalar delta = maxWidth - this->width();
+  if (delta <= 0) {
+    // Delta can be < 0 if there are extra whitespaces at the end of the line;
+    // This is a limitation of a current version
+    return;
+  }
+
+  switch (effectiveAlign) {
+    case SkTextAlign::left:
+
+      this->shiftTo(0);
+      break;
+    case SkTextAlign::right:
+
+      //this->setWidth(maxWidth);
+      this->shiftTo(delta);
+      break;
+    case SkTextAlign::center: {
+
+      //this->setWidth(maxWidth);
+      this->shiftTo(delta / 2);
+      break;
+    }
+    case SkTextAlign::justify: {
+
+      if (last) {
+        this->justify(maxWidth);
+      } else {
+        this->shiftTo(0);
+      }
+
+      break;
+    }
+    default:
+      break;
+  }
 }
 
 // Scan parts of each style separately
@@ -94,7 +142,7 @@ void SkLine::scanStyles(SkStyleType style, SkSpan<SkBlock> blocks,
   }
 
   this->iterateThroughStylesInTextOrder(
-      style, blocks,
+      style, blocks, true,
       [this, apply](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         apply(style, offsetX);
         return this->iterateThroughRuns(
@@ -126,7 +174,7 @@ SkScalar SkLine::paintText(
     paint.setColor(style.getColor());
   }
 
-  auto shiftDown = this->sizes().leading() / 2 - this->sizes().ascent();
+  auto shiftDown = this->baseline();
   return this->iterateThroughRuns(
     text, offsetX,
     [paint, canvas, shiftDown]
@@ -190,7 +238,7 @@ SkScalar SkLine::paintShadow(
       paint.setMaskFilter(filter);
     }
 
-    auto shiftDown = this->sizes().leading() / 2 - this->sizes().ascent();
+    auto shiftDown = this->baseline();
     result = this->iterateThroughRuns(
       text, offsetX,
       [canvas, shadow, paint, shiftDown]
@@ -473,7 +521,7 @@ SkRun* SkLine::shapeEllipsis(const std::string& ellipsis, SkRun* run) {
   class ShapeHandler final : public SkShaper::RunHandler {
 
    public:
-    ShapeHandler() : fRun(nullptr) { }
+    explicit ShapeHandler(SkScalar lineHeight) : fRun(nullptr), fLineHeight(lineHeight) { }
     SkRun* run() { return fRun; }
 
    private:
@@ -486,21 +534,22 @@ SkRun* SkLine::shapeEllipsis(const std::string& ellipsis, SkRun* run) {
 
     Buffer runBuffer(const RunInfo& info) override {
 
-      fRun = fEllipsisCache.set(info.fFont, SkRun(SkSpan<const char>(), info, 0, 0));
+      fRun = fEllipsisCache.set(info.fFont, SkRun(SkSpan<const char>(), info, fLineHeight, 0, 0));
       return fRun->newRunBuffer();
     }
 
     void commitRunBuffer(const RunInfo& info) override {
       fRun->fAdvance.fX = info.fAdvance.fX;
-      fRun->fAdvance.fY = fRun->descent() + fRun->leading() - fRun->ascent();
+      fRun->fAdvance.fY = fRun->descent() - fRun->ascent();
     }
 
     void commitLine() override { }
 
     SkRun* fRun;
+    SkScalar fLineHeight;
   };
 
-  ShapeHandler handler;
+  ShapeHandler handler(run->lineHeight());
   std::unique_ptr<SkShaper> shaper = SkShaper::MakeShapeThenWrap();
   shaper->shape(ellipsis.data(), ellipsis.size(),
                 run->font(),
@@ -538,7 +587,7 @@ SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
                                        size_t& size,
                                        bool& clippingNeeded) const {
 
-  SkASSERT(!(text * run->text()).empty());
+  SkASSERT(intersects(run->text(), text) >= 0);
 
   // Find [start:end] clusters for the text
   bool found;
@@ -551,8 +600,8 @@ SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
   size = end->endPos() - start->startPos();
 
   // Calculate the clipping rectangle for the text with cluster edges
-  SkRect clip = SkRect::MakeXYWH( run->position(start->startPos()).fX - run->position(0).fX,
-                                  run->sizes().diff(sizes()),
+  SkRect clip = SkRect::MakeXYWH( run->positionX(start->startPos()) - run->positionX(0),
+                                  sizes().runTop(run),
                                   run->calculateWidth(start->startPos(), end->endPos()),
                                   run->calculateHeight());
 
@@ -574,13 +623,6 @@ void SkLine::iterateThroughClustersInGlyphsOrder(
 
   for (size_t r = 0; r != fLogical.size(); ++r) {
     auto& run = fLogical[reverse ? fLogical.size() - r - 1 : r];
-    /*
-    // Find the intersection between the text and the run
-    SkSpan<const char> intersect = run->text() * this->fText;
-    if (intersect.empty()) {
-      continue;
-    }
-    */
     // Walk through the clusters in the logical order (or reverse)
     auto normalOrder = run->leftToRight() != reverse;
     auto start = normalOrder ? run->clusters().begin() : run->clusters().end() - 1;
@@ -601,19 +643,15 @@ SkScalar SkLine::iterateThroughRuns(
     SkScalar runOffset,
     std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const {
 
-  if (text.empty()) {
-    return 0;
-  }
-
   SkScalar width = 0;
   // Walk through the runs in the logical order
   for (auto& run : fLogical) {
 
-    // Find the intersection between the text and the run
-    SkSpan<const char> intersect = run->text() * text;
-    if (intersect.empty()) {
+    if (intersects(run->text(), text) <= 0) {
       continue;
     }
+    // Find the intersection between the text and the run
+    SkSpan<const char> intersect = run->text() * text;
 
     size_t pos;
     size_t size;
@@ -628,7 +666,7 @@ SkScalar SkLine::iterateThroughRuns(
     } else if (run == fLogical.back() && this->ellipsis() != nullptr) {
       clippingNeeded = true; // To avoid trouble
     }
-    if (!apply(run, pos, size, clip, shift - run->position(0).fX, clippingNeeded)) {
+    if (!apply(run, pos, size, clip, shift - run->positionX(0), clippingNeeded)) {
       return width;
     }
 
@@ -650,6 +688,7 @@ SkScalar SkLine::iterateThroughRuns(
 void SkLine::iterateThroughStylesInTextOrder(
     SkStyleType styleType,
     SkSpan<SkBlock> blocks,
+    bool checkOffsets,
     std::function<SkScalar(SkSpan<const char> text,
                            const SkTextStyle& style,
                            SkScalar offsetX)> apply) const {
@@ -702,6 +741,8 @@ void SkLine::iterateThroughStylesInTextOrder(
   if (!SkScalarNearlyEqual(offsetX, this->width())) {
     SkDebugf("ASSERT: %f != %f '%s'\n", offsetX, this->width(), toString(fText).c_str());
   }
-  SkASSERT(SkScalarNearlyEqual(offsetX, this->width()));
+  if (checkOffsets) {
+    SkASSERT(SkScalarNearlyEqual(offsetX, this->width()));
+  }
 }
 

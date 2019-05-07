@@ -14,46 +14,6 @@
 #include "SkFontMetrics.h"
 
 class SkRun;
-
-class SkRunMetrics {
-  SkScalar fAscent;
-  SkScalar fDescent;
-  SkScalar fLeading;
-
- public:
-  SkRunMetrics() { clean(); }
-  SkRunMetrics(SkScalar a, SkScalar d, SkScalar l) {
-    fAscent = a;
-    fDescent = d;
-    fLeading = l;
-  }
-  void add(SkScalar a, SkScalar d, SkScalar l) {
-    fAscent = SkTMin(fAscent, a);
-    fDescent = SkTMax(fDescent, d);
-    fLeading = SkTMax(fLeading, l);
-  }
-  void add (SkRunMetrics other) {
-    add(other.fAscent, other.fDescent, other.fLeading);
-  }
-  void clean() {
-    fAscent = 0;
-    fDescent = 0;
-    fLeading = 0;
-  }
-  SkScalar diff(SkRunMetrics lineMetrics) const {
-    return ascent() - lineMetrics.ascent() - leading() / 2 + delta();
-  }
-  SkScalar height() const {
-    return  SkScalarRoundToInt(fDescent - fAscent + fLeading);
-  }
-  SkScalar delta() const {
-    return height() - (fDescent - fAscent + fLeading);
-  }
-  SkScalar leading() const { return fLeading; }
-  SkScalar ascent() const { return fAscent; }
-  SkScalar descent() const { return fDescent; }
-};
-
 class SkCluster {
 
  public:
@@ -69,13 +29,14 @@ class SkCluster {
   SkCluster()
   : fText(nullptr, 0), fRun(nullptr)
   , fStart(0), fEnd()
-  , fWidth(), fHeight()
-  , fWhiteSpaces(false), fBreakType(None) { }
+  , fWidth(), fSpacing(0), fHeight()
+  , fWhiteSpaces(false)
+  , fBreakType(None) { }
 
   SkCluster(SkRun* run, size_t start, size_t end, SkSpan<const char> text, SkScalar width, SkScalar height)
     : fText(text), fRun(run)
     , fStart(start), fEnd(end)
-    , fWidth(width), fHeight(height)
+    , fWidth(width), fSpacing(0), fHeight(height)
     , fWhiteSpaces(false), fBreakType(None) { }
 
   ~SkCluster() = default;
@@ -100,6 +61,10 @@ class SkCluster {
 
     return fWidth * ratio;
   }
+  void space(SkScalar shift) {
+    fSpacing = shift;
+    fWidth += shift;
+  }
   inline void setBreakType(BreakType type) { fBreakType = type; }
   inline void setIsWhiteSpaces(bool ws) { fWhiteSpaces = ws; }
   inline bool isWhitespaces() const { return fWhiteSpaces; }
@@ -111,6 +76,8 @@ class SkCluster {
   size_t startPos() const { return fStart; }
   size_t endPos() const { return fEnd; }
   SkScalar width() const { return fWidth; }
+  SkScalar trimmedWidth() const { return fWidth - fSpacing; }
+  SkScalar lastSpacing() const { return fSpacing; }
   SkScalar height() const { return fHeight; }
   SkSpan<const char> text() const { return fText; }
   BreakType breakType() const { return fBreakType; }
@@ -136,6 +103,10 @@ class SkCluster {
     return fText.begin() >= text.begin() && fText.end() <= text.end();
   }
 
+  bool startsIn(SkSpan<const char> text) {
+    return fText.begin() >= text.begin() && fText.begin() < text.end();
+  }
+
  private:
   SkSpan<const char> fText;
 
@@ -143,6 +114,7 @@ class SkCluster {
   size_t fStart;
   size_t fEnd;
   SkScalar fWidth;
+  SkScalar fSpacing;
   SkScalar fHeight;
   bool fWhiteSpaces;
   BreakType fBreakType;
@@ -152,7 +124,11 @@ class SkRun {
  public:
 
   SkRun() : fFont() { }
-  SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info, size_t index, SkScalar shiftX);
+  SkRun(SkSpan<const char> text,
+        const SkShaper::RunHandler::RunInfo& info,
+        SkScalar lineHeight,
+        size_t index,
+        SkScalar shiftX);
   ~SkRun() { }
 
   SkShaper::RunHandler::Buffer newRunBuffer();
@@ -165,30 +141,46 @@ class SkRun {
     fOffset.fY += shiftY;
   }
   SkVector advance() const {
-    return SkVector::Make(fAdvance.fX,
-                          fFontMetrics.fDescent + fFontMetrics.fLeading - fFontMetrics.fAscent);
+    return SkVector::Make(fAdvance.fX, fFontMetrics.fDescent - fFontMetrics.fAscent);
   }
   inline SkVector offset() const { return fOffset; }
   inline SkScalar ascent() const { return fFontMetrics.fAscent; }
   inline SkScalar descent() const { return fFontMetrics.fDescent; }
-  inline SkScalar leading() const { return fFontMetrics.fLeading; }
   inline const SkFont& font() const { return fFont ; };
   bool leftToRight() const { return fBidiLevel % 2 == 0; }
   size_t index() const { return fIndex; }
+  SkScalar lineHeight() const { return fLineHeight; }
 
   inline SkSpan<const char> text() const { return fText; }
   inline size_t clusterIndex(size_t pos) const { return fClusterIndexes[pos]; }
-  inline SkPoint position(size_t pos) const { return fPositions[pos]; }
+  SkScalar positionX(size_t pos) const {
+    return fPositions[pos].fX + fOffsets[pos];
+  }
   inline SkSpan<SkCluster> clusters() const { return fClusters; }
   inline void setClusters(SkSpan<SkCluster> clusters) { fClusters = clusters; }
   SkRect clip() const {
     return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
   }
 
-  SkScalar calculateHeight() const;
-  SkScalar calculateWidth(size_t start, size_t end) const;
+  void space(SkScalar& shift, SkScalar space, SkCluster* cluster) {
+    // Offset all the glyphs in the cluster
+    for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
+      fOffsets[i] = shift + space;
+    }
+    // Increment the run width
+    fSpaced = true;
+    fAdvance.fX += space;
+    // Increment the cluster width
+    cluster->space(space);
 
-  SkRunMetrics sizes() const { return { fFontMetrics.fAscent, fFontMetrics.fDescent, fFontMetrics.fLeading }; }
+    shift += space;
+  }
+
+  SkScalar calculateHeight() const {
+    return fFontMetrics.fDescent - fFontMetrics.fAscent;
+  }
+
+  SkScalar calculateWidth(size_t start, size_t end) const;
 
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 
@@ -209,6 +201,7 @@ class SkRun {
 
   SkFont fFont;
   SkFontMetrics fFontMetrics;
+  SkScalar fLineHeight;
   size_t fIndex;
   uint8_t fBidiLevel;
   SkVector fAdvance;
@@ -222,4 +215,42 @@ class SkRun {
   SkSTArray<128, SkScalar, true> fOffsets;
   SkSTArray<128, uint32_t, true> fClusterIndexes;
   bool fJustified;
+  bool fSpaced;
+};
+
+class SkLineMetrics {
+  SkScalar fAscent;
+  SkScalar fDescent;
+  SkScalar fLineHeight;
+
+  SkScalar delta() const {
+    return SkScalarRoundToInt(fDescent - fAscent) - (fDescent - fAscent);
+  }
+
+ public:
+  SkLineMetrics() { clean(); }
+
+  void add (SkRun* run) {
+    fAscent = SkTMin(fAscent, run->ascent() * run->lineHeight());
+    fDescent = SkTMax(fDescent, run->descent() * run->lineHeight());
+    //fLeading = SkTMax(fLeading, run->leading() * run->lineHeight());
+  }
+  void add (SkLineMetrics other) {
+    fAscent = SkTMin(fAscent, other.fAscent);
+    fDescent = SkTMax(fDescent, other.fDescent);
+    //fLeading = SkTMax(fLeading, other.fLeading);
+  }
+  void clean() {
+    fAscent = 0;
+    fDescent = 0;
+    //fLeading = 0;
+    fLineHeight = 1;
+  }
+  SkScalar runTop(SkRun* run) const {
+    return - fAscent + run->ascent() + delta();
+  }
+  SkScalar height() const { return SkScalarRoundToInt(fDescent - fAscent); }
+  SkScalar alphabeticBaseline() const { return - fAscent;  }
+  SkScalar ideographicBaseline() const { return fDescent - fAscent; }
+  SkScalar baseline() const { return - fAscent; }
 };
