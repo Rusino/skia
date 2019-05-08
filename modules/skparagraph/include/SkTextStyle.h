@@ -162,7 +162,6 @@ class SkTextStyle {
   SkFontStyle fFontStyle;
 
   std::vector<std::string> fFontFamilies;
-  //std::string fFontFamily;
   SkScalar fFontSize;
 
   SkScalar fHeight;

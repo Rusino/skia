@@ -17,11 +17,19 @@
 #include "SkParagraphStyle.h"
 #include "unicode/unistr.h"
 
+SkStrutStyle::SkStrutStyle() {
+    fFontStyle = SkFontStyle::Normal();
+    fFontSize = 14;
+    fHeight = 1;
+    fLeading = -1;
+    fForceStrutHeight = false;
+    fStrutEnabled = false;
+}
+
 SkParagraphStyle::SkParagraphStyle() {
     fTextAlign = SkTextAlign::start;
     fTextDirection = SkTextDirection::ltr;
     fLinesLimit = std::numeric_limits<size_t>::max();
-    //_ellipsis = u"\u2026";
     fHeight = 1;
     fHintingIsOn = true;
 }

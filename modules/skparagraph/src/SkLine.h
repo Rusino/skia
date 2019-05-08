@@ -45,7 +45,8 @@ class SkLine {
         , SkVector advance
         , SkSpan<SkCluster> clusters
         , SkSpan<const char> text
-        , SkLineMetrics sizes)
+        , SkLineMetrics sizes
+        , SkLineMetrics strutMetrics)
       : fText(text)
       , fClusters(clusters)
       , fLogical()
@@ -53,7 +54,9 @@ class SkLine {
       , fAdvance(advance)
       , fOffset(offset)
       , fEllipsis(nullptr)
-      , fSizes(sizes) { }
+      , fSizes(sizes)
+      , fStrutMetrics(strutMetrics) {
+  }
 
   inline SkSpan<const char> text() const { return fText; }
   inline SkSpan<SkCluster> clusters() const { return fClusters; }
@@ -93,6 +96,7 @@ class SkLine {
   SkScalar iterateThroughRuns(
       SkSpan<const char> text,
       SkScalar offsetX,
+      bool includeEmptyText,
       std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const;
 
   void iterateThroughClustersInGlyphsOrder(
@@ -109,14 +113,12 @@ class SkLine {
   SkScalar paintDecorations(
       SkCanvas* canvas, SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX) const;
 
-  void format();
-
   void computeDecorationPaint(SkPaint& paint, SkRect clip, const SkTextStyle& style, SkPath& path) const;
 
   void createEllipsis(SkScalar maxWidth, const std::string& ellipsis, bool ltr);
 
   void scanStyles(SkStyleType style, SkSpan<SkBlock> blocks,
-                  std::function<void(SkTextStyle, SkScalar)> apply);
+                  std::function<void(SkTextStyle, SkSpan<const char>)> apply);
   void scanRuns(std::function<void(SkRun*, int32_t, size_t, SkRect)> apply);
 
  private:
@@ -135,6 +137,7 @@ class SkLine {
   SkVector fOffset;   // Text position on the screen
   std::unique_ptr<SkRun> fEllipsis;   // In case the line ends with the ellipsis
   SkLineMetrics fSizes;
+  SkLineMetrics fStrutMetrics;
 
   static SkTHashMap<SkFont, SkRun> fEllipsisCache; // All found so far shapes of ellipsis
 };

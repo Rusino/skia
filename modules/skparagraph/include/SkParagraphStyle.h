@@ -22,6 +22,18 @@
 #include "SkFontStyle.h"
 #include "SkTextStyle.h"
 
+struct SkStrutStyle {
+
+  SkStrutStyle();
+  SkFontStyle fFontStyle;
+  std::vector<std::string> fFontFamilies;
+  SkScalar fFontSize;
+  SkScalar fHeight;
+  SkScalar fLeading;
+  bool fForceStrutHeight;
+  bool fStrutEnabled;
+};
+
 struct SkParagraphStyle {
   SkParagraphStyle();
 
@@ -34,11 +46,13 @@ struct SkParagraphStyle {
         this->fDefaultTextStyle == rhs.fDefaultTextStyle;
   }
 
+  SkStrutStyle& getStrutStyle() { return fStrutStyle; }
   SkTextStyle& getTextStyle() { return fDefaultTextStyle; }
   inline size_t getMaxLines() const { return fLinesLimit; }
   inline SkTextDirection getTextDirection() const { return fTextDirection; }
   inline std::string getEllipsis() const { return fEllipsis; }
 
+  void setStrutStyle(SkStrutStyle strutStyle) { fStrutStyle = strutStyle; }
   void setTextStyle(SkTextStyle textStyle) {
 
     fDefaultTextStyle = textStyle;
@@ -62,7 +76,7 @@ struct SkParagraphStyle {
   void turnHintingOff() { fHintingIsOn = false; }
 
  private:
-
+  SkStrutStyle fStrutStyle;
   SkTextStyle fDefaultTextStyle;
   SkTextAlign fTextAlign;
   SkTextDirection fTextDirection;
@@ -71,3 +85,4 @@ struct SkParagraphStyle {
   SkScalar fHeight;
   bool fHintingIsOn;
 };
+

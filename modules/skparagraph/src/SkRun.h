@@ -146,6 +146,7 @@ class SkRun {
   inline SkVector offset() const { return fOffset; }
   inline SkScalar ascent() const { return fFontMetrics.fAscent; }
   inline SkScalar descent() const { return fFontMetrics.fDescent; }
+  inline SkScalar leading() const { return fFontMetrics.fLeading; }
   inline const SkFont& font() const { return fFont ; };
   bool leftToRight() const { return fBidiLevel % 2 == 0; }
   size_t index() const { return fIndex; }
@@ -198,6 +199,7 @@ class SkRun {
 
   friend class SkParagraphImpl;
   friend class SkLine;
+  friend class SkLineMetrics;
 
   SkFont fFont;
   SkFontMetrics fFontMetrics;
@@ -221,7 +223,7 @@ class SkRun {
 class SkLineMetrics {
   SkScalar fAscent;
   SkScalar fDescent;
-  SkScalar fLineHeight;
+  SkScalar fLeading;
 
   SkScalar delta() const {
     return SkScalarRoundToInt(fDescent - fAscent) - (fDescent - fAscent);
@@ -230,21 +232,28 @@ class SkLineMetrics {
  public:
   SkLineMetrics() { clean(); }
 
+  SkLineMetrics(SkScalar a, SkScalar d, SkScalar l) {
+    fAscent = a;
+    fDescent = d;
+    fLeading = l;
+  }
+
   void add (SkRun* run) {
     fAscent = SkTMin(fAscent, run->ascent() * run->lineHeight());
     fDescent = SkTMax(fDescent, run->descent() * run->lineHeight());
-    //fLeading = SkTMax(fLeading, run->leading() * run->lineHeight());
   }
   void add (SkLineMetrics other) {
     fAscent = SkTMin(fAscent, other.fAscent);
     fDescent = SkTMax(fDescent, other.fDescent);
-    //fLeading = SkTMax(fLeading, other.fLeading);
   }
   void clean() {
     fAscent = 0;
     fDescent = 0;
-    //fLeading = 0;
-    fLineHeight = 1;
+  }
+  void updateFontMetrics(SkRun* run) {
+    run->fFontMetrics.fAscent = SkTMin(run->fFontMetrics.fAscent, fAscent);
+    run->fFontMetrics.fDescent = SkTMax(run->fFontMetrics.fDescent, fDescent);
+    run->fFontMetrics.fLeading = SkTMax(run->fFontMetrics.fLeading, fLeading);
   }
   SkScalar runTop(SkRun* run) const {
     return - fAscent + run->ascent() + delta();

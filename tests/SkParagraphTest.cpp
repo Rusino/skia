@@ -1018,7 +1018,7 @@ DEF_TEST(SkParagraph_DecorationsParagraph, reporter) {
   size_t index = 0;
   for (auto& line : impl->lines()) {
     line.scanStyles(SkStyleType::Decorations, impl->styles(),
-        [&index, reporter](SkTextStyle style, SkScalar offsetX) {
+        [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
           auto decoration = (SkTextDecoration)(SkTextDecoration::kUnderline |
               SkTextDecoration::kOverline |
               SkTextDecoration::kLineThrough);
@@ -1097,7 +1097,7 @@ DEF_TEST(SkParagraph_ItalicsParagraph, reporter) {
   size_t index = 0;
   line.scanStyles(
       SkStyleType::Foreground, impl->styles(),
-    [&index, reporter](SkTextStyle style, SkScalar offsetX) {
+    [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
 
       switch (index) {
         case 0:
@@ -1388,7 +1388,7 @@ DEF_TEST(SkParagraph_UnderlineShiftParagraph, reporter) {
     size_t index = 0;
     line.scanStyles(
         SkStyleType::Decorations, impl->styles(),
-        [&index, reporter](SkTextStyle style, SkScalar offsetX) {
+        [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
 
           switch (index) {
             case 0:
@@ -1410,7 +1410,7 @@ DEF_TEST(SkParagraph_UnderlineShiftParagraph, reporter) {
     size_t index = 0;
     line.scanStyles(
         SkStyleType::Decorations, impl1->styles(),
-        [&index, reporter](SkTextStyle style, SkScalar offsetX) {
+        [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
           if (index == 0) {
             REPORTER_ASSERT(reporter,  style.getDecoration() == SkTextDecoration::kNoDecoration);
           } else {
@@ -1587,7 +1587,7 @@ DEF_TEST(SkParagraph_SimpleShadow, reporter) {
   size_t index = 0;
   for (auto& line : impl->lines()) {
     line.scanStyles(SkStyleType::Shadow, impl->styles(),
-      [&index, text_style, reporter](SkTextStyle style, SkScalar offsetX) {
+      [&index, text_style, reporter](SkTextStyle style, SkSpan<const char> text) {
         REPORTER_ASSERT(reporter, index == 0 && style.equals(text_style));
         ++index;
     });
@@ -1633,7 +1633,7 @@ DEF_TEST(SkParagraph_ComplexShadow, reporter) {
   size_t index = 0;
   for (auto& line : impl->lines()) {
     line.scanStyles(SkStyleType::Shadow, impl->styles(),
-      [&index, text_style, reporter](SkTextStyle style, SkScalar offsetX) {
+      [&index, text_style, reporter](SkTextStyle style, SkSpan<const char> text) {
       ++index;
       switch(index) {
         case 1:
@@ -2336,19 +2336,19 @@ DEF_TEST(SkParagraph_SpacingParagraph, reporter) {
   paragraph->layout(550);
 
   auto impl = static_cast<SkParagraphImpl*>(paragraph.get());
-  // Some of the formatting lazily done on paint
-  impl->formatLines(TestCanvasWidth - 100);
-
-/*
-  ASSERT_EQ(paragraph->records_.size(), 7ull);
-  ASSERT_EQ(paragraph->records_[0].style().letter_spacing, 20);
-  ASSERT_EQ(paragraph->records_[1].style().letter_spacing, 10);
-  ASSERT_EQ(paragraph->records_[2].style().letter_spacing, 20);
-
-  ASSERT_EQ(paragraph->records_[4].style().word_spacing, 20);
-  ASSERT_EQ(paragraph->records_[5].style().word_spacing, 0);
-  ASSERT_EQ(paragraph->records_[6].style().word_spacing, 20);
-  */
+  REPORTER_ASSERT(reporter, impl->lines().size() == 1);
+  size_t index = 0;
+  impl->lines().begin()->scanStyles(SkStyleType::LetterSpacing, impl->styles(),
+    [&index](SkTextStyle style, SkSpan<const char> text) {
+      ++index;
+    });
+  REPORTER_ASSERT(reporter, index == 4);
+  index = 0;
+  impl->lines().begin()->scanStyles(SkStyleType::WordSpacing, impl->styles(),
+    [&index](SkTextStyle style, SkSpan<const char> text) {
+      ++index;
+    });
+  REPORTER_ASSERT(reporter, index == 4);
 }
 
 DEF_TEST(SkParagraph_1, reporter) {

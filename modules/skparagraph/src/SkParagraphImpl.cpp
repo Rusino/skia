@@ -66,11 +66,42 @@ void SkParagraphImpl::layout(SkScalar width) {
 
   this->resetContext();
 
+  this->resolveStrut();
+
   this->shapeTextIntoEndlessLine();
 
   this->buildClusterTable();
 
   this->breakShapedTextIntoLines(width);
+}
+
+void SkParagraphImpl::resolveStrut() {
+
+  auto strutStyle = this->paragraphStyle().getStrutStyle();
+  if (!strutStyle.fStrutEnabled) {
+    return;
+  }
+
+  sk_sp<SkTypeface> typeface;
+  for (auto& fontFamily : strutStyle.fFontFamilies) {
+    typeface = fFontCollection->matchTypeface(fontFamily, strutStyle.fFontStyle);
+    if (typeface.get() != nullptr) {
+      break;
+    }
+  }
+  if (typeface.get() == nullptr) {
+    typeface = SkTypeface::MakeDefault();
+  }
+
+  SkFontMetrics metrics;
+  SkFont font(typeface, strutStyle.fFontSize);
+  font.getMetrics(&metrics);
+
+  fStrutMetrics = SkLineMetrics(
+    metrics.fAscent * strutStyle.fHeight,
+    metrics.fDescent* strutStyle.fHeight,
+    strutStyle.fLeading < 0 ? metrics.fLeading / 2 : strutStyle.fLeading * strutStyle.fFontSize / 2
+  );
 }
 
 void SkParagraphImpl::paint(SkCanvas* canvas, SkScalar x, SkScalar y) {
@@ -168,8 +199,6 @@ void SkParagraphImpl::buildClusterTable() {
     auto size = std::get<2>(update);
     run->setClusters(SkSpan<SkCluster>(&fClusters[start], size));
   }
-
-  //fClusters.back().setBreakType(SkCluster::BreakType::HardLineBreak);
 }
 
 void SkParagraphImpl::shapeTextIntoEndlessLine() {
@@ -197,6 +226,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
 
     // TODO: Resolve fonts via harfbuzz
     void resolveFonts() {
+
       fResolvedFont.reset();
 
       sk_sp<SkTypeface> prevTypeface;
@@ -332,6 +362,9 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
           fFontIterator->lineHeight(),
           fParagraph->fRuns.count(),
           fAdvance.fX);
+      if (fParagraph->strutEnabled()) {
+        fParagraph->strutMetrics().updateFontMetrics(&run);
+      }
       return run.newRunBuffer();
     }
 
@@ -415,7 +448,8 @@ SkLine& SkParagraphImpl::addLine (SkVector offset, SkVector advance, SkSpan<cons
        advance,
        SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
        text,
-       sizes);
+       sizes,
+       fStrutMetrics);
 }
 
 // Returns a vector of bounding boxes that enclose all text between
@@ -441,7 +475,8 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
     SkRect maxClip = SkRect::MakeLTRB(SK_ScalarMax, SK_ScalarMax, -SK_ScalarMax, -SK_ScalarMax);
     line.iterateThroughRuns(
       line.text(),
-      false,
+      0,
+      true,
       [&results, &maxClip, &line, &index, start, end]
       (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
         if (size == 0 && pos == start) {
@@ -530,7 +565,8 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx
       // Find the line
       line.iterateThroughRuns(
           line.text(),
-          false,
+          0,
+          true,
           [dx, &result]
           (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
             if (run->positionX(pos) <= dx && dx < run->positionX(pos + size)) {

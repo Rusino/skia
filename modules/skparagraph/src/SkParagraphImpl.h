@@ -154,14 +154,18 @@ class SkParagraphImpl final: public SkParagraph {
   inline SkSpan<SkRun> runs() { return SkSpan<SkRun>(fRuns.data(), fRuns.size()); }
   inline SkSpan<SkBlock> styles() { return SkSpan<SkBlock>(fTextStyles.data(), fTextStyles.size()); }
   inline SkSpan<SkLine> lines() { return SkSpan<SkLine>(fLines.data(), fLines.size()); }
-  inline SkParagraphStyle paragraphStyle() { return fParagraphStyle; }
+  inline SkParagraphStyle paragraphStyle() const { return fParagraphStyle; }
   void formatLines(SkScalar maxWidth);
+
+  inline bool strutEnabled() const { return paragraphStyle().getStrutStyle().fStrutEnabled; }
+  inline SkLineMetrics strutMetrics() const { return fStrutMetrics; }
 
  private:
 
   friend class SkParagraphBuilder;
 
   void resetContext();
+  void resolveStrut();
   void buildClusterTable();
   void shapeTextIntoEndlessLine();
   void breakShapedTextIntoLines(SkScalar maxWidth);
@@ -176,6 +180,7 @@ class SkParagraphImpl final: public SkParagraph {
   SkTArray<SkCluster, true> fClusters;
   SkTArray<SkLine> fLines;
   SkTextWrapper fTextWrapper;
+  SkLineMetrics fStrutMetrics;
 
   // Painting
   sk_sp<SkPicture> fPicture;

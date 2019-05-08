@@ -93,7 +93,9 @@ std::tuple<bool, SkCluster*, SkCluster*> SkRun::findClusters(SkSpan<const char> 
     std::swap(start, end);
   }
 
-  if (start == nullptr || end == nullptr) {
+  if (text.empty()) {
+    return std::make_tuple(true, start, start);
+  } else if (start == nullptr || end == nullptr) {
     return std::make_tuple(false, start, end);
   }
   return std::make_tuple(true, start, end);

@@ -135,18 +135,18 @@ void SkLine::format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool last) {
 
 // Scan parts of each style separately
 void SkLine::scanStyles(SkStyleType style, SkSpan<SkBlock> blocks,
-                        std::function<void(SkTextStyle, SkScalar)> apply) {
+                        std::function<void(SkTextStyle, SkSpan<const char>text)> apply) {
 
   if (this->empty()) {
     return;
   }
 
   this->iterateThroughStylesInTextOrder(
-      style, blocks, true,
+      style, blocks, false,
       [this, apply](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-        apply(style, offsetX);
+        apply(style, text);
         return this->iterateThroughRuns(
-            text, offsetX,
+            text, offsetX, false,
             [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
       });
 }
@@ -154,7 +154,7 @@ void SkLine::scanStyles(SkStyleType style, SkSpan<SkBlock> blocks,
 void SkLine::scanRuns(std::function<void(SkRun*, int32_t, size_t, SkRect)> apply) {
 
   this->iterateThroughRuns(
-      fText, 0,
+      fText, 0, false,
       [apply](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar, bool) {
         apply(run, pos, size, clip);
         return true;
@@ -176,7 +176,7 @@ SkScalar SkLine::paintText(
 
   auto shiftDown = this->baseline();
   return this->iterateThroughRuns(
-    text, offsetX,
+    text, offsetX, false,
     [paint, canvas, shiftDown]
     (SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
 
@@ -202,11 +202,11 @@ SkScalar SkLine::paintBackground(
   if (!style.hasBackground()) {
     // Still need to calculate text advance
     return iterateThroughRuns(
-      text, offsetX,
+      text, offsetX, false,
       [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
   }
   return this->iterateThroughRuns(
-    text, offsetX,
+    text, offsetX, false,
     [canvas, style](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
       canvas->drawRect(clip, style.getBackground());
       return true;
@@ -222,7 +222,7 @@ SkScalar SkLine::paintShadow(
   if (style.getShadowNumber() == 0) {
     // Still need to calculate text advance
     return iterateThroughRuns(
-        text, offsetX,
+        text, offsetX, false,
         [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
   }
 
@@ -240,7 +240,7 @@ SkScalar SkLine::paintShadow(
 
     auto shiftDown = this->baseline();
     result = this->iterateThroughRuns(
-      text, offsetX,
+      text, offsetX, false,
       [canvas, shadow, paint, shiftDown]
       (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
         SkTextBlobBuilder builder;
@@ -269,12 +269,12 @@ SkScalar SkLine::paintDecorations(
   if (style.getDecoration() == SkTextDecoration::kNoDecoration) {
     // Still need to calculate text advance
     return iterateThroughRuns(
-        text, offsetX,
+        text, offsetX, false,
         [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
   }
 
   return this->iterateThroughRuns(
-    text, offsetX,
+    text, offsetX, false,
     [this, canvas, style]
     (SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
 
@@ -641,17 +641,21 @@ void SkLine::iterateThroughClustersInGlyphsOrder(
 SkScalar SkLine::iterateThroughRuns(
     SkSpan<const char> text,
     SkScalar runOffset,
+    bool includeEmptyText,
     std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const {
 
   SkScalar width = 0;
   // Walk through the runs in the logical order
   for (auto& run : fLogical) {
 
-    if (intersects(run->text(), text) <= 0) {
+    if (intersects(run->text(), text) < 0) {
       continue;
     }
     // Find the intersection between the text and the run
     SkSpan<const char> intersect = run->text() * text;
+    if (!includeEmptyText && intersect.empty()) {
+      continue;
+    }
 
     size_t pos;
     size_t size;
@@ -738,7 +742,7 @@ void SkLine::iterateThroughStylesInTextOrder(
 
   // This is not a trivial assert!
   // It asserts that 2 different ways of calculation come with the same results
-  if (!SkScalarNearlyEqual(offsetX, this->width())) {
+  if (checkOffsets && !SkScalarNearlyEqual(offsetX, this->width())) {
     SkDebugf("ASSERT: %f != %f '%s'\n", offsetX, this->width(), toString(fText).c_str());
   }
   if (checkOffsets) {
