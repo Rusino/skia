@@ -39,7 +39,7 @@ enum SkTextDecoration {
 enum SkTextDecorationStyle { kSolid, kDouble, kDotted, kDashed, kWavy };
 
 enum SkStyleType {
-  Unknown,
+  AllAttributes,
   Text,
   Font,
   Foreground,

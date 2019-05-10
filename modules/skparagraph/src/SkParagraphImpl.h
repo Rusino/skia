@@ -158,6 +158,7 @@ class SkParagraphImpl final: public SkParagraph {
   void formatLines(SkScalar maxWidth);
 
   inline bool strutEnabled() const { return paragraphStyle().getStrutStyle().fStrutEnabled; }
+  inline bool strutForceHeight() const { return paragraphStyle().getStrutStyle().fForceStrutHeight; }
   inline SkLineMetrics strutMetrics() const { return fStrutMetrics; }
 
  private:

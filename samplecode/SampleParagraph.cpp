@@ -1516,6 +1516,111 @@ class ParagraphView7 : public Sample {
   sk_sp<SkFontCollection> fontCollection;
 };
 
+class ParagraphView8 : public Sample {
+ public:
+  ParagraphView8() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+    LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+  }
+
+  ~ParagraphView8() {
+  }
+ protected:
+  bool onQuery(Sample::Event* evt) override {
+    if (Sample::TitleQ(*evt)) {
+      Sample::TitleR(evt, "Paragraph7");
+      return true;
+    }
+    return this->INHERITED::onQuery(evt);
+  }
+
+  void drawText(SkCanvas* canvas, SkColor background, SkScalar w, SkScalar h) {
+
+    SkAutoCanvasRestore acr(canvas, true);
+    canvas->clipRect(SkRect::MakeWH(w, h));
+    canvas->drawColor(background);
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/ahem.ttf"));
+    fontCollection->setTestFontManager(testFontProvider);
+
+    // The chinese extra height should be absorbed by the strut.
+    const char* text = "01234満毎冠p来É本可\nabcd\n満毎É行p昼本可";
+
+    SkParagraphStyle paragraph_style;
+    paragraph_style.setMaxLines(10);
+    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.turnHintingOff();
+
+    SkStrutStyle strut_style;
+    strut_style.fStrutEnabled = true;
+    strut_style.fFontFamilies = { "BlahFake" };
+    strut_style.fFontSize = 50;
+    strut_style.fHeight = 1.8;
+    strut_style.fLeading = 0.1;
+    strut_style.fForceStrutHeight = true;
+    paragraph_style.setStrutStyle(strut_style);
+
+    SkParagraphBuilder builder(paragraph_style, fontCollection);
+
+    SkTextStyle text_style;
+    text_style.setFontFamilies({ "Ahem" });
+    text_style.setFontSize(50);
+    text_style.setLetterSpacing(0);
+    text_style.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
+    text_style.setColor(SK_ColorBLACK);
+    text_style.setHeight(0.5);
+    builder.pushStyle(text_style);
+    builder.addText(text);
+    builder.pop();
+
+    auto paragraph = builder.Build();
+    paragraph->layout(550);
+    paragraph->paint(canvas, 0, 0);
+    //RectHeightStyle rect_height_style = RectHeightStyle::kTight;
+    RectHeightStyle rect_height_max_style = RectHeightStyle::kMax;
+    RectWidthStyle rect_width_style = RectWidthStyle::kTight;
+
+    auto boxes0 = paragraph->getRectsForRange(6, 10, rect_height_max_style, rect_width_style);
+    auto boxes1 = paragraph->getRectsForRange(14, 16, rect_height_max_style, rect_width_style);
+    auto boxes2 = paragraph->getRectsForRange(20, 25, rect_height_max_style, rect_width_style);
+
+    SkPaint paint;
+    paint.setColor(SK_ColorGREEN);
+    canvas->drawRect(boxes0[0].rect, paint);
+    paint.setColor(SK_ColorBLUE);
+    canvas->drawRect(boxes1[0].rect, paint);
+    paint.setColor(SK_ColorRED);
+    canvas->drawRect(boxes2[0].rect, paint);
+  }
+
+  void onDrawContent(SkCanvas* canvas) override {
+
+    canvas->drawColor(SK_ColorWHITE);
+
+    auto h = this->height();
+    auto w = this->width();
+
+    drawText(canvas, SK_ColorGRAY, w, h);
+  }
+ private:
+  typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
+};
 //////////////////////////////////////////////////////////////////////////////
 
 DEF_SAMPLE(return new ParagraphView1();)
@@ -1525,3 +1630,4 @@ DEF_SAMPLE(return new ParagraphView4();)
 DEF_SAMPLE(return new ParagraphView5();)
 DEF_SAMPLE(return new ParagraphView6();)
 DEF_SAMPLE(return new ParagraphView7();)
+DEF_SAMPLE(return new ParagraphView8();)

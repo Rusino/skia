@@ -221,14 +221,6 @@ class SkRun {
 };
 
 class SkLineMetrics {
-  SkScalar fAscent;
-  SkScalar fDescent;
-  SkScalar fLeading;
-
-  SkScalar delta() const {
-    return SkScalarRoundToInt(fDescent - fAscent) - (fDescent - fAscent);
-  }
-
  public:
   SkLineMetrics() { clean(); }
 
@@ -241,25 +233,48 @@ class SkLineMetrics {
   void add (SkRun* run) {
     fAscent = SkTMin(fAscent, run->ascent() * run->lineHeight());
     fDescent = SkTMax(fDescent, run->descent() * run->lineHeight());
+    fLeading = SkTMax(fLeading, run->leading() * run->lineHeight());
   }
+
   void add (SkLineMetrics other) {
     fAscent = SkTMin(fAscent, other.fAscent);
     fDescent = SkTMax(fDescent, other.fDescent);
+    fLeading = SkTMax(fLeading, other.fLeading);
   }
   void clean() {
     fAscent = 0;
     fDescent = 0;
+    fLeading = 0;
   }
-  void updateFontMetrics(SkRun* run) {
-    run->fFontMetrics.fAscent = SkTMin(run->fFontMetrics.fAscent, fAscent);
-    run->fFontMetrics.fDescent = SkTMax(run->fFontMetrics.fDescent, fDescent);
-    run->fFontMetrics.fLeading = SkTMax(run->fFontMetrics.fLeading, fLeading);
+
+  SkScalar delta() const { return height() - ideographicBaseline(); }
+
+  void updateLineMetrics(SkLineMetrics& metrics, bool forceHeight) {
+    if (forceHeight) {
+      metrics.fAscent = fAscent;
+      metrics.fDescent = fDescent;
+      metrics.fLeading = fLeading;
+    } else {
+      metrics.fAscent = SkTMin(metrics.fAscent, fAscent);
+      metrics.fDescent = SkTMax(metrics.fDescent, fDescent);
+      metrics.fLeading = SkTMax(metrics.fLeading, fLeading);
+    }
   }
+
   SkScalar runTop(SkRun* run) const {
-    return - fAscent + run->ascent() + delta();
+    return fLeading / 2 - fAscent + run->ascent() + delta();
   }
-  SkScalar height() const { return SkScalarRoundToInt(fDescent - fAscent); }
-  SkScalar alphabeticBaseline() const { return - fAscent;  }
-  SkScalar ideographicBaseline() const { return fDescent - fAscent; }
-  SkScalar baseline() const { return - fAscent; }
+  inline SkScalar height() const { return SkScalarRoundToInt(fDescent - fAscent + fLeading); }
+  inline SkScalar alphabeticBaseline() const { return fLeading / 2 - fAscent;  }
+  inline SkScalar ideographicBaseline() const { return fDescent - fAscent + fLeading; }
+  inline SkScalar baseline() const { return fLeading / 2 - fAscent; }
+  inline SkScalar ascent() const { return fAscent; }
+  inline SkScalar descent() const { return fDescent; }
+  inline SkScalar leading() const { return fLeading; }
+
+ private:
+
+  SkScalar fAscent;
+  SkScalar fDescent;
+  SkScalar fLeading;
 };

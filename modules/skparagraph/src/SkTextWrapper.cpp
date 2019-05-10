@@ -15,6 +15,11 @@ bool SkTextWrapper::addLineUpToTheLastBreak() {
     return true;
   }
 
+  if (fParent->strutEnabled()) {
+    // Make sure font metrics are not less than the strut
+    fParent->strutMetrics().updateLineMetrics(fLastBreak.sizes(), fParent->strutForceHeight());
+  }
+
   // TODO: Place the ellipsis to the left or to the right of the line
   //  in case there is only one text direction on the line
   //  (in addition to the current approach that always places it to the right)
@@ -42,7 +47,6 @@ bool SkTextWrapper::addLineUpToTheLastBreak() {
   fWidth =  SkMaxScalar(fWidth, fLastBreak.trimmedWidth());
   fHeight += fLastBreak.height();
   fOffsetY += fLastBreak.height();
-
   fLastBreak.clean(fLineStart);
 
   return !reachedLinesLimit();

@@ -45,8 +45,7 @@ class SkLine {
         , SkVector advance
         , SkSpan<SkCluster> clusters
         , SkSpan<const char> text
-        , SkLineMetrics sizes
-        , SkLineMetrics strutMetrics)
+        , SkLineMetrics sizes)
       : fText(text)
       , fClusters(clusters)
       , fLogical()
@@ -54,8 +53,7 @@ class SkLine {
       , fAdvance(advance)
       , fOffset(offset)
       , fEllipsis(nullptr)
-      , fSizes(sizes)
-      , fStrutMetrics(strutMetrics) {
+      , fSizes(sizes) {
   }
 
   inline SkSpan<const char> text() const { return fText; }
@@ -74,6 +72,7 @@ class SkLine {
   SkScalar alphabeticBaseline() const { return fSizes.alphabeticBaseline(); }
   SkScalar ideographicBaseline() const { return fSizes.ideographicBaseline(); }
   SkScalar baseline() const { return fSizes.baseline(); }
+  SkScalar roundingDelta() const { return fSizes.delta(); }
 
   SkRect measureTextInsideOneRun(SkSpan<const char> text,
                                  SkRun* run,
@@ -137,7 +136,6 @@ class SkLine {
   SkVector fOffset;   // Text position on the screen
   std::unique_ptr<SkRun> fEllipsis;   // In case the line ends with the ellipsis
   SkLineMetrics fSizes;
-  SkLineMetrics fStrutMetrics;
 
   static SkTHashMap<SkFont, SkRun> fEllipsisCache; // All found so far shapes of ellipsis
 };

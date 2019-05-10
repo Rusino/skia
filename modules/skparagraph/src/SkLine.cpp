@@ -35,7 +35,9 @@ int32_t intersects(SkSpan<const char> a, SkSpan<const char> b) {
   }
   auto begin = SkTMax(a.begin(), b.begin());
   auto end = SkTMin(a.end(), b.end());
-  return end - begin;
+  auto size = end - begin;
+  return size;
+  //return end - begin;
 }
 }
 
@@ -594,7 +596,10 @@ SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
   SkCluster* start;
   SkCluster* end;
   std::tie(found, start, end) = run->findClusters(text);
-  SkASSERT(found);
+  if (!found) {
+    SkASSERT(text.empty());
+    return SkRect::MakeEmpty();
+  }
 
   pos = start->startPos();
   size = end->endPos() - start->startPos();
@@ -648,7 +653,7 @@ SkScalar SkLine::iterateThroughRuns(
   // Walk through the runs in the logical order
   for (auto& run : fLogical) {
 
-    if (intersects(run->text(), text) < 0) {
+    if (intersects(run->text(), text) < 0) { // || (text.empty() && run->size() > 0)) {
       continue;
     }
     // Find the intersection between the text and the run
@@ -661,6 +666,9 @@ SkScalar SkLine::iterateThroughRuns(
     size_t size;
     bool clippingNeeded;
     SkRect clip = this->measureTextInsideOneRun(intersect, run, pos, size, clippingNeeded);
+    if (clip.height() == 0) {
+      continue;
+    }
 
     auto shift = runOffset - clip.fLeft;
     clip.offset(shift, 0);

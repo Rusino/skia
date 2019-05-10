@@ -33,14 +33,14 @@ class SkTextWrapper {
     SkScalar trimmedWidth() const {
       return fWidth - fEnd->lastSpacing();
     }
-    inline SkScalar height() const { return fSizes.height(); }
+    inline SkScalar height() const { return fLineMetrics.height(); }
     inline const SkCluster* trimmed() const { return fTrimmedEnd; }
     inline const SkCluster* end() const { return fEnd; }
-    inline SkLineMetrics sizes() const { return fSizes; }
+    inline SkLineMetrics& sizes() { return fLineMetrics; }
 
     void clean(const SkCluster* start) {
       if (fEnd != start) {
-        fSizes.clean();
+        fLineMetrics.clean();
       }
       fEnd = start;
       fTrimmedEnd = start;
@@ -49,7 +49,6 @@ class SkTextWrapper {
     }
 
     SkScalar moveTo(Position& other) {
-
       auto result = other.fWidth;
       if (other.fWidth > 0) {
         this->fWidth += this->fWhitespaces.fX + other.fWidth;
@@ -57,26 +56,25 @@ class SkTextWrapper {
         this->fEnd = other.fEnd;
         this->fWhitespaces = other.fWhitespaces;
       } else {
-        fWhitespaces.fX += other.fWhitespaces.fX;
-        fWhitespaces.fY = SkTMax(fWhitespaces.fY, other.fWhitespaces.fY);
+        this->fWhitespaces.fX += other.fWhitespaces.fX;
+        this->fWhitespaces.fY = SkTMax(this->fWhitespaces.fY, other.fWhitespaces.fY);
       }
-      this->fSizes.add(other.fSizes);
+      this->fLineMetrics.add(other.fLineMetrics);
       other.clean(other.fEnd);
-
       return result;
     }
 
     void moveTo(const SkCluster& cluster) {
       if (cluster.isWhitespaces()) {
-        fWhitespaces.fX += cluster.width();
-        fWhitespaces.fY = SkTMax(fWhitespaces.fY, cluster.run()->calculateHeight());
+        this->fWhitespaces.fX += cluster.width();
+        this->fWhitespaces.fY = SkTMax(this->fWhitespaces.fY, cluster.run()->calculateHeight());
       } else {
-        fTrimmedEnd = &cluster;
-        fWidth += fWhitespaces.fX + cluster.width();
-        fWhitespaces = SkVector::Make(0, 0);
+        this->fTrimmedEnd = &cluster;
+        this->fWidth += this->fWhitespaces.fX + cluster.width();
+        this->fWhitespaces = SkVector::Make(0, 0);
       }
-      fSizes.add(cluster.run());
-      fEnd = &cluster;
+      this->fLineMetrics.add(cluster.run());
+      this->fEnd = &cluster;
     }
 
     void extend(SkScalar w) { fWidth += w; }
@@ -90,7 +88,7 @@ class SkTextWrapper {
 
    private:
     SkScalar fWidth;
-    SkLineMetrics fSizes;
+    SkLineMetrics fLineMetrics;
     SkVector fWhitespaces;
     const SkCluster* fEnd;
     const SkCluster* fTrimmedEnd;

@@ -136,6 +136,9 @@ bool SkTextStyle::matchOneAttribute(SkStyleType styleType, const SkTextStyle& ot
     case WordSpacing:
       return fWordSpacing == other.fWordSpacing;
 
+    case AllAttributes:
+      return this->equals(other);
+
     default:
         SkASSERT(false);
     return false;

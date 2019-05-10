@@ -25,6 +25,11 @@ namespace {
     return str;
   }
   */
+  SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
+    auto begin = SkTMax(a.begin(), b.begin());
+    auto end = SkTMin(a.end(), b.end());
+    return SkSpan<const char>(begin, end > begin ? end - begin : 0);
+  }
   void print(const SkCluster& cluster) {
 /*
     auto type = cluster.breakType() == SkCluster::BreakType::HardLineBreak
@@ -100,7 +105,7 @@ void SkParagraphImpl::resolveStrut() {
   fStrutMetrics = SkLineMetrics(
     metrics.fAscent * strutStyle.fHeight,
     metrics.fDescent* strutStyle.fHeight,
-    strutStyle.fLeading < 0 ? metrics.fLeading / 2 : strutStyle.fLeading * strutStyle.fFontSize / 2
+    strutStyle.fLeading < 0 ? metrics.fLeading : strutStyle.fLeading * strutStyle.fFontSize
   );
 }
 
@@ -362,9 +367,6 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
           fFontIterator->lineHeight(),
           fParagraph->fRuns.count(),
           fAdvance.fX);
-      if (fParagraph->strutEnabled()) {
-        fParagraph->strutMetrics().updateFontMetrics(&run);
-      }
       return run.newRunBuffer();
     }
 
@@ -443,13 +445,13 @@ void SkParagraphImpl::paintLinesIntoPicture() {
 }
 
 SkLine& SkParagraphImpl::addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkLineMetrics sizes) {
+
   return fLines.emplace_back
       (offset,
        advance,
        SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
        text,
-       sizes,
-       fStrutMetrics);
+       sizes);
 }
 
 // Returns a vector of bounding boxes that enclose all text between
@@ -464,50 +466,39 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
   if (start >= end) {
     return results;
   }
-  size_t index = 0;
-  for (auto& line : fLines) {
 
-    if (index >= end) {
-      break;
+  // Calculate the utf8 substring
+  const char* first = fUtf8.begin();
+  for (unsigned i = 0; i < start; ++i) {
+    utf8_next(&first, fUtf8.end());
+  }
+  const char* last = first;
+  for (unsigned i = start; i < end; ++i) {
+    utf8_next(&last, fUtf8.end());
+  }
+  SkSpan<const char> text(first, last - first);
+
+  for (auto& line : fLines) {
+    auto intersect = line.text() * text;
+    if (intersect.empty() && (!line.text().empty() || line.text().begin() != text.begin())) {
+      continue;
     }
 
+    SkScalar runOffset = 0;
+    if (line.text().begin() != intersect.begin()) {
+      SkSpan<const char> before(line.text().begin(), intersect.begin() - line.text().begin());
+      runOffset = line.iterateThroughRuns
+          (before, 0, true, [](SkRun*, size_t, size_t, SkRect, SkScalar, bool) { return true; });
+    }
     auto firstBox = results.size();
-    SkRect maxClip = SkRect::MakeLTRB(SK_ScalarMax, SK_ScalarMax, -SK_ScalarMax, -SK_ScalarMax);
     line.iterateThroughRuns(
-      line.text(),
-      0,
+      intersect,
+      runOffset,
       true,
-      [&results, &maxClip, &line, &index, start, end]
+      [&results,&line]
       (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
-        if (size == 0 && pos == start) {
-          // Special case: empty line
-        } else if (pos + size <= start) {
-          // Keep going
-          index += size;
-          return true;
-        } else if (pos >= end) {
-          // Done with the range
-          return false;
-        }
-
-        // Correct the clip in case it does not
-        if (start > pos) {
-          clip.fLeft += run->positionX(start) - run->positionX(pos);
-        }
-        if (end < pos + size) {
-          clip.fRight -= run->positionX(pos + size) - run->positionX(end);
-        }
-
         clip.offset(line.offset());
         results.emplace_back(clip, run->leftToRight() ? SkTextDirection::ltr : SkTextDirection::rtl);
-
-        // join does not work for empty rect (left == right)
-        maxClip.fLeft   = SkMinScalar(maxClip.fLeft, clip.fLeft);
-        maxClip.fTop    = SkMinScalar(maxClip.fTop, clip.fTop);
-        maxClip.fRight  = SkMaxScalar(maxClip.fRight, clip.fRight);
-        maxClip.fBottom = SkMaxScalar(maxClip.fBottom, clip.fBottom);
-
-        index +=size;
         return true;
       });
 
@@ -516,8 +507,8 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
       for (auto i = firstBox; i < results.size(); ++i) {
         auto& rect = results[i].rect;
         if (rectHeightStyle == RectHeightStyle::kMax) {
-          rect.fTop = maxClip.top();
-          rect.fBottom = maxClip.bottom();
+          rect.fTop = line.offset().fY + line.roundingDelta();
+          rect.fBottom = line.offset().fY + line.height();
 
         } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingTop) {
           rect.fTop = line.offset().fY;
@@ -539,13 +530,13 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
       for (auto& i = firstBox; i < results.size(); ++i) {
         auto clip = results[i].rect;
         auto dir = results[i].direction;
-        if (clip.fLeft > maxClip.fLeft) {
-          SkRect left = SkRect::MakeXYWH(0, clip.fTop, clip.fLeft - maxClip.fLeft, clip.fBottom);
+        if (clip.fLeft > line.offset().fX) {
+          SkRect left = SkRect::MakeXYWH(0, clip.fTop, clip.fLeft -line.offset().fX, clip.fBottom);
           results.insert(results.begin() + i, { left, dir });
           ++i;
         }
-        if (clip.fRight < maxClip.fRight) {
-          SkRect right = SkRect::MakeXYWH(0, clip.fTop, maxClip.fRight - clip.fRight, clip.fBottom);
+        if (clip.fRight < line.offset().fX + line.width()) {
+          SkRect right = SkRect::MakeXYWH(0, clip.fTop, line.offset().fX + line.width() - clip.fRight, clip.fBottom);
           results.insert(results.begin() + i, { right, dir });
           ++i;
         }
@@ -555,7 +546,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
 
   return results;
 }
-
+// TODO: Deal with RTL here
 SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx, SkScalar dy) {
   SkPositionWithAffinity result(0, Affinity::DOWNSTREAM);
   for (auto& line : fLines) {
@@ -569,27 +560,25 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx
           true,
           [dx, &result]
           (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
-            if (run->positionX(pos) <= dx && dx < run->positionX(pos + size)) {
-              // Find the run
-              size_t pos = 0;
-              for (size_t i = 0; i < run->size(); ++i) {
-                if (run->positionX(i) <= dx) {
-                  // Find the position
-                  pos = i;
-                } else {
+            if (clip.fLeft <= dx && dx < clip.fRight) {
+              // Find the position
+              size_t found = 0;
+              for (size_t i = pos; i < size; ++i) {
+                if (run->positionX(i) + shift > dx) {
                   break;
                 }
+                found = i;
               }
-              if (pos == 0) {
+              if (found == 0) {
                 result = { SkToS32(run->fClusterIndexes[0]), DOWNSTREAM };
-              } else if (pos == run->size() - 1) {
+              } else if (found == size - 1) {
                 result = { SkToS32(run->fClusterIndexes.back()), UPSTREAM };
               } else {
                 auto center = (run->positionX(pos + 1) + run->positionX(pos)) / 2;
                 if ((dx <= center) == run->leftToRight()) {
-                  result = { SkToS32(run->fClusterIndexes[pos]), DOWNSTREAM };
+                  result = { SkToS32(run->fClusterIndexes[found]), DOWNSTREAM };
                 } else {
-                  result = { SkToS32(run->fClusterIndexes[pos + 1]), UPSTREAM };
+                  result = { SkToS32(run->fClusterIndexes[found + 1]), UPSTREAM };
                 }
               }
               return false;

@@ -77,12 +77,23 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
   }
 }
 
+// TODO: Make the search more effective
 std::tuple<bool, SkCluster*, SkCluster*> SkRun::findClusters(SkSpan<const char> text) {
+
+  if (text.empty()) {
+    SkCluster* found = nullptr;
+    for (auto& cluster : fClusters) {
+      if (cluster.contains(text.begin())) {
+        found = &cluster;
+        break;
+      }
+    }
+    return std::make_tuple(found != nullptr, found, found);
+  }
 
   auto first = text.begin();
   auto last = text.end() - 1;
 
-  // TODO: Make the search more effective
   SkCluster* start = nullptr;
   SkCluster* end = nullptr;
   for (auto& cluster : fClusters) {
@@ -93,12 +104,15 @@ std::tuple<bool, SkCluster*, SkCluster*> SkRun::findClusters(SkSpan<const char> 
     std::swap(start, end);
   }
 
+  return std::make_tuple(start != nullptr && end != nullptr, start, end);
+/*
   if (text.empty()) {
     return std::make_tuple(true, start, start);
   } else if (start == nullptr || end == nullptr) {
     return std::make_tuple(false, start, end);
   }
   return std::make_tuple(true, start, end);
+*/
 }
 
 void SkRun::iterateThroughClustersInTextOrder(std::function<void(
