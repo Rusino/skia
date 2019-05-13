@@ -1651,64 +1651,64 @@ class ParagraphView9 : public Sample {
     return this->INHERITED::onQuery(evt);
   }
 
+  static sk_sp<SkShader> setgrad(const SkRect& r, SkColor c0, SkColor c1) {
+    SkColor colors[] = { c0, c1 };
+    SkPoint pts[] = { { r.fLeft, r.fTop }, { r.fRight, r.fTop } };
+    return SkGradientShader::MakeLinear(pts, colors, nullptr, 2, SkTileMode::kClamp);
+  }
+
   void drawText(SkCanvas* canvas, SkColor background, SkScalar w, SkScalar h) {
 
     SkAutoCanvasRestore acr(canvas, true);
     canvas->clipRect(SkRect::MakeWH(w, h));
     canvas->drawColor(background);
 
-    fontCollection = sk_make_sp<SkFontCollection>();
-    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/ahem.ttf"));
-    fontCollection->setTestFontManager(testFontProvider);
-
     // The chinese extra height should be absorbed by the strut.
-    const char* text = "01234満毎冠p来É本可\nabcd\n満毎É行p昼本可";
+    const char* text = "World domination is such an ugly phrase - I prefer to call it world optimisation";
+    std::vector<size_t> sizes = {
+        0, 5, 16, 19, 24, 27, 32, 39, 41, 43, 50, 53, 58, 61, 67, 80
+    };
 
-    SkParagraphStyle paragraph_style;
-    paragraph_style.setMaxLines(10);
-    paragraph_style.setTextAlign(SkTextAlign::left);
-    paragraph_style.turnHintingOff();
+    std::vector<size_t> colors = {
+        SK_ColorBLUE, SK_ColorCYAN, SK_ColorLTGRAY, SK_ColorGREEN, SK_ColorRED, SK_ColorWHITE, SK_ColorYELLOW, SK_ColorMAGENTA
+    };
 
-    SkStrutStyle strut_style;
-    strut_style.fStrutEnabled = true;
-    strut_style.fFontFamilies = { "BlahFake" };
-    strut_style.fFontSize = 50;
-    strut_style.fHeight = 1.8;
-    strut_style.fLeading = 0.1;
-    strut_style.fForceStrutHeight = true;
-    paragraph_style.setStrutStyle(strut_style);
+    SkParagraphStyle paragraphStyle;
+    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.turnHintingOff();
+    SkTextStyle textStyle;
+    textStyle.setFontFamily("Roboto");
+    textStyle.setFontSize(30);
+    textStyle.setColor(SK_ColorBLACK);
 
-    SkParagraphBuilder builder(paragraph_style, fontCollection);
-
-    SkTextStyle text_style;
-    text_style.setFontFamilies({ "Ahem" });
-    text_style.setFontSize(50);
-    text_style.setLetterSpacing(0);
-    text_style.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
-    text_style.setColor(SK_ColorBLACK);
-    text_style.setHeight(0.5);
-    builder.pushStyle(text_style);
+    SkParagraphBuilder builder(paragraphStyle, fontCollection);
+    builder.pushStyle(textStyle);
     builder.addText(text);
     builder.pop();
 
     auto paragraph = builder.Build();
-    paragraph->layout(550);
+    paragraph->layout(w - 20);
     paragraph->paint(canvas, 0, 0);
-    //RectHeightStyle rect_height_style = RectHeightStyle::kTight;
-    RectHeightStyle rect_height_max_style = RectHeightStyle::kMax;
+
+    RectHeightStyle rect_height_style = RectHeightStyle::kTight;
     RectWidthStyle rect_width_style = RectWidthStyle::kTight;
 
-    auto boxes0 = paragraph->getRectsForRange(6, 10, rect_height_max_style, rect_width_style);
-    auto boxes1 = paragraph->getRectsForRange(14, 16, rect_height_max_style, rect_width_style);
-    auto boxes2 = paragraph->getRectsForRange(20, 25, rect_height_max_style, rect_width_style);
+    for (size_t i = 0; i < sizes.size() - 1; ++i) {
+      size_t from = (i == 0 ? 0 : 1) + sizes[i];
+      size_t to = sizes[i + 1];
+      auto boxes = paragraph->getRectsForRange(from, to, rect_height_style, rect_width_style);
+      if (boxes.empty()) {
+        continue;
+      }
+      for (auto& box : boxes) {
+        SkPaint paint;
+        paint.setColor(colors[i % colors.size()]);
+        paint.setShader(setgrad(box.rect, colors[i % colors.size()], SK_ColorWHITE));
+        canvas->drawRect(box.rect, paint);
+      }
+    }
 
-    SkPaint paint;
-    paint.setColor(SK_ColorGREEN);
-    canvas->drawRect(boxes0[0].rect, paint);
-    paint.setColor(SK_ColorBLUE);
-    canvas->drawRect(boxes1[0].rect, paint);
-    paint.setColor(SK_ColorRED);
-    canvas->drawRect(boxes2[0].rect, paint);
+    paragraph->paint(canvas, 0, 0);
   }
 
   void onDrawContent(SkCanvas* canvas) override {
@@ -1736,3 +1736,5 @@ DEF_SAMPLE(return new ParagraphView5();)
 DEF_SAMPLE(return new ParagraphView6();)
 DEF_SAMPLE(return new ParagraphView7();)
 DEF_SAMPLE(return new ParagraphView8();)
+DEF_SAMPLE(return new ParagraphView8();)
+DEF_SAMPLE(return new ParagraphView9();)
