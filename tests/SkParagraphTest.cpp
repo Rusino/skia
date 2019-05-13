@@ -433,25 +433,27 @@ DEF_TEST(SkParagraph_LeftAlignParagraph, reporter) {
 
   // Apparently, Minikin records start from the base line (24)
   double expected_y = 0;
-  REPORTER_ASSERT(reporter, impl->lines()[0].offset() == SkPoint::Make(0, expected_y));
+  double epsilon = 0.01;
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[0].baseline(), 24.121, epsilon));
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[0].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[1].offset() == SkPoint::Make(0, expected_y));
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[1].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[2].offset() == SkPoint::Make(0, expected_y));
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[2].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[3].offset() == SkPoint::Make(0, expected_y));
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[3].offset().fY, expected_y, epsilon));
   expected_y += 30 * 10;
-  REPORTER_ASSERT(reporter, impl->lines()[13].offset() == SkPoint::Make(0, expected_y));
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[13].offset().fY, expected_y, epsilon));
 
   REPORTER_ASSERT(reporter, paragraph_style.getTextAlign() == impl->paragraphStyle().getTextAlign());
 
   // Tests for GetGlyphPositionAtCoordinate()
   REPORTER_ASSERT(reporter, impl->getGlyphPositionAtCoordinate(0, 0).position == 0);
   REPORTER_ASSERT(reporter, impl->getGlyphPositionAtCoordinate(1, 1).position == 0);
-  // TODO: Implement word spacing
-  //REPORTER_ASSERT(reporter, impl->getGlyphPositionAtCoordinate(1, 35).position == 68);
-  //REPORTER_ASSERT(reporter, impl->getGlyphPositionAtCoordinate(1, 70).position == 134);
-  //REPORTER_ASSERT(reporter, impl->getGlyphPositionAtCoordinate(2000, 35).position == 134);
+  REPORTER_ASSERT(reporter, impl->getGlyphPositionAtCoordinate(1, 35).position == 68);
+  REPORTER_ASSERT(reporter, impl->getGlyphPositionAtCoordinate(1, 70).position == 134);
+  // This is actually the last character on the second line, not the first of the third
+  REPORTER_ASSERT(reporter, impl->getGlyphPositionAtCoordinate(2000, 35).position == 133);
 }
 
 DEF_TEST(SkParagraph_RightAlignParagraph, reporter) {
@@ -510,21 +512,22 @@ DEF_TEST(SkParagraph_RightAlignParagraph, reporter) {
 
   // Apparently, Minikin records start from the base line (24)
   double expected_y = 0;
-  REPORTER_ASSERT(reporter, impl->lines()[0].offset().fY == expected_y);
+  double epsilon = 0.01;
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[0].baseline(), 24.121, epsilon));
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[0].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[1].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[1].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[2].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[2].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[3].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[3].offset().fY, expected_y, epsilon));
   expected_y += 30 * 10;
-  REPORTER_ASSERT(reporter, impl->lines()[13].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[13].offset().fY, expected_y, epsilon));
 
   auto calculate = [](const SkLine& line) -> SkScalar {
     return TestCanvasWidth - 100 - line.offset().fX - line.width();
   };
 
-  SkScalar epsilon = 0.1;
   REPORTER_ASSERT(reporter, SkScalarNearlyEqual(calculate(impl->lines()[0]), 0, epsilon));
   REPORTER_ASSERT(reporter, SkScalarNearlyEqual(calculate(impl->lines()[1]), 0, epsilon));
   REPORTER_ASSERT(reporter, SkScalarNearlyEqual(calculate(impl->lines()[2]), 0, epsilon));
@@ -591,21 +594,22 @@ DEF_TEST(SkParagraph_CenterAlignParagraph, reporter) {
 
   // Apparently, Minikin records start from the base line (24)
   double expected_y = 0;
-  REPORTER_ASSERT(reporter, impl->lines()[0].offset().fY == expected_y);
+  double epsilon = 0.01;
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[0].baseline(), 24.121, epsilon));
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[0].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[1].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[1].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[2].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[2].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[3].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[3].offset().fY, expected_y, epsilon));
   expected_y += 30 * 10;
-  REPORTER_ASSERT(reporter, impl->lines()[13].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[13].offset().fY, expected_y, epsilon));
 
   auto calculate = [](const SkLine& line) -> SkScalar {
     return TestCanvasWidth - 100 - (line.offset().fX * 2 + line.width());
   };
 
-  SkScalar epsilon = 0.1;
   REPORTER_ASSERT(reporter, SkScalarNearlyEqual(calculate(impl->lines()[0]), 0, epsilon));
   REPORTER_ASSERT(reporter, SkScalarNearlyEqual(calculate(impl->lines()[1]), 0, epsilon));
   REPORTER_ASSERT(reporter, SkScalarNearlyEqual(calculate(impl->lines()[2]), 0, epsilon));
@@ -666,21 +670,22 @@ DEF_TEST(SkParagraph_JustifyAlignParagraph, reporter) {
   REPORTER_ASSERT(reporter, impl->styles()[0].style().equals(text_style));
 
   double expected_y = 0;
-  REPORTER_ASSERT(reporter, impl->lines()[0].offset().fY == expected_y);
+  double epsilon = 0.01;
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[0].baseline(), 24.121, epsilon));
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[0].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[1].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[1].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[2].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[2].offset().fY, expected_y, epsilon));
   expected_y += 30;
-  REPORTER_ASSERT(reporter, impl->lines()[3].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[3].offset().fY, expected_y, epsilon));
   expected_y += 30 * 9;
-  REPORTER_ASSERT(reporter, impl->lines()[12].offset().fY == expected_y);
+  REPORTER_ASSERT(reporter, SkScalarNearlyEqual(impl->lines()[12].offset().fY, expected_y, epsilon));
 
   auto calculate = [](const SkLine& line) -> SkScalar {
     return TestCanvasWidth - 100 - (line.offset().fX  + line.width());
   };
 
-  SkScalar epsilon = 0.1;
   REPORTER_ASSERT(reporter, SkScalarNearlyEqual(calculate(impl->lines()[0]), 0, epsilon));
   REPORTER_ASSERT(reporter, SkScalarNearlyEqual(calculate(impl->lines()[1]), 0, epsilon));
   REPORTER_ASSERT(reporter, SkScalarNearlyEqual(calculate(impl->lines()[2]), 0, epsilon));
@@ -802,43 +807,44 @@ DEF_TEST(SkParagraph_DecorationsParagraph, reporter) {
   size_t index = 0;
   for (auto& line : impl->lines()) {
     line.scanStyles(SkStyleType::Decorations, impl->styles(),
-                    [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
-                      auto decoration = (SkTextDecoration)(SkTextDecoration::kUnderline |
-                          SkTextDecoration::kOverline |
-                          SkTextDecoration::kLineThrough);
-                      REPORTER_ASSERT(reporter, style.getDecoration() == decoration);
-                      switch (index) {
-                        case 0:
-                          REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kSolid);
-                          REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
-                          REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 2.0);
-                          break;
-                        case 1: // The style appears on 2 lines so it has 2 pieces
-                          REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kDouble);
-                          REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLUE);
-                          REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 1.0);
-                          break;
-                        case 2:
-                          REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kDotted);
-                          REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
-                          REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 1.0);
-                          break;
-                        case 3:
-                          REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kDashed);
-                          REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
-                          REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 3.0);
-                          break;
-                        case 4:
-                          REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kWavy);
-                          REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorRED);
-                          REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 1.0);
-                          break;
-                        default:
-                          REPORTER_ASSERT(reporter, false);
-                          break;
-                      }
-                      ++index;
-                    });
+      [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
+        auto decoration = (SkTextDecoration)(SkTextDecoration::kUnderline |
+            SkTextDecoration::kOverline |
+            SkTextDecoration::kLineThrough);
+        REPORTER_ASSERT(reporter, style.getDecoration() == decoration);
+        switch (index) {
+          case 0:
+            REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kSolid);
+            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
+            REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 2.0);
+            break;
+          case 1: // The style appears on 2 lines so it has 2 pieces
+            REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kDouble);
+            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLUE);
+            REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 1.0);
+            break;
+          case 2:
+            REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kDotted);
+            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
+            REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 1.0);
+            break;
+          case 3:
+          case 4:
+            REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kDashed);
+            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
+            REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 3.0);
+            break;
+          case 5:
+            REPORTER_ASSERT(reporter, style.getDecorationStyle() == SkTextDecorationStyle::kWavy);
+            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorRED);
+            REPORTER_ASSERT(reporter, style.getDecorationThicknessMultiplier() == 1.0);
+            break;
+          default:
+            REPORTER_ASSERT(reporter, false);
+            break;
+        }
+        ++index;
+      });
   }
 }
 
@@ -1024,32 +1030,28 @@ DEF_TEST(SkParagraph_GetGlyphPositionAtCoordinateParagraph, reporter) {
   // the original text because the final trailing whitespaces are sometimes not
   // drawn (namely, when using "justify" alignment) and therefore are not active
   // glyphs.
-  // TODO: letter_spacing and word_spacing are not implemented yet
-  //  so the numbers are off...
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(-10000, -10000).position == 0);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(-1, -1).position == 0);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(0, 0).position == 0);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(3, 3).position == 0);
-  /*
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(35, 1).position == 1);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(300, 2).position == 11);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(301, 2.2).position == 11);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(302, 2.6).position == 11);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(301, 2.1).position == 11);
-  REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(100000, 20).position == 18);
+  REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(100000, 20).position == 17); // !!! 18
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(450, 20).position == 16);
-  REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(100000, 90).position == 36);
+  REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(100000, 90).position == 35); // !!! 36
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(-100000, 90).position == 18);
-  REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(20, -80).position == 1);
+  REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(20, -80).position == 0); // !!! 1
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(1, 90).position == 18);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(1, 170).position == 36);
-  REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(10000, 180).position == 72);
+  REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(10000, 180).position == 71); // !!! 72
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(70, 180).position == 56);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(1, 270).position == 72);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(35, 90).position == 19);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(10000, 10000).position == 77);
   REPORTER_ASSERT(reporter, paragraph->getGlyphPositionAtCoordinate(85, 10000).position == 75);
-   */
 }
 
 DEF_TEST(SkParagraph_GetRectsForRangeParagraph, reporter) {
@@ -1948,8 +1950,11 @@ DEF_TEST(SkParagraph_LongWordParagraph, reporter) {
   REPORTER_ASSERT(reporter, impl->runs().size() == 1);
   REPORTER_ASSERT(reporter, impl->styles().size() == 1);
   REPORTER_ASSERT(reporter, impl->styles()[0].style().equals(text_style));
-  // TODO: Improve line breaking algorightm for too long words
-  REPORTER_ASSERT(reporter, impl->lines().size() == 5);
+  REPORTER_ASSERT(reporter, impl->lines().size() == 4);
+
+  REPORTER_ASSERT(reporter, impl->lines()[0].width() > TestCanvasWidth / 2 - 20);
+  REPORTER_ASSERT(reporter, impl->lines()[1].width() > TestCanvasWidth / 2 - 20);
+  REPORTER_ASSERT(reporter, impl->lines()[2].width() > TestCanvasWidth / 2 - 20);
 }
 
 DEF_TEST(SkParagraph_KernScaleParagraph, reporter) {

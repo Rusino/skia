@@ -191,7 +191,17 @@ void SkParagraphImpl::buildClusterTable() {
         }
 
         if (currentStyle->style().getLetterSpacing() != 0) {
-          run.space(spacing, currentStyle->style().getLetterSpacing(), &cluster);
+          run.addSpaces(spacing,
+                        currentStyle->style().getLetterSpacing(),
+                        &cluster);
+        }
+        if (currentStyle->style().getWordSpacing() != 0 &&
+            fParagraphStyle.getTextAlign() != SkTextAlign::justify) {
+          if (cluster.isWhitespaces() && cluster.isSoftBreak()) {
+            run.addSpaces(spacing,
+                          currentStyle->style().getWordSpacing(),
+                          &cluster);
+          }
         }
 
         print(cluster);
@@ -548,45 +558,72 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(
 }
 // TODO: Deal with RTL here
 SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx, SkScalar dy) {
+
   SkPositionWithAffinity result(0, Affinity::DOWNSTREAM);
   for (auto& line : fLines) {
+
+    // This is so far the the line vertically closest to our coordinates
+    // (or the first one, or the only one - all the same)
+    line.iterateThroughRuns(
+      line.text(),
+      0,
+      true,
+      [&]
+      (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
+
+        if (dx < clip.fLeft) {
+          // All the other runs are placed right of this one
+          result = { SkToS32(run->fClusterIndexes[pos]), DOWNSTREAM };
+          return false;
+        }
+
+        if (dx >= clip.fRight) {
+          // We have to keep looking but just in case keep the last one as the closes so far
+          result = { SkToS32(run->fClusterIndexes[pos + size]), UPSTREAM };
+          return true;
+        }
+
+        // So we found the run that contains our coordinates
+        size_t found = pos;
+        for (size_t i = pos; i < pos + size; ++i) {
+          if (run->positionX(i) + shift > dx) {
+            break;
+          }
+          found = i;
+        }
+
+        if (found == pos) {
+          result = { SkToS32(run->fClusterIndexes[found]), DOWNSTREAM };
+        } else if (found == pos + size - 1) {
+          result = { SkToS32(run->fClusterIndexes[found]), UPSTREAM };
+        } else {
+          auto center = (run->positionX(found + 1) + run->positionX(found)) / 2;
+          if ((dx <= center + shift) == run->leftToRight()) {
+            result = { SkToS32(run->fClusterIndexes[found]), DOWNSTREAM };
+          } else {
+            result = { SkToS32(run->fClusterIndexes[found + 1]), UPSTREAM };
+          }
+        }
+        // No need to continue
+        return false;
+    });
+
+    // Let's figure out if we can stop looking
     auto offsetY = line.offset().fY;
-    auto advanceY = line.height();
-    if (offsetY <= dy && dy < offsetY + advanceY) {
-      // Find the line
-      line.iterateThroughRuns(
-          line.text(),
-          0,
-          true,
-          [dx, &result]
-          (SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded) {
-            if (clip.fLeft <= dx && dx < clip.fRight) {
-              // Find the position
-              size_t found = 0;
-              for (size_t i = pos; i < size; ++i) {
-                if (run->positionX(i) + shift > dx) {
-                  break;
-                }
-                found = i;
-              }
-              if (found == 0) {
-                result = { SkToS32(run->fClusterIndexes[0]), DOWNSTREAM };
-              } else if (found == size - 1) {
-                result = { SkToS32(run->fClusterIndexes.back()), UPSTREAM };
-              } else {
-                auto center = (run->positionX(pos + 1) + run->positionX(pos)) / 2;
-                if ((dx <= center) == run->leftToRight()) {
-                  result = { SkToS32(run->fClusterIndexes[found]), DOWNSTREAM };
-                } else {
-                  result = { SkToS32(run->fClusterIndexes[found + 1]), UPSTREAM };
-                }
-              }
-              return false;
-            }
-            return true;
-      });
+    if (dy < offsetY) {
+      // The closest position on this line; next line is going to be even lower
+      break;
     }
+    if (dy >= offsetY + line.height()) {
+      // We have the closest position on the lowest line so far, but we have to continue
+      continue;
+    }
+
+    // We hit the line; nothing else to do
+    break;
   }
+
+  //SkDebugf("getGlyphPositionAtCoordinate(%f,%f) = %d\n", dx, dy, result.position);
   return result;
 }
 

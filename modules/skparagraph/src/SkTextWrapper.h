@@ -125,6 +125,7 @@ class SkTextWrapper {
   bool reachedLinesLimit() const {
     return fMaxLines != std::numeric_limits<size_t>::max() && fLineNumber >= fMaxLines;
   }
+  SkScalar lengthUntilSoftLineBreak(SkCluster* cluster);
 
   SkParagraphImpl* fParent;
   SkSpan<SkCluster> fClusters;

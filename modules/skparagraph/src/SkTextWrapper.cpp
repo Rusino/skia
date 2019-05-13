@@ -52,6 +52,19 @@ bool SkTextWrapper::addLineUpToTheLastBreak() {
   return !reachedLinesLimit();
 }
 
+SkScalar SkTextWrapper::lengthUntilSoftLineBreak(SkCluster* cluster) {
+  SkScalar length = 0;
+  SkCluster* current = cluster;
+  while (current != fClusters.end()) {
+    if (current->canBreakLineAfter()) {
+      break;
+    }
+    length += cluster->width();
+    ++current;
+  }
+  return length;
+}
+
 void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
                                SkScalar maxWidth,
                                size_t maxLines,
@@ -73,15 +86,22 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
   SkScalar wordLength = 0;
   for (auto& cluster : clusters) {
     if (!cluster.isWhitespaces()) {
-      wordLength += cluster.width();
 
+      wordLength += cluster.width();
       if (fLastBreak.width() + fLastPosition.width() + cluster.trimmedWidth() > fMaxWidth) {
+
+        // There is one tricky case of too-long-word that does not fit a line anyway
+        // but since we don't know it in advance we break the line before this too-long-word
+        // and potentially cause an unnecessary line break; to avoid this situation
+        // we need to look ahead
+        auto length = fLastPosition.width() + lengthUntilSoftLineBreak(&cluster);
+        if (length > maxWidth) {
+          // We cannot fit the word on the line anyway;
+          // let's break it in the middle and hope is' enough
+          fLastBreak.moveTo(fLastPosition);
+        }
         // Cluster does not fit: add the line until the closest break
         if (!addLineUpToTheLastBreak()) break;
-      }
-
-      if (fLastPosition.width() + cluster.width() > fMaxWidth) {
-        // Cluster does not fit yet: try to break the text by hyphen?
       }
 
       if (fLastPosition.width() + cluster.trimmedWidth() > fMaxWidth) {

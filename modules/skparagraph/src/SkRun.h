@@ -163,7 +163,7 @@ class SkRun {
     return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
   }
 
-  void space(SkScalar& shift, SkScalar space, SkCluster* cluster) {
+  void addSpaces(SkScalar& shift, SkScalar space, SkCluster* cluster) {
     // Offset all the glyphs in the cluster
     for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
       fOffsets[i] = shift + space;
