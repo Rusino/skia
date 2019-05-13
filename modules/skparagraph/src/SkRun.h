@@ -61,8 +61,8 @@ class SkCluster {
 
     return fWidth * ratio;
   }
-  void space(SkScalar shift) {
-    fSpacing = shift;
+  void space(SkScalar shift, SkScalar space) {
+    fSpacing += space;
     fWidth += shift;
   }
   inline void setBreakType(BreakType type) { fBreakType = type; }
@@ -163,18 +163,42 @@ class SkRun {
     return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
   }
 
-  void addSpaces(SkScalar& shift, SkScalar space, SkCluster* cluster) {
-    // Offset all the glyphs in the cluster
-    for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
-      fOffsets[i] = shift + space;
+  SkScalar addSpacesAtTheEnd(SkScalar space, SkCluster* cluster) {
+    if (cluster->endPos() == cluster->startPos()) {
+      return 0;
     }
+
+    fOffsets[cluster->endPos() - 1] += space;
     // Increment the run width
     fSpaced = true;
     fAdvance.fX += space;
     // Increment the cluster width
-    cluster->space(space);
+    cluster->space(space, space);
 
-    shift += space;
+    return space;
+  }
+
+  SkScalar addSpacesEvenly(SkScalar space, SkCluster* cluster) {
+    // Offset all the glyphs in the cluster
+    SkScalar shift = 0;
+    for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
+      fOffsets[i] += shift;
+      shift += space;
+    }
+    // Increment the run width
+    fSpaced = true;
+    fAdvance.fX += shift;
+    // Increment the cluster width
+    cluster->space(shift, space);
+
+    return shift;
+  }
+
+
+  void shift(SkCluster* cluster, SkScalar offset) {
+    for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
+      fOffsets[i] += offset;
+    }
   }
 
   SkScalar calculateHeight() const {

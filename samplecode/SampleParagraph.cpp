@@ -668,16 +668,23 @@ class ParagraphView2 : public Sample {
     std::vector<std::string> very_long =
         {"A very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text"};
 
+    std::vector<std::string> very_word =
+        {"A very_very_very_very_very_very_very_very_very_very very_very_very_very_very_very_very_very_very_very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long text"};
+
     SkScalar width = this->width() / 5;
     SkScalar height = this->height();
     drawText(canvas, width, height, long_word, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
     canvas->translate(width, 0);
     drawText(canvas, width, height, very_long, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
     canvas->translate(width, 0);
-    drawText(canvas, width, height, text, SK_ColorBLACK, SK_ColorWHITE, "Roboto", 20, 100, u"\u2026");
+    drawText(canvas, width, height, very_word, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
     canvas->translate(width, 0);
-    drawCode(canvas, width, height);
-    canvas->translate(width, 0);
+
+    drawText(canvas, width, height/2, text, SK_ColorBLACK, SK_ColorWHITE, "Roboto", 20, 100, u"\u2026");
+    canvas->translate(0, height/2);
+    drawCode(canvas, width, height/2);
+    canvas->translate(width, -height/2);
+
     drawText(canvas, width, height, cupertino, SK_ColorBLACK, SK_ColorWHITE, "Google Sans", 30);
   }
 
@@ -1536,6 +1543,104 @@ class ParagraphView8 : public Sample {
   }
 
   ~ParagraphView8() {
+  }
+ protected:
+  bool onQuery(Sample::Event* evt) override {
+    if (Sample::TitleQ(*evt)) {
+      Sample::TitleR(evt, "Paragraph7");
+      return true;
+    }
+    return this->INHERITED::onQuery(evt);
+  }
+
+  void drawText(SkCanvas* canvas, SkColor background, SkScalar wordSpace, SkScalar w, SkScalar h) {
+
+    SkAutoCanvasRestore acr(canvas, true);
+    canvas->clipRect(SkRect::MakeWH(w, h));
+    canvas->drawColor(background);
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+    const char* line = "World domination is such an ugly phrase - I prefer to call it world optimisation";
+
+    SkParagraphStyle paragraphStyle;
+    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setMaxLines(10);
+    paragraphStyle.turnHintingOff();
+    SkTextStyle textStyle;
+    textStyle.setFontFamily("Roboto");
+    textStyle.setFontSize(30);
+    textStyle.setWordSpacing(wordSpace);
+    textStyle.setColor(SK_ColorBLACK);
+    textStyle.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
+
+    SkParagraphBuilder builder(paragraphStyle, fontCollection);
+    builder.pushStyle(textStyle);
+    builder.addText(line);
+    builder.pop();
+
+    auto paragraph = builder.Build();
+    paragraph->layout(w - 20);
+    paragraph->paint(canvas, 10, 10);
+  }
+
+  void onDrawContent(SkCanvas* canvas) override {
+
+    canvas->drawColor(SK_ColorWHITE);
+
+    auto h = this->height() / 4;
+    auto w = this->width() / 2;
+
+    drawText(canvas, SK_ColorGRAY, 1, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorLTGRAY, 2, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorCYAN, 3, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorGRAY, 4, w, h);
+    canvas->translate(w, - 3 *h);
+
+    drawText(canvas, SK_ColorYELLOW, 5, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorGREEN, 10, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorRED, 15, w, h);
+    canvas->translate(0, h);
+
+    drawText(canvas, SK_ColorBLUE, 20, w, h);
+    canvas->translate(0, h);
+  }
+ private:
+  typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
+};
+
+class ParagraphView9 : public Sample {
+ public:
+  ParagraphView9() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+    LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+  }
+
+  ~ParagraphView9() {
   }
  protected:
   bool onQuery(Sample::Event* evt) override {

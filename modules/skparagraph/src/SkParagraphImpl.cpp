@@ -190,18 +190,18 @@ void SkParagraphImpl::buildClusterTable() {
           SkASSERT(currentStyle != this->fTextStyles.end());
         }
 
-        if (currentStyle->style().getLetterSpacing() != 0) {
-          run.addSpaces(spacing,
-                        currentStyle->style().getLetterSpacing(),
-                        &cluster);
+        if (spacing > 0) {
+          run.shift(&cluster, spacing);
         }
+
         if (currentStyle->style().getWordSpacing() != 0 &&
             fParagraphStyle.getTextAlign() != SkTextAlign::justify) {
           if (cluster.isWhitespaces() && cluster.isSoftBreak()) {
-            run.addSpaces(spacing,
-                          currentStyle->style().getWordSpacing(),
-                          &cluster);
+            spacing += run.addSpacesAtTheEnd(currentStyle->style().getWordSpacing(), &cluster);
           }
+        }
+        if (currentStyle->style().getLetterSpacing() != 0) {
+          spacing += run.addSpacesEvenly(currentStyle->style().getLetterSpacing(), &cluster);
         }
 
         print(cluster);

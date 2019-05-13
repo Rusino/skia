@@ -31,7 +31,7 @@ class SkTextWrapper {
     }
     inline SkScalar width() const { return fWidth + fWhitespaces.fX; }
     SkScalar trimmedWidth() const {
-      return fWidth - fEnd->lastSpacing();
+      return fWidth - fTrimmedEnd->lastSpacing();
     }
     inline SkScalar height() const { return fLineMetrics.height(); }
     inline const SkCluster* trimmed() const { return fTrimmedEnd; }
