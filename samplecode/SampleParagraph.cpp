@@ -1638,6 +1638,8 @@ class ParagraphView9 : public Sample {
 #endif
 
     fontCollection = sk_make_sp<SkFontCollection>();
+    wordSpacing = 0;
+    letterSpacing = 0;
   }
 
   ~ParagraphView9() {
@@ -1645,9 +1647,21 @@ class ParagraphView9 : public Sample {
  protected:
   bool onQuery(Sample::Event* evt) override {
     if (Sample::TitleQ(*evt)) {
-      Sample::TitleR(evt, "Paragraph7");
+      Sample::TitleR(evt, "Paragraph9");
       return true;
     }
+
+    SkUnichar uni;
+    if (Sample::CharQ(*evt, &uni)) {
+      switch (uni) {
+        case 'w': ++wordSpacing;  return true;
+        case 'q': if (wordSpacing > 0) --wordSpacing; return true;
+        case 'l': ++letterSpacing; return true;
+        case 'k': if (letterSpacing > 0) --letterSpacing; return true;
+        default: break;
+      }
+    }
+
     return this->INHERITED::onQuery(evt);
   }
 
@@ -1680,6 +1694,8 @@ class ParagraphView9 : public Sample {
     textStyle.setFontFamily("Roboto");
     textStyle.setFontSize(30);
     textStyle.setColor(SK_ColorBLACK);
+    textStyle.setWordSpacing(wordSpacing);
+    textStyle.setLetterSpacing(letterSpacing);
 
     SkParagraphBuilder builder(paragraphStyle, fontCollection);
     builder.pushStyle(textStyle);
@@ -1725,6 +1741,85 @@ class ParagraphView9 : public Sample {
 
   sk_sp<TestFontProvider> testFontProvider;
   sk_sp<SkFontCollection> fontCollection;
+  SkScalar letterSpacing;
+  SkScalar wordSpacing;
+};
+
+class ParagraphView0 : public Sample {
+ public:
+  ParagraphView0() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+    LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+
+    fontCollection = sk_make_sp<SkFontCollection>();
+  }
+
+  ~ParagraphView0() {
+  }
+ protected:
+  bool onQuery(Sample::Event* evt) override {
+    if (Sample::TitleQ(*evt)) {
+      Sample::TitleR(evt, "Paragraph0");
+      return true;
+    }
+    return this->INHERITED::onQuery(evt);
+  }
+
+  void onDrawContent(SkCanvas* canvas) override {
+
+    canvas->drawColor(SK_ColorWHITE);
+
+    sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
+    fontCollection->setTestFontManager(
+        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/Katibeh-Regular.ttf")));
+
+    const char* text =
+        "من أسر وإعلان الخاصّة وهولندا،, عل قائمة الضغوط بالمطالبة تلك. الصفحة "
+        "بمباركة التقليدية قام عن. تصفح";
+
+    SkParagraphStyle paragraph_style;
+    paragraph_style.setMaxLines(14);
+    paragraph_style.setTextAlign(SkTextAlign::justify);
+    paragraph_style.turnHintingOff();
+    SkParagraphBuilder builder(paragraph_style, fontCollection);
+
+    auto decoration = (SkTextDecoration)(SkTextDecoration::kUnderline |
+        SkTextDecoration::kOverline |
+        SkTextDecoration::kLineThrough);
+
+    SkTextStyle text_style;
+    text_style.setFontFamilies({ "Katibeh" });
+    text_style.setFontSize(35);
+    text_style.setColor(SK_ColorBLACK);
+    text_style.setLetterSpacing(2);
+    text_style.setDecoration(decoration);
+    text_style.setDecorationColor(SK_ColorBLACK);
+    text_style.setDecorationStyle(SkTextDecorationStyle::kSolid);
+    builder.pushStyle(text_style);
+    builder.addText(text);
+    builder.pop();
+
+    auto paragraph = builder.Build();
+    paragraph->layout(1000 - 100);
+    paragraph->paint(canvas, 0, 0);
+
+
+  }
+ private:
+  typedef Sample INHERITED;
+
+  sk_sp<TestFontProvider> testFontProvider;
+  sk_sp<SkFontCollection> fontCollection;
 };
 //////////////////////////////////////////////////////////////////////////////
 
@@ -1736,5 +1831,5 @@ DEF_SAMPLE(return new ParagraphView5();)
 DEF_SAMPLE(return new ParagraphView6();)
 DEF_SAMPLE(return new ParagraphView7();)
 DEF_SAMPLE(return new ParagraphView8();)
-DEF_SAMPLE(return new ParagraphView8();)
 DEF_SAMPLE(return new ParagraphView9();)
+//DEF_SAMPLE(return new ParagraphView0();)

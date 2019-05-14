@@ -43,12 +43,12 @@ SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
     };
 }
 
-SkScalar SkRun::calculateWidth(size_t start, size_t end) const {
+SkScalar SkRun::calculateWidth(size_t start, size_t end, bool clip) const {
 
   SkASSERT(start <= end);
   SkScalar offset = 0;
   if ((fJustified || fSpaced) && end > start) {
-    offset = fOffsets[end - 1] - fOffsets[start];
+    offset = fOffsets[clip ? end - 1 : end] - fOffsets[start];
   }
   return fPositions[end].fX - fPositions[start].fX + offset;
 }
@@ -135,7 +135,7 @@ void SkRun::iterateThroughClustersInTextOrder(std::function<void(
         continue;
       }
 
-      apply(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph), this->calculateHeight());
+      apply(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph, glyph == size()), this->calculateHeight());
 
       start = glyph;
       cluster = nextCluster;
@@ -151,7 +151,7 @@ void SkRun::iterateThroughClustersInTextOrder(std::function<void(
         continue;
       }
 
-      apply(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph), this->calculateHeight());
+      apply(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph, glyph == 0), this->calculateHeight());
 
       glyph = start;
       cluster = nextCluster;

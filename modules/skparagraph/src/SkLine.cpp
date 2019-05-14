@@ -53,6 +53,7 @@ SkLine::SkLine(const SkLine& other) {
   this->fEllipsis.reset(other.fEllipsis == nullptr ? nullptr : new SkRun(*other.fEllipsis));
   this->fSizes = other.sizes();
   this->fClusters = other.fClusters;
+  this->fInvisibleEnd = other.fInvisibleEnd;
 }
 
 // Paint parts of each style separately
@@ -423,56 +424,51 @@ void SkLine::reorderVisualRuns() {
 
 void SkLine::justify(SkScalar maxWidth) {
 
+  // Count words an extra spaces to spread across the line
   size_t words = 0;
   SkScalar textLen = 0;
-  bool wereWhitespaces = false;
+  bool whitespacePatch = false;
   this->iterateThroughClustersInGlyphsOrder(false,
-  [&words, &textLen, &wereWhitespaces](const SkCluster* cluster) {
+  [&words, &textLen, &whitespacePatch](const SkCluster* cluster) {
     if (cluster->isWhitespaces()) {
-      if (!wereWhitespaces) {
+      if (!whitespacePatch) {
+        whitespacePatch = true;
         ++words;
       }
-      wereWhitespaces = true;
     } else {
-      wereWhitespaces = false;
-      textLen += cluster->width();
+      whitespacePatch = false;
     }
+    textLen += cluster->width();
     return true;
   });
 
   if (words == 0) {
     this->fShift = 0;
-    //this->fAdvance.fX = maxWidth;
     return;
   }
 
   SkScalar step = (maxWidth - textLen) / words;
   SkScalar shift = 0;
 
-  // Walk through the runs in the logical order
-  wereWhitespaces = false;
-  SkScalar whitespaceLen = 0;
+  // Add extra whitespaces
+  whitespacePatch = false;
   this->iterateThroughClustersInGlyphsOrder(false,
-    [&shift, step, &wereWhitespaces, &words, &whitespaceLen](const SkCluster* cluster) {
+    [&](const SkCluster* cluster) {
+
       if (cluster->isWhitespaces()) {
-        if (!wereWhitespaces) {
-          // First whitespace (could be many in a row)
-          wereWhitespaces = true;
+        if (!whitespacePatch) {
+          // Start of whitespaces; here we add an extra spaces
+          shift += step;
+          whitespacePatch = true;
           --words;
         }
-        whitespaceLen += cluster->width();
       } else {
-        // Shift the cluster
-        if (wereWhitespaces) {
-          // If it's the first character after the spaces, increase the shift
-          shift += step;
-        }
-        for (auto j = cluster->startPos(); j != cluster->endPos(); ++j) {
-          cluster->run()->fOffsets[j] = shift - whitespaceLen;
-        }
-        wereWhitespaces = false;
+        whitespacePatch = false;
       }
+
       cluster->run()->fJustified = true;
+      cluster->run()->shift(cluster, shift);
+
       return true;
     });
 
@@ -605,10 +601,16 @@ SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
   size = end->endPos() - start->startPos();
 
   // Calculate the clipping rectangle for the text with cluster edges
-  SkRect clip = SkRect::MakeXYWH( run->positionX(start->startPos()) - run->positionX(0),
-                                  sizes().runTop(run),
-                                  run->calculateWidth(start->startPos(), end->endPos()),
-                                  run->calculateHeight());
+  // There are 2 cases:
+  // EOL (when we expect the last cluster clipped without any spaces)
+  // Anything else (when we want the cluster width contain all the spaces -
+  // coming from letter spacing or word spacing or justification)
+  bool needsClipping = (run->leftToRight() ? end : start) == clusters().end() - 1;
+  SkRect clip = SkRect::MakeXYWH(
+      run->positionX(start->startPos()) - run->positionX(0),
+      sizes().runTop(run),
+      run->calculateWidth(start->startPos(), end->endPos(), needsClipping),
+      run->calculateHeight());
 
   // Correct the width in case the text edges don't match clusters
   // TODO: This is where we get smart about selecting a part of a cluster

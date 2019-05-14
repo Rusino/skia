@@ -27,6 +27,8 @@ bool SkTextWrapper::addLineUpToTheLastBreak() {
     SkVector::Make(0, fOffsetY), // offset
     SkVector::Make(fLastBreak.trimmedWidth(), fLastBreak.height()), // advance
     fLastBreak.trimmedText(fLineStart), // text
+    SkSpan<const SkCluster>(fLineStart, fLastBreak.trimmed() - fLineStart + 1),
+    SkSpan<const SkCluster>(fLastBreak.end(), fLastBreak.end() - fLastBreak.trimmed() + 1),
     fLastBreak.sizes()); // metrics
   ++fLineNumber;
 
@@ -132,8 +134,9 @@ void SkTextWrapper::formatText(SkSpan<SkCluster> clusters,
     if (cluster.isHardBreak()) {
       if (!addLineUpToTheLastBreak()) break;
       if (endOfText()) {
-        fLastBreak.moveTo(cluster);
         fLineStart = &cluster;
+        fLastBreak.clean(&cluster);
+        fLastBreak.moveTo(cluster);
         addLineUpToTheLastBreak();
       }
     }

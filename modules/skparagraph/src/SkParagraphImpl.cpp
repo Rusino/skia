@@ -184,14 +184,14 @@ void SkParagraphImpl::buildClusterTable() {
         }
         cluster.setIsWhiteSpaces();
 
+        if (spacing > 0) {
+          run.shift(&cluster, spacing);
+        }
+
         // Synchronize styles (one cluster can be covered by few styles)
         while (!cluster.startsIn(currentStyle->text())) {
           currentStyle++;
           SkASSERT(currentStyle != this->fTextStyles.end());
-        }
-
-        if (spacing > 0) {
-          run.shift(&cluster, spacing);
         }
 
         if (currentStyle->style().getWordSpacing() != 0 &&
@@ -206,8 +206,10 @@ void SkParagraphImpl::buildClusterTable() {
 
         print(cluster);
       });
+
     toUpdate.emplace_back(&run, runStart, fClusters.size() - runStart);
   }
+
   for (auto update : toUpdate) {
     auto run = std::get<0>(update);
     auto start = std::get<1>(update);
@@ -454,13 +456,20 @@ void SkParagraphImpl::paintLinesIntoPicture() {
   fPicture = recorder.finishRecordingAsPicture();
 }
 
-SkLine& SkParagraphImpl::addLine (SkVector offset, SkVector advance, SkSpan<const char> text, SkLineMetrics sizes) {
+SkLine& SkParagraphImpl::addLine(
+    SkVector offset,
+    SkVector advance,
+    SkSpan<const char> text,
+    SkSpan<const SkCluster> clusters,
+    SkSpan<const SkCluster> end,
+    SkLineMetrics sizes) {
 
   return fLines.emplace_back
       (offset,
        advance,
-       SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
        text,
+       clusters,
+       end,
        sizes);
 }
 

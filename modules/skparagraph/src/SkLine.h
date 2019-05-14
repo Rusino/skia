@@ -43,11 +43,13 @@ class SkLine {
 
   SkLine(SkVector offset
         , SkVector advance
-        , SkSpan<SkCluster> clusters
         , SkSpan<const char> text
+        , SkSpan<const SkCluster> clusters
+        , SkSpan<const SkCluster> end
         , SkLineMetrics sizes)
       : fText(text)
       , fClusters(clusters)
+      , fInvisibleEnd(end)
       , fLogical()
       , fShift(0)
       , fAdvance(advance)
@@ -57,7 +59,7 @@ class SkLine {
   }
 
   inline SkSpan<const char> text() const { return fText; }
-  inline SkSpan<SkCluster> clusters() const { return fClusters; }
+  inline SkSpan<const SkCluster> clusters() const { return fClusters; }
   inline SkVector offset() const { return fOffset + SkVector::Make(fShift, 0); }
   inline SkRun* ellipsis() const { return fEllipsis.get(); }
   inline SkLineMetrics sizes() const { return fSizes; }
@@ -129,7 +131,8 @@ class SkLine {
   }
 
   SkSpan<const char> fText;
-  SkSpan<SkCluster> fClusters;
+  SkSpan<const SkCluster> fClusters;
+  SkSpan<const SkCluster> fInvisibleEnd;
   SkTArray<SkRun*, true> fLogical;
   SkScalar fShift;    // Shift to left - right - center
   SkVector fAdvance;  // Text on the line size

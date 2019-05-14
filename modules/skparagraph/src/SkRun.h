@@ -195,7 +195,7 @@ class SkRun {
   }
 
 
-  void shift(SkCluster* cluster, SkScalar offset) {
+  void shift(const SkCluster* cluster, SkScalar offset) {
     for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
       fOffsets[i] += offset;
     }
@@ -205,7 +205,7 @@ class SkRun {
     return fFontMetrics.fDescent - fFontMetrics.fAscent;
   }
 
-  SkScalar calculateWidth(size_t start, size_t end) const;
+  SkScalar calculateWidth(size_t start, size_t end, bool clip) const;
 
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 

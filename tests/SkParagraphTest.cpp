@@ -978,7 +978,7 @@ DEF_TEST(SkParagraph_ArabicParagraph, reporter) {
   text_style.setFontFamilies({ "Katibeh" });
   text_style.setFontSize(35);
   text_style.setColor(SK_ColorBLACK);
-  text_style.setLetterSpacing(2);
+  //text_style.setLetterSpacing(2);
   text_style.setDecoration(decoration);
   text_style.setDecorationColor(SK_ColorBLACK);
   text_style.setDecorationStyle(SkTextDecorationStyle::kSolid);
