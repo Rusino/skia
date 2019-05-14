@@ -32,8 +32,6 @@ bool SkTextWrapper::addLineUpToTheLastBreak() {
     fLastBreak.sizes()); // metrics
   ++fLineNumber;
 
-  line.reorderVisualRuns();
-
   if (reachedLinesLimit() && fLastBreak.end() != fClusters.end() - 1 && !fEllipsis.empty()) {
     // We must be on the last line and not at the end of the text
     line.createEllipsis(fMaxWidth, fEllipsis, true);

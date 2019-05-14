@@ -35,15 +35,52 @@ int32_t intersects(SkSpan<const char> a, SkSpan<const char> b) {
   }
   auto begin = SkTMax(a.begin(), b.begin());
   auto end = SkTMin(a.end(), b.end());
-  auto size = end - begin;
-  return size;
-  //return end - begin;
+  return end - begin;
 }
 }
 
 SkTHashMap<SkFont, SkRun> SkLine::fEllipsisCache;
 
+SkLine::SkLine(SkVector offset
+             , SkVector advance
+             , SkSpan<const SkBlock> blocks
+             , SkSpan<const char> text
+             , SkSpan<const SkCluster> clusters
+             , SkSpan<const SkCluster> tail
+             , SkLineMetrics sizes)
+: fBlocks(blocks)
+, fText(text)
+, fClusters(clusters)
+, fInvisibleTail(tail)
+, fLogical()
+, fShift(0)
+, fAdvance(advance)
+, fOffset(offset)
+, fEllipsis(nullptr)
+, fSizes(sizes) {
+
+  // Reorder visual runs
+  auto start = fClusters.begin();
+  auto end = fClusters.end() - 1;
+  size_t numRuns = end->run()->index() - start->run()->index() + 1;
+
+  // Get the logical order
+  std::vector<UBiDiLevel> runLevels;
+  for (auto run = start->run(); run <= end->run(); ++run) {
+    runLevels.emplace_back(run->fBidiLevel);
+  }
+
+  std::vector<int32_t> logicals(numRuns);
+  ubidi_reorderVisual(runLevels.data(), SkToU32(numRuns), logicals.data());
+
+  auto firstRun = start->run();
+  for (auto logical : logicals) {
+    fLogical.push_back(firstRun + logical);
+  }
+}
+
 SkLine::SkLine(const SkLine& other) {
+  this->fBlocks = other.fBlocks;
   this->fText = other.fText;
   this->fLogical.reset();
   this->fLogical = std::move(other.fLogical);
@@ -53,11 +90,10 @@ SkLine::SkLine(const SkLine& other) {
   this->fEllipsis.reset(other.fEllipsis == nullptr ? nullptr : new SkRun(*other.fEllipsis));
   this->fSizes = other.sizes();
   this->fClusters = other.fClusters;
-  this->fInvisibleEnd = other.fInvisibleEnd;
+  this->fInvisibleTail = other.fInvisibleTail;
 }
 
-// Paint parts of each style separately
-void SkLine::paint(SkCanvas* textCanvas, SkSpan<SkBlock> blocks) {
+void SkLine::paint(SkCanvas* textCanvas) {
 
   if (this->empty()) {
     return;
@@ -67,28 +103,28 @@ void SkLine::paint(SkCanvas* textCanvas, SkSpan<SkBlock> blocks) {
   textCanvas->translate(this->offset().fX, this->offset().fY);
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Background, blocks, true,
+      SkStyleType::Background, true,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintBackground(textCanvas, text, style, offsetX);
       });
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Shadow, blocks, true,
+      SkStyleType::Shadow, true,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintShadow(textCanvas, text, style, offsetX);
       });
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Foreground, blocks, true,
+      SkStyleType::Foreground, true,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintText(textCanvas, text, style, offsetX);
       });
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Decorations, blocks, true,
+      SkStyleType::Decorations, true,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintDecorations(textCanvas, text, style, offsetX);
@@ -136,30 +172,29 @@ void SkLine::format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool last) {
   }
 }
 
-// Scan parts of each style separately
-void SkLine::scanStyles(SkStyleType style, SkSpan<SkBlock> blocks,
-                        std::function<void(SkTextStyle, SkSpan<const char>text)> apply) {
+void SkLine::scanStyles(SkStyleType style,
+                        std::function<void(SkTextStyle, SkSpan<const char>text)> visitor) {
 
   if (this->empty()) {
     return;
   }
 
   this->iterateThroughStylesInTextOrder(
-      style, blocks, false,
-      [this, apply](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-        apply(style, text);
+      style, false,
+      [this, visitor](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
+        visitor(style, text);
         return this->iterateThroughRuns(
             text, offsetX, false,
             [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
       });
 }
 
-void SkLine::scanRuns(std::function<void(SkRun*, int32_t, size_t, SkRect)> apply) {
+void SkLine::scanRuns(std::function<void(SkRun*, int32_t, size_t, SkRect)> visitor) {
 
   this->iterateThroughRuns(
       fText, 0, false,
-      [apply](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar, bool) {
-        apply(run, pos, size, clip);
+      [visitor](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar, bool) {
+        visitor(run, pos, size, clip);
         return true;
       });
 }
@@ -401,27 +436,6 @@ void SkLine::computeDecorationPaint(
   }
 }
 
-void SkLine::reorderVisualRuns() {
-
-  auto start = fClusters.begin();
-  auto end = fClusters.end() - 1;
-  size_t numRuns = end->run()->index() - start->run()->index() + 1;
-
-  // Get the logical order
-  std::vector<UBiDiLevel> runLevels;
-  for (auto run = start->run(); run <= end->run(); ++run) {
-    runLevels.emplace_back(run->fBidiLevel);
-  }
-
-  std::vector<int32_t> logicals(numRuns);
-  ubidi_reorderVisual(runLevels.data(), SkToU32(numRuns), logicals.data());
-
-  auto firstRun = start->run();
-  for (auto logical : logicals) {
-    fLogical.push_back(firstRun + logical);
-  }
-}
-
 void SkLine::justify(SkScalar maxWidth) {
 
   // Count words an extra spaces to spread across the line
@@ -558,27 +572,6 @@ SkRun* SkLine::shapeEllipsis(const std::string& ellipsis, SkRun* run) {
   return handler.run();
 }
 
-SkVector SkLine::measureWordAcrossAllRuns(SkSpan<const char> word) const {
-
-  SkVector wordSize = SkVector::Make(0, 0);
-  for (auto run : fLogical) {
-
-    // Find the intersection between the text and the run
-    SkSpan<const char> intersect = run->text() * word;
-    if (intersect.empty()) {
-      continue;
-    }
-
-    size_t pos;
-    size_t size;
-    bool clippingNeeded;
-    SkRect clip = this->measureTextInsideOneRun(intersect, run, pos, size, clippingNeeded);
-    wordSize.fX += clip.width();
-    wordSize.fY = SkTMax(wordSize.fY, clip.height());
-  }
-  return wordSize;
-}
-
 SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
                                        SkRun* run,
                                        size_t& pos,
@@ -626,7 +619,7 @@ SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
 }
 
 void SkLine::iterateThroughClustersInGlyphsOrder(
-    bool reverse, std::function<bool(const SkCluster* cluster)> apply) const {
+    bool reverse, std::function<bool(const SkCluster* cluster)> visitor) const {
 
   for (size_t r = 0; r != fLogical.size(); ++r) {
     auto& run = fLogical[reverse ? fLogical.size() - r - 1 : r];
@@ -638,7 +631,7 @@ void SkLine::iterateThroughClustersInGlyphsOrder(
       if (!this->contains(cluster)) {
         continue;
       }
-      if (!apply(cluster)) {
+      if (!visitor(cluster)) {
         return;
       }
     }
@@ -649,7 +642,7 @@ SkScalar SkLine::iterateThroughRuns(
     SkSpan<const char> text,
     SkScalar runOffset,
     bool includeEmptyText,
-    std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> apply) const {
+    std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift, bool clippingNeeded)> visitor) const {
 
   SkScalar width = 0;
   // Walk through the runs in the logical order
@@ -680,7 +673,7 @@ SkScalar SkLine::iterateThroughRuns(
     } else if (run == fLogical.back() && this->ellipsis() != nullptr) {
       clippingNeeded = true; // To avoid trouble
     }
-    if (!apply(run, pos, size, clip, shift - run->positionX(0), clippingNeeded)) {
+    if (!visitor(run, pos, size, clip, shift - run->positionX(0), clippingNeeded)) {
       return width;
     }
 
@@ -690,7 +683,7 @@ SkScalar SkLine::iterateThroughRuns(
 
   if (this->ellipsis() != nullptr) {
     auto ellipsis = this->ellipsis();
-    if (!apply(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft, false)) {
+    if (!visitor(ellipsis, 0, ellipsis->size(), ellipsis->clip(), ellipsis->clip().fLeft, false)) {
       return width;
     }
     width += ellipsis->clip().width();
@@ -701,18 +694,17 @@ SkScalar SkLine::iterateThroughRuns(
 
 void SkLine::iterateThroughStylesInTextOrder(
     SkStyleType styleType,
-    SkSpan<SkBlock> blocks,
     bool checkOffsets,
     std::function<SkScalar(SkSpan<const char> text,
                            const SkTextStyle& style,
-                           SkScalar offsetX)> apply) const {
+                           SkScalar offsetX)> visitor) const {
 
   const char* start = nullptr;
   size_t size = 0;
   SkTextStyle prevStyle;
 
   SkScalar offsetX = 0;
-  for (auto& block : blocks) {
+  for (auto& block : fBlocks) {
 
     auto intersect = block.text() * this->text();
     if (intersect.empty()) {
@@ -737,7 +729,7 @@ void SkLine::iterateThroughStylesInTextOrder(
       continue;
     }
 
-    auto width = apply(SkSpan<const char>(start, size), prevStyle, offsetX);
+    auto width = visitor(SkSpan<const char>(start, size), prevStyle, offsetX);
     offsetX += width;
 
     // Start all over again
@@ -747,7 +739,7 @@ void SkLine::iterateThroughStylesInTextOrder(
   }
 
   // The very last style
-  auto width = apply(SkSpan<const char>(start, size), prevStyle, offsetX);
+  auto width = visitor(SkSpan<const char>(start, size), prevStyle, offsetX);
   offsetX += width;
 
   // This is not a trivial assert!

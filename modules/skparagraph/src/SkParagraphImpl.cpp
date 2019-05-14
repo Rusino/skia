@@ -448,12 +448,31 @@ void SkParagraphImpl::paintLinesIntoPicture() {
   SkPictureRecorder recorder;
   SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
 
-  auto blocks = SkSpan<SkBlock>(fTextStyles.begin(), fTextStyles.size());
   for (auto& line : fLines) {
-    line.paint(textCanvas, blocks);
+    line.paint(textCanvas);
   }
 
   fPicture = recorder.finishRecordingAsPicture();
+}
+
+SkSpan<const SkBlock> SkParagraphImpl::findAllBlocks(SkSpan<const char> text) {
+
+  const SkBlock* begin = nullptr;
+  const SkBlock* end = nullptr;
+  for (auto& block : fTextStyles) {
+    if (block.text().end() <= text.begin()) {
+      continue;
+    }
+    if (block.text().begin() >= text.end()) {
+      break;
+    }
+    if (begin == nullptr) {
+      begin = &block;
+    }
+    end = &block;
+  }
+
+  return SkSpan<const SkBlock>(begin, end - begin + 1);
 }
 
 SkLine& SkParagraphImpl::addLine(
@@ -464,9 +483,13 @@ SkLine& SkParagraphImpl::addLine(
     SkSpan<const SkCluster> end,
     SkLineMetrics sizes) {
 
+  // Define a list of styles that covers the line
+  auto blocks = findAllBlocks(text);
+
   return fLines.emplace_back
       (offset,
        advance,
+       blocks,
        text,
        clusters,
        end,

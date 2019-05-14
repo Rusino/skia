@@ -121,7 +121,7 @@ void SkRun::iterateThroughClustersInTextOrder(std::function<void(
     size_t charStart,
     size_t charEnd,
     SkScalar width,
-    SkScalar height)> apply) {
+    SkScalar height)> visitor) {
 
   // Can't figure out how to do it with one code for both cases without 100 ifs
   // Can't go through clusters because there are no cluster table yet
@@ -135,7 +135,7 @@ void SkRun::iterateThroughClustersInTextOrder(std::function<void(
         continue;
       }
 
-      apply(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph, glyph == size()), this->calculateHeight());
+      visitor(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph, glyph == size()), this->calculateHeight());
 
       start = glyph;
       cluster = nextCluster;
@@ -151,7 +151,7 @@ void SkRun::iterateThroughClustersInTextOrder(std::function<void(
         continue;
       }
 
-      apply(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph, glyph == 0), this->calculateHeight());
+      visitor(start, glyph, cluster, nextCluster, this->calculateWidth(start, glyph, glyph == 0), this->calculateHeight());
 
       glyph = start;
       cluster = nextCluster;

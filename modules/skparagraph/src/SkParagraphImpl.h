@@ -178,6 +178,8 @@ class SkParagraphImpl final: public SkParagraph {
   void breakShapedTextIntoLines(SkScalar maxWidth);
   void paintLinesIntoPicture();
 
+  SkSpan<const SkBlock> findAllBlocks(SkSpan<const char> text);
+
   // Input
   SkTArray<SkBlock, true> fTextStyles;
   SkSpan<const char> fUtf8;

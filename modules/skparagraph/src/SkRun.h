@@ -215,7 +215,7 @@ class SkRun {
       size_t charStart,
       size_t charEnd,
       SkScalar width,
-      SkScalar height)> apply);
+      SkScalar height)> visitor);
 
   std::tuple<bool, SkCluster*, SkCluster*> findClusters(SkSpan<const char> text);
 
