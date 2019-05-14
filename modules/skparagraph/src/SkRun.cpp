@@ -46,6 +46,7 @@ SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
 SkScalar SkRun::calculateWidth(size_t start, size_t end, bool clip) const {
 
   SkASSERT(start <= end);
+  clip |= end == size();
   SkScalar offset = 0;
   if ((fJustified || fSpaced) && end > start) {
     offset = fOffsets[clip ? end - 1 : end] - fOffsets[start];

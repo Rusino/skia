@@ -31,7 +31,7 @@ namespace {
     return SkSpan<const char>(begin, end > begin ? end - begin : 0);
   }
   void print(const SkCluster& cluster) {
-/*
+    /*
     auto type = cluster.breakType() == SkCluster::BreakType::HardLineBreak
                 ? "!"
                 : (cluster.isSoftBreak() ? "?" : " ");
@@ -48,9 +48,20 @@ namespace {
     if (cluster.text().size() != 1) {
       SkDebugf("(%d)\n", cluster.text().size());
     } else {
+      if (cluster.endPos() - cluster.startPos() == 1) {
+        SkDebugf(" %f + %f", cluster.run()->positionX(cluster.startPos()), cluster.run()->offset(cluster.startPos()));
+      }
       SkDebugf("\n");
     }
-    */
+
+    if (cluster.endPos() - cluster.startPos() > 1) {
+      SkDebugf("Offsets: ");
+      for (size_t i = cluster.startPos(); i < cluster.endPos(); ++i) {
+        SkDebugf("%f ", cluster.run()->offset(i));
+      }
+      SkDebugf("\n");
+    }
+     */
   }
   /*
   SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {

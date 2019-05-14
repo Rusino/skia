@@ -66,7 +66,6 @@ class SkLine {
 
   void iterateThroughStylesInTextOrder(
       SkStyleType styleType,
-      bool checkOffsets,
       std::function<SkScalar(
           SkSpan<const char> text,
           const SkTextStyle& style,

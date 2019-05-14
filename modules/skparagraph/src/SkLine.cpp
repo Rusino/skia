@@ -35,7 +35,7 @@ int32_t intersects(SkSpan<const char> a, SkSpan<const char> b) {
   }
   auto begin = SkTMax(a.begin(), b.begin());
   auto end = SkTMin(a.end(), b.end());
-  return end - begin;
+  return SkToS32(end - begin);
 }
 }
 
@@ -103,28 +103,28 @@ void SkLine::paint(SkCanvas* textCanvas) {
   textCanvas->translate(this->offset().fX, this->offset().fY);
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Background, true,
+      SkStyleType::Background,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintBackground(textCanvas, text, style, offsetX);
       });
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Shadow, true,
+      SkStyleType::Shadow,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintShadow(textCanvas, text, style, offsetX);
       });
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Foreground, true,
+      SkStyleType::Foreground,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintText(textCanvas, text, style, offsetX);
       });
 
   this->iterateThroughStylesInTextOrder(
-      SkStyleType::Decorations, true,
+      SkStyleType::Decorations,
       [textCanvas, this]
       (SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         return this->paintDecorations(textCanvas, text, style, offsetX);
@@ -134,6 +134,7 @@ void SkLine::paint(SkCanvas* textCanvas) {
 }
 
 void SkLine::format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool last) {
+
   SkScalar delta = maxWidth - this->width();
   if (delta <= 0) {
     // Delta can be < 0 if there are extra whitespaces at the end of the line;
@@ -143,28 +144,21 @@ void SkLine::format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool last) {
 
   switch (effectiveAlign) {
     case SkTextAlign::left:
-
       this->shiftTo(0);
       break;
     case SkTextAlign::right:
-
-      //this->setWidth(maxWidth);
       this->shiftTo(delta);
       break;
     case SkTextAlign::center: {
-
-      //this->setWidth(maxWidth);
       this->shiftTo(delta / 2);
       break;
     }
     case SkTextAlign::justify: {
-
       if (last) {
         this->justify(maxWidth);
       } else {
         this->shiftTo(0);
       }
-
       break;
     }
     default:
@@ -180,7 +174,7 @@ void SkLine::scanStyles(SkStyleType style,
   }
 
   this->iterateThroughStylesInTextOrder(
-      style, false,
+      style,
       [this, visitor](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
         visitor(style, text);
         return this->iterateThroughRuns(
@@ -694,7 +688,6 @@ SkScalar SkLine::iterateThroughRuns(
 
 void SkLine::iterateThroughStylesInTextOrder(
     SkStyleType styleType,
-    bool checkOffsets,
     std::function<SkScalar(SkSpan<const char> text,
                            const SkTextStyle& style,
                            SkScalar offsetX)> visitor) const {
@@ -744,11 +737,9 @@ void SkLine::iterateThroughStylesInTextOrder(
 
   // This is not a trivial assert!
   // It asserts that 2 different ways of calculation come with the same results
-  if (checkOffsets && !SkScalarNearlyEqual(offsetX, this->width())) {
+  if (!SkScalarNearlyEqual(offsetX, this->width())) {
     SkDebugf("ASSERT: %f != %f '%s'\n", offsetX, this->width(), toString(fText).c_str());
   }
-  if (checkOffsets) {
-    SkASSERT(SkScalarNearlyEqual(offsetX, this->width()));
-  }
+  SkASSERT(SkScalarNearlyEqual(offsetX, this->width()));
 }
 

@@ -201,6 +201,10 @@ class SkRun {
     }
   }
 
+  SkScalar offset(size_t index) {
+    return fOffsets[index];
+  }
+
   SkScalar calculateHeight() const {
     return fFontMetrics.fDescent - fFontMetrics.fAscent;
   }
