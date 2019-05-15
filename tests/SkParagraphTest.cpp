@@ -246,7 +246,7 @@ DEF_TEST(SkParagraph_RainbowParagraph, reporter) {
   builder.pushStyle(text_style3);
   builder.addText(text3);
   builder.pop();
-  
+
   SkTextStyle text_style4;
   text_style4.setFontFamilies({ "Roboto" });
   text_style4.setFontSize(14);
@@ -2371,7 +2371,7 @@ DEF_TEST(SkParagraph_ComplexShadow, reporter) {
 }
 
 DEF_TEST(SkParagraph_BaselineParagraph, reporter) {
-  
+
   sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
   fontCollection->setTestFontManager(
       sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/SourceHanSerifCN-Regular.otf")));
@@ -2407,7 +2407,7 @@ DEF_TEST(SkParagraph_BaselineParagraph, reporter) {
 }
 
 DEF_TEST(SkParagraph_FontFallbackParagraph, reporter) {
-  
+
   sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
   fontCollection->setAssetFontManager(
       sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/NotoSansCJK-Regular.ttc")));
