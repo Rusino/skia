@@ -13,112 +13,7 @@
 #include "SkShaper.h"
 #include "SkFontMetrics.h"
 
-class SkRun;
-class SkCluster {
-
- public:
-  enum BreakType {
-    None,
-    CharacterBoundary,        // not yet in use (UBRK_CHARACTER)
-    WordBoundary,             // calculated for all clusters (UBRK_WORD)
-    WordBreakWithoutHyphen,   // calculated only for hyphenated words
-    WordBreakWithHyphen,
-    SoftLineBreak,            // calculated for all clusters (UBRK_LINE)
-    HardLineBreak,            // calculated for all clusters (UBRK_LINE)
-  };
-
-  SkCluster()
-      : fText(nullptr, 0), fRun(nullptr), fStart(0), fEnd(), fWidth(),
-        fSpacing(0), fHeight(), fWhiteSpaces(false), fBreakType(None) {}
-
-  SkCluster(SkRun* run, size_t start, size_t end, SkSpan<const char> text, SkScalar width, SkScalar height)
-    : fText(text), fRun(run)
-    , fStart(start), fEnd(end)
-    , fWidth(width), fSpacing(0), fHeight(height)
-    , fWhiteSpaces(false), fBreakType(None) { }
-
-  ~SkCluster() = default;
-
-  SkScalar sizeToChar(const char* ch) const {
-
-    if (ch < fText.begin() || ch >= fText.end()) {
-      return 0;
-    }
-    auto shift = ch - fText.begin();
-    auto ratio = shift * 1.0 / fText.size();
-
-    return SkDoubleToScalar(fWidth * ratio);
-  }
-
-  SkScalar sizeFromChar(const char* ch) const {
-
-    if (ch < fText.begin() || ch >= fText.end()) {
-      return 0;
-    }
-    auto shift = fText.end() - ch - 1;
-    auto ratio = shift * 1.0 / fText.size();
-
-    return SkDoubleToScalar(fWidth * ratio);
-  }
-
-  void space(SkScalar shift, SkScalar space) {
-    fSpacing += space;
-    fWidth += shift;
-  }
-
-  inline void setBreakType(BreakType type) { fBreakType = type; }
-  inline void setIsWhiteSpaces(bool ws) { fWhiteSpaces = ws; }
-  inline bool isWhitespaces() const { return fWhiteSpaces; }
-  inline bool canBreakLineAfter() const { return fBreakType == SoftLineBreak || fBreakType == HardLineBreak; }
-  inline bool isHardBreak() const { return fBreakType == HardLineBreak; }
-  inline bool isSoftBreak() const { return fBreakType == SoftLineBreak; }
-  inline SkRun* run() const { return fRun; }
-  inline size_t startPos() const { return fStart; }
-  inline size_t endPos() const { return fEnd; }
-  inline SkScalar width() const { return fWidth; }
-  inline SkScalar trimmedWidth() const { return fWidth - fSpacing; }
-  inline SkScalar lastSpacing() const { return fSpacing; }
-  inline SkScalar height() const { return fHeight; }
-  inline SkSpan<const char> text() const { return fText; }
-
-  void setIsWhiteSpaces() {
-    auto pos = fText.end();
-    while (--pos >= fText.begin()) {
-      auto ch = *pos;
-      if (!u_isspace(ch) &&
-          u_charType(ch) != U_CONTROL_CHAR &&
-          u_charType(ch) != U_NON_SPACING_MARK) {
-        return;
-      }
-    }
-    fWhiteSpaces = true;
-  }
-
-  bool contains(const char* ch) const {
-    return ch >= fText.begin() && ch < fText.end();
-  }
-
-  bool belongs(SkSpan<const char> text) const {
-    return fText.begin() >= text.begin() && fText.end() <= text.end();
-  }
-
-  bool startsIn(SkSpan<const char> text) const {
-    return fText.begin() >= text.begin() && fText.begin() < text.end();
-  }
-
- private:
-  SkSpan<const char> fText;
-
-  SkRun* fRun;
-  size_t fStart;
-  size_t fEnd;
-  SkScalar fWidth;
-  SkScalar fSpacing;
-  SkScalar fHeight;
-  bool fWhiteSpaces;
-  BreakType fBreakType;
-};
-
+class SkCluster;
 class SkRun {
  public:
 
@@ -149,7 +44,7 @@ class SkRun {
   inline const SkFont& font() const { return fFont ; };
   inline bool leftToRight() const { return fBidiLevel % 2 == 0; }
   inline size_t index() const { return fIndex; }
-  inline SkScalar lineHeight() const { return fLineHeight; }
+  inline SkScalar lineHeight() const { return fHeightMultiplier; }
   inline SkSpan<const char> text() const { return fText; }
   inline size_t clusterIndex(size_t pos) const { return fClusterIndexes[pos]; }
   SkScalar positionX(size_t pos) const {
@@ -162,49 +57,13 @@ class SkRun {
     return SkRect::MakeXYWH(fOffset.fX, fOffset.fY, fAdvance.fX, fAdvance.fY);
   }
 
-  SkScalar addSpacesAtTheEnd(SkScalar space, SkCluster* cluster) {
-    if (cluster->endPos() == cluster->startPos()) {
-      return 0;
-    }
-
-    fOffsets[cluster->endPos() - 1] += space;
-    // Increment the run width
-    fSpaced = true;
-    fAdvance.fX += space;
-    // Increment the cluster width
-    cluster->space(space, space);
-
-    return space;
-  }
-
-  SkScalar addSpacesEvenly(SkScalar space, SkCluster* cluster) {
-    // Offset all the glyphs in the cluster
-    SkScalar shift = 0;
-    for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
-      fOffsets[i] += shift;
-      shift += space;
-    }
-    // Increment the run width
-    fSpaced = true;
-    fAdvance.fX += shift;
-    // Increment the cluster width
-    cluster->space(shift, space);
-
-    return shift;
-  }
-
-  void shift(const SkCluster* cluster, SkScalar offset) {
-
-    fSpaced = true;
-    for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
-      fOffsets[i] += offset;
-    }
-  }
+  SkScalar addSpacesAtTheEnd(SkScalar space, SkCluster* cluster);
+  SkScalar addSpacesEvenly(SkScalar space, SkCluster* cluster);
+  void shift(const SkCluster* cluster, SkScalar offset);
 
   SkScalar calculateHeight() const {
     return fFontMetrics.fDescent - fFontMetrics.fAscent;
   }
-
   SkScalar calculateWidth(size_t start, size_t end, bool clip) const;
 
   void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
@@ -227,20 +86,97 @@ class SkRun {
 
   SkFont fFont;
   SkFontMetrics fFontMetrics;
-  SkScalar fLineHeight;
+  SkScalar fHeightMultiplier;
   size_t fIndex;
   uint8_t fBidiLevel;
   SkVector fAdvance;
-  size_t glyphCount;
   SkSpan<const char> fText;
   SkSpan<SkCluster> fClusters;
   SkVector fOffset;
   SkShaper::RunHandler::Range fUtf8Range;
   SkSTArray<128, SkGlyphID, false> fGlyphs;
   SkSTArray<128, SkPoint, true> fPositions;
-  SkSTArray<128, SkScalar, true> fOffsets;
   SkSTArray<128, uint32_t, true> fClusterIndexes;
+  SkSTArray<128, SkScalar, true> fOffsets;        // For formatting (letter/word spacing, justification)
   bool fSpaced;
+};
+
+class SkCluster {
+
+ public:
+  enum BreakType {
+    None,
+    CharacterBoundary,        // not yet in use (UBRK_CHARACTER)
+    WordBoundary,             // calculated for all clusters (UBRK_WORD)
+    WordBreakWithoutHyphen,   // calculated only for hyphenated words
+    WordBreakWithHyphen,
+    SoftLineBreak,            // calculated for all clusters (UBRK_LINE)
+    HardLineBreak,            // calculated for all clusters (UBRK_LINE)
+  };
+
+  SkCluster()
+      : fText(nullptr, 0), fRun(nullptr), fStart(0), fEnd(), fWidth(),
+        fSpacing(0), fHeight(), fWhiteSpaces(false), fBreakType(None) {}
+
+  SkCluster(SkRun* run, size_t start, size_t end, SkSpan<const char> text, SkScalar width, SkScalar height)
+      : fText(text), fRun(run)
+      , fStart(start), fEnd(end)
+      , fWidth(width), fSpacing(0), fHeight(height)
+      , fWhiteSpaces(false), fBreakType(None) { }
+
+  ~SkCluster() = default;
+
+  SkScalar sizeToChar(const char* ch) const;
+
+  SkScalar sizeFromChar(const char* ch) const;
+
+  void space(SkScalar shift, SkScalar space) {
+    fSpacing += space;
+    fWidth += shift;
+  }
+
+  inline void setBreakType(BreakType type) { fBreakType = type; }
+  inline void setIsWhiteSpaces(bool ws) { fWhiteSpaces = ws; }
+  inline bool isWhitespaces() const { return fWhiteSpaces; }
+  inline bool canBreakLineAfter() const { return fBreakType == SoftLineBreak || fBreakType == HardLineBreak; }
+  inline bool isHardBreak() const { return fBreakType == HardLineBreak; }
+  inline bool isSoftBreak() const { return fBreakType == SoftLineBreak; }
+  inline SkRun* run() const { return fRun; }
+  inline size_t startPos() const { return fStart; }
+  inline size_t endPos() const { return fEnd; }
+  inline SkScalar width() const { return fWidth; }
+  inline SkScalar trimmedWidth() const { return fWidth - fSpacing; }
+  inline SkScalar lastSpacing() const { return fSpacing; }
+  inline SkScalar height() const { return fHeight; }
+  inline SkSpan<const char> text() const { return fText; }
+
+  void shift(SkScalar offset) const { this->run()->shift(this, offset); }
+
+  void setIsWhiteSpaces();
+
+  bool contains(const char* ch) const {
+    return ch >= fText.begin() && ch < fText.end();
+  }
+
+  bool belongs(SkSpan<const char> text) const {
+    return fText.begin() >= text.begin() && fText.end() <= text.end();
+  }
+
+  bool startsIn(SkSpan<const char> text) const {
+    return fText.begin() >= text.begin() && fText.begin() < text.end();
+  }
+
+ private:
+  SkSpan<const char> fText;
+
+  SkRun* fRun;
+  size_t fStart;
+  size_t fEnd;
+  SkScalar fWidth;
+  SkScalar fSpacing;
+  SkScalar fHeight;
+  bool fWhiteSpaces;
+  BreakType fBreakType;
 };
 
 class SkLineMetrics {

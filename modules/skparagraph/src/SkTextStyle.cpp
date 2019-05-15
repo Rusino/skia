@@ -18,9 +18,6 @@
 #include "SkFontStyle.h"
 #include "SkColor.h"
 
-// TODO: Make it external so the other platforms (Android) could use it
-#define DEFAULT_FONT_FAMILY "Arial"
-
 SkTextStyle::SkTextStyle()
     : fFontStyle() {
 

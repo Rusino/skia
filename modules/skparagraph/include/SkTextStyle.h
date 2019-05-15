@@ -27,6 +27,9 @@
 #include "SkFont.h"
 #include "SkDartTypes.h"
 
+// TODO: Make it external so the other platforms (Android) could use it
+#define DEFAULT_FONT_FAMILY "sans-serif"
+
 // Multiple decorations can be applied at once. Ex: Underline and overline is
 // (0x1 | 0x2)
 enum SkTextDecoration {
@@ -34,6 +37,12 @@ enum SkTextDecoration {
   kUnderline = 0x1,
   kOverline = 0x2,
   kLineThrough = 0x4,
+};
+constexpr std::initializer_list<SkTextDecoration> AllTextDecorations = {
+    kNoDecoration,
+    kUnderline,
+    kOverline,
+    kLineThrough,
 };
 
 enum SkTextDecorationStyle { kSolid, kDouble, kDotted, kDashed, kWavy };

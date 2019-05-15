@@ -1153,10 +1153,10 @@ class ParagraphView5 : public Sample {
       builder.addText(text4);
       builder.pop();
     } else {
-      icu::UnicodeString unicode((UChar*) text.data(), SkToS32(text.size()));
-      std::string str;
-      unicode.toUTF8String(str);
-      SkDebugf("Text: %s\n", str.c_str());
+      //icu::UnicodeString unicode((UChar*) text.data(), SkToS32(text.size()));
+      //std::string str;
+      //unicode.toUTF8String(str);
+      //SkDebugf("Text: %s\n", str.c_str());
       builder.addText(text + expected);
     }
 

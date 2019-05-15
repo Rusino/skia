@@ -288,54 +288,60 @@ SkScalar SkLine::paintDecorations(
         return true;
       }
 
-      SkScalar thickness = style.getDecorationThicknessMultiplier();
-      SkScalar position;
-      switch (style.getDecoration()) {
-        case SkTextDecoration::kUnderline:
-          position = - run->ascent() + thickness;
-          break;
-        case SkTextDecoration::kOverline:
-          position = 0;
-          break;
-        case SkTextDecoration::kLineThrough: {
-          position = (run->descent() - run->ascent() - thickness) / 2;
-          break;
+      for (auto decoration : AllTextDecorations) {
+        if (style.getDecoration() && decoration == 0) {
+          continue;
         }
-        default:
-          position = 0;
-          // TODO: a combination of several decorations
-          break;
+
+        SkScalar thickness = style.getDecorationThicknessMultiplier();
+        SkScalar position;
+        switch (style.getDecoration()) {
+          case SkTextDecoration::kUnderline:
+            position = - run->ascent() + thickness;
+            break;
+          case SkTextDecoration::kOverline:
+            position = 0;
+            break;
+          case SkTextDecoration::kLineThrough: {
+            position = (run->descent() - run->ascent() - thickness) / 2;
+            break;
+          }
+          default:
+            SkASSERT(false);
+            break;
+        }
+
+        auto width = clip.width();
+        SkScalar x = clip.left();
+        SkScalar y = clip.top() + position;
+
+        // Decoration paint (for now) and/or path
+        SkPaint paint;
+        SkPath path;
+        this->computeDecorationPaint(paint, clip, style, path);
+        paint.setStrokeWidth(thickness);
+
+        switch (style.getDecorationStyle()) {
+          case SkTextDecorationStyle::kWavy:
+            path.offset(x, y);
+            canvas->drawPath(path, paint);
+            break;
+          case SkTextDecorationStyle::kDouble: {
+            canvas->drawLine(x, y, x + width, y, paint);
+            SkScalar bottom = y + thickness * 2;
+            canvas->drawLine(x, bottom, x + width, bottom, paint);
+            break;
+          }
+          case SkTextDecorationStyle::kDashed:
+          case SkTextDecorationStyle::kDotted:
+          case SkTextDecorationStyle::kSolid:
+            canvas->drawLine(x, y, x + width, y, paint);
+            break;
+          default:
+            break;
+        }
       }
 
-      auto width = clip.width();
-      SkScalar x = clip.left();
-      SkScalar y = clip.top() + position;
-
-      // Decoration paint (for now) and/or path
-      SkPaint paint;
-      SkPath path;
-      this->computeDecorationPaint(paint, clip, style, path);
-      paint.setStrokeWidth(thickness);
-
-      switch (style.getDecorationStyle()) {
-        case SkTextDecorationStyle::kWavy:
-          path.offset(x, y);
-          canvas->drawPath(path, paint);
-          break;
-        case SkTextDecorationStyle::kDouble: {
-          canvas->drawLine(x, y, x + width, y, paint);
-          SkScalar bottom = y + thickness * 2;
-          canvas->drawLine(x, bottom, x + width, bottom, paint);
-          break;
-        }
-        case SkTextDecorationStyle::kDashed:
-        case SkTextDecorationStyle::kDotted:
-        case SkTextDecorationStyle::kSolid:
-          canvas->drawLine(x, y, x + width, y, paint);
-          break;
-        default:
-          break;
-      }
       return true;
     });
 }
@@ -451,7 +457,7 @@ void SkLine::justify(SkScalar maxWidth) {
       } else {
         whitespacePatch = false;
       }
-      cluster->run()->shift(cluster, shift);
+      cluster->shift(shift);
       return true;
     });
 

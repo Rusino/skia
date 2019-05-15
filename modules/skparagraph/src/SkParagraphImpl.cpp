@@ -158,23 +158,25 @@ void SkParagraphImpl::buildClusterTable() {
     return;
   }
   size_t currentPos = breaker.first();
-  SkTHashMap<const char*, bool> map;
+  SkTHashMap<const char*, bool> softLineBreaks;
   while (!breaker.eof()) {
     currentPos = breaker.next();
     const char* ch = currentPos + fUtf8.begin();
-    map.set(ch, breaker.status() == UBRK_LINE_HARD);
+    softLineBreaks.set(ch, breaker.status() == UBRK_LINE_HARD);
   }
 
   SkBlock* currentStyle = this->fTextStyles.begin();
-  SkScalar spacing = 0;
-  // Walk through all the run in the direction of input text
+  SkScalar shift = 0;
+  // Cannot set SkSpan<SkCluster> until the array is done - can be moved around
   std::vector<std::tuple<SkRun*, size_t, size_t>> toUpdate;
+
+  // Walk through all the run in the direction of input text
   for (auto& run : fRuns) {
 
     auto runStart = fClusters.size();
     // Walk through the glyph in the direction of input text
     run.iterateThroughClustersInTextOrder(
-      [&run, this, &map, &currentStyle, &spacing]
+      [&run, this, &softLineBreaks, &currentStyle, &shift]
       (size_t glyphStart,
        size_t glyphEnd,
        size_t charStart,
@@ -186,8 +188,9 @@ void SkParagraphImpl::buildClusterTable() {
         SkSpan<const char> text(fUtf8.begin() + charStart, charEnd - charStart);
 
         auto& cluster = fClusters.emplace_back(&run, glyphStart, glyphEnd, text, width, height);
-        // Mark line breaks
-        auto found = map.find(cluster.text().end());
+
+        // Mark the line breaks
+        auto found = softLineBreaks.find(cluster.text().end());
         if (found) {
           cluster.setBreakType(*found
                                ? SkCluster::BreakType::HardLineBreak
@@ -195,9 +198,8 @@ void SkParagraphImpl::buildClusterTable() {
         }
         cluster.setIsWhiteSpaces();
 
-        if (spacing > 0) {
-          run.shift(&cluster, spacing);
-        }
+        // Shift the cluster
+        run.shift(&cluster, shift);
 
         // Synchronize styles (one cluster can be covered by few styles)
         while (!cluster.startsIn(currentStyle->text())) {
@@ -205,14 +207,15 @@ void SkParagraphImpl::buildClusterTable() {
           SkASSERT(currentStyle != this->fTextStyles.end());
         }
 
+        // Take spacing styles in account
         if (currentStyle->style().getWordSpacing() != 0 &&
             fParagraphStyle.getTextAlign() != SkTextAlign::justify) {
           if (cluster.isWhitespaces() && cluster.isSoftBreak()) {
-            spacing += run.addSpacesAtTheEnd(currentStyle->style().getWordSpacing(), &cluster);
+            shift += run.addSpacesAtTheEnd(currentStyle->style().getWordSpacing(), &cluster);
           }
         }
         if (currentStyle->style().getLetterSpacing() != 0) {
-          spacing += run.addSpacesEvenly(currentStyle->style().getLetterSpacing(), &cluster);
+          shift += run.addSpacesEvenly(currentStyle->style().getLetterSpacing(), &cluster);
         }
 
         print(cluster);
@@ -221,6 +224,7 @@ void SkParagraphImpl::buildClusterTable() {
     toUpdate.emplace_back(&run, runStart, fClusters.size() - runStart);
   }
 
+  // Set SkSpan<SkCluster> ranges for all the runs
   for (auto update : toUpdate) {
     auto run = std::get<0>(update);
     auto start = std::get<1>(update);

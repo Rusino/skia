@@ -17,9 +17,6 @@
 #include "SkFontCollection.h"
 #include "SkTextStyle.h"
 
-// TODO: Extract the platform dependent part
-#define DEFAULT_FONT_FAMILY "sans-serif"
-
 bool SkFontCollection::FamilyKey::operator==(
     const SkFontCollection::FamilyKey& other) const {
 

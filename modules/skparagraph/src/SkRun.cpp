@@ -12,10 +12,9 @@
 SkRun::SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info, SkScalar lineHeight, size_t index, SkScalar offsetX) {
 
   fFont = info.fFont;
-  fLineHeight = lineHeight;
+  fHeightMultiplier = lineHeight;
   fBidiLevel = info.fBidiLevel;
   fAdvance = info.fAdvance;
-  glyphCount = info.glyphCount;
   fText = SkSpan<const char>(text.begin() + info.utf8Range.begin(), info.utf8Range.size());
 
   fIndex = index;
@@ -45,7 +44,7 @@ SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
 SkScalar SkRun::calculateWidth(size_t start, size_t end, bool clip) const {
 
   SkASSERT(start <= end);
-  clip |= end == size();
+  clip |= end == size(); // Clip at the end of the run?
   SkScalar offset = 0;
   if (fSpaced && end > start) {
     offset = fOffsets[clip ? end - 1 : end] - fOffsets[start];
@@ -78,8 +77,8 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
 }
 
 // TODO: Make the search more effective
-std::tuple<bool, SkCluster*, SkCluster*> SkRun::findLimitingClusters(SkSpan<
-    const char> text) {
+std::tuple<bool, SkCluster*, SkCluster*>
+    SkRun::findLimitingClusters(SkSpan<const char> text) {
 
   if (text.empty()) {
     SkCluster* found = nullptr;
@@ -106,14 +105,6 @@ std::tuple<bool, SkCluster*, SkCluster*> SkRun::findLimitingClusters(SkSpan<
   }
 
   return std::make_tuple(start != nullptr && end != nullptr, start, end);
-/*
-  if (text.empty()) {
-    return std::make_tuple(true, start, start);
-  } else if (start == nullptr || end == nullptr) {
-    return std::make_tuple(false, start, end);
-  }
-  return std::make_tuple(true, start, end);
-*/
 }
 
 void SkRun::iterateThroughClustersInTextOrder(std::function<void(
@@ -158,4 +149,82 @@ void SkRun::iterateThroughClustersInTextOrder(std::function<void(
       cluster = nextCluster;
     }
   }
+}
+
+SkScalar SkRun::addSpacesAtTheEnd(SkScalar space, SkCluster* cluster) {
+  if (cluster->endPos() == cluster->startPos()) {
+    return 0;
+  }
+
+  fOffsets[cluster->endPos() - 1] += space;
+  // Increment the run width
+  fSpaced = true;
+  fAdvance.fX += space;
+  // Increment the cluster width
+  cluster->space(space, space);
+
+  return space;
+}
+
+SkScalar SkRun::addSpacesEvenly(SkScalar space, SkCluster* cluster) {
+  // Offset all the glyphs in the cluster
+  SkScalar shift = 0;
+  for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
+    fOffsets[i] += shift;
+    shift += space;
+  }
+  // Increment the run width
+  fSpaced = true;
+  fAdvance.fX += shift;
+  // Increment the cluster width
+  cluster->space(shift, space);
+
+  return shift;
+}
+
+void SkRun::shift(const SkCluster* cluster, SkScalar offset) {
+
+  if (offset == 0) {
+    return;
+  }
+
+  fSpaced = true;
+  for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
+    fOffsets[i] += offset;
+  }
+}
+
+void SkCluster::setIsWhiteSpaces() {
+  auto pos = fText.end();
+  while (--pos >= fText.begin()) {
+    auto ch = *pos;
+    if (!u_isspace(ch) &&
+        u_charType(ch) != U_CONTROL_CHAR &&
+        u_charType(ch) != U_NON_SPACING_MARK) {
+      return;
+    }
+  }
+  fWhiteSpaces = true;
+}
+
+SkScalar SkCluster::sizeToChar(const char* ch) const {
+
+  if (ch < fText.begin() || ch >= fText.end()) {
+    return 0;
+  }
+  auto shift = ch - fText.begin();
+  auto ratio = shift * 1.0 / fText.size();
+
+  return SkDoubleToScalar(fWidth * ratio);
+}
+
+SkScalar SkCluster::sizeFromChar(const char* ch) const {
+
+  if (ch < fText.begin() || ch >= fText.end()) {
+    return 0;
+  }
+  auto shift = fText.end() - ch - 1;
+  auto ratio = shift * 1.0 / fText.size();
+
+  return SkDoubleToScalar(fWidth * ratio);
 }
