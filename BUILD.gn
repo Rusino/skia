@@ -1660,12 +1660,12 @@ if (skia_enable_tools) {
       ":skia",
       ":tool_utils",
       "modules/skottie:tests",
+      "modules/skparagraph",
       "modules/sksg:tests",
       "modules/skshaper",
       "//third_party/libpng",
       "//third_party/libwebp",
       "//third_party/zlib",
-      "modules/skparagraph",
     ]
     public_deps = [
       ":gpu_tool_utils",  # Test.h #includes headers from this target.
