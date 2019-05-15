@@ -14,25 +14,13 @@
 
 class SkParagraphImpl;
 class SkTextWrapper {
-
  public:
 
   class Position {
-    std::string toString(SkSpan<const char> text) {
-      icu::UnicodeString
-          utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
-      std::string str;
-      utf16.toUTF8String(str);
-      return str;
-    }
    public:
-    explicit Position(const SkCluster* start) {
-      clean(start);
-    }
+    explicit Position(const SkCluster* start) { clean(start); }
     inline SkScalar width() const { return fWidth + fWhitespaces.fX; }
-    SkScalar trimmedWidth() const {
-      return fWidth - fTrimmedEnd->lastSpacing();
-    }
+    SkScalar trimmedWidth() const { return fWidth - fTrimmedEnd->lastSpacing(); }
     inline SkScalar height() const { return fLineMetrics.height(); }
     inline const SkCluster* trimmed() const { return fTrimmedEnd; }
     inline const SkCluster* end() const { return fEnd; }
@@ -47,7 +35,6 @@ class SkTextWrapper {
       fWidth = 0;
       fWhitespaces = SkVector::Make(0, 0);
     }
-
     SkScalar moveTo(Position& other) {
       auto result = other.fWidth;
       if (other.fWidth > 0) {
@@ -63,7 +50,6 @@ class SkTextWrapper {
       other.clean(other.fEnd);
       return result;
     }
-
     void moveTo(const SkCluster& cluster) {
       if (cluster.isWhitespaces()) {
         this->fWhitespaces.fX += cluster.width();
@@ -76,9 +62,6 @@ class SkTextWrapper {
       this->fLineMetrics.add(cluster.run());
       this->fEnd = &cluster;
     }
-
-    void extend(SkScalar w) { fWidth += w; }
-    void trim(const SkCluster* end) { fTrimmedEnd = end; }
 
     SkSpan<const char> trimmedText(const SkCluster* start) {
       size_t size = fTrimmedEnd->text().end() > start->text().begin()
@@ -94,8 +77,8 @@ class SkTextWrapper {
     const SkCluster* fTrimmedEnd;
   };
 
-  SkTextWrapper(SkParagraphImpl* parent)
-  : fParent(parent), fLastBreak(nullptr), fLastPosition(nullptr) { reset(); }
+  explicit SkTextWrapper(SkParagraphImpl* parent)
+  : fParent(parent), fLastSoftLineBreak(nullptr), fLastClusterBreak(nullptr) { reset(); }
 
   void formatText(SkSpan<SkCluster> clusters,
                   SkScalar maxWidth,
@@ -108,8 +91,8 @@ class SkTextWrapper {
 
   void reset() {
     fLineStart = nullptr;
-    fLastBreak.clean(nullptr);
-    fLastPosition.clean(nullptr);
+    fLastSoftLineBreak.clean(nullptr);
+    fLastClusterBreak.clean(nullptr);
     fMinIntrinsicWidth = 0;
     fOffsetY = 0;
     fWidth = 0;
@@ -129,10 +112,10 @@ class SkTextWrapper {
 
   SkParagraphImpl* fParent;
   SkSpan<SkCluster> fClusters;
-  std::string fEllipsis;
+  std::string fEllipsisText;
   const SkCluster* fLineStart;
-  Position fLastBreak;
-  Position fLastPosition;
+  Position fLastSoftLineBreak;
+  Position fLastClusterBreak;
   SkScalar fOffsetY;
   size_t fLineNumber;
   size_t fMaxLines;

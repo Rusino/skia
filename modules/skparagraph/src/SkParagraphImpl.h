@@ -36,8 +36,7 @@ inline bool operator&&(const SkSpan<const char>& a, const SkSpan<const char>& b)
 class SkTextBreaker {
 
  public:
-  SkTextBreaker() : fPos(-1) {
-  }
+  SkTextBreaker() : fPos(-1) { }
 
   bool initialize(SkSpan<const char> text, UBreakIteratorType type) {
     UErrorCode status = U_ZERO_ERROR;
@@ -100,7 +99,7 @@ class SkParagraphImpl final: public SkParagraph {
                   SkParagraphStyle style,
                   std::vector<Block> blocks,
                   sk_sp<SkFontCollection> fonts)
-      : SkParagraph(style, std::move(fonts))
+      : SkParagraph(std::move(style), std::move(fonts))
       , fUtf8(text.data(), text.size())
       , fTextWrapper(this)
       , fPicture(nullptr) {
@@ -115,7 +114,7 @@ class SkParagraphImpl final: public SkParagraph {
                   SkParagraphStyle style,
                   std::vector<Block> blocks,
                   sk_sp<SkFontCollection> fonts)
-      : SkParagraph(style, std::move(fonts))
+      : SkParagraph(std::move(style), std::move(fonts))
       , fTextWrapper(this)
       , fPicture(nullptr) {
 

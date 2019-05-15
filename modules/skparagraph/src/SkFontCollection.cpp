@@ -113,7 +113,7 @@ sk_sp<SkTypeface> SkFontCollection::matchTypeface(const std::string& familyName,
   }
 
   sk_sp<SkTypeface> typeface = nullptr;
-  for (auto manager : this->getFontManagerOrder()) {
+  for (const auto& manager : this->getFontManagerOrder()) {
     SkFontStyleSet* set = manager->matchFamily(familyName.c_str());
     if (nullptr == set || set->count() == 0) {
       continue;
@@ -141,12 +141,12 @@ sk_sp<SkTypeface> SkFontCollection::defaultFallback(const std::string& familyNam
   if (!familyName.empty()) {
     SkDebugf("Instead of %s (%d %s) ",
              familyName.c_str(),
-             (int)fontStyle.weight(),
+             fontStyle.weight(),
              fontStyle.slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic");
     SkDebugf("Using default %s (%d %s)\n",
              fDefaultFamilyName.c_str(),
-             (int)typeface.get()->fontStyle().weight(),
-             typeface.get()->fontStyle().slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic");
+             typeface->fontStyle().weight(),
+             typeface->fontStyle().slant() == SkFontStyle::kUpright_Slant ? "normal" : "italic");
   }
   return typeface;
 }

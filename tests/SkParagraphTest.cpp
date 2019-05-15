@@ -881,7 +881,7 @@ DEF_TEST(SkParagraph_ItalicsParagraph, reporter) {
   REPORTER_ASSERT(reporter, impl->runs().size() == 3);
   REPORTER_ASSERT(reporter, impl->styles().size() == 3);
   REPORTER_ASSERT(reporter, impl->lines().size() == 1);
-  auto line = impl->lines()[0];
+  auto& line = impl->lines()[0];
   size_t index = 0;
   line.scanStyles(
       SkStyleType::Foreground,
@@ -2167,7 +2167,7 @@ DEF_TEST(SkParagraph_Ellipsize, reporter) {
   REPORTER_ASSERT(reporter, line.ellipsis() != nullptr);
   size_t index = 0;
   line.scanRuns(
-      [&index, line, reporter](SkRun* run, int32_t, size_t, SkRect) {
+      [&index, &line, reporter](SkRun* run, int32_t, size_t, SkRect) {
     ++index;
     if (index == 2) {
       REPORTER_ASSERT(reporter, run->text() == line.ellipsis()->text());

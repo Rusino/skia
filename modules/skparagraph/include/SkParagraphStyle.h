@@ -52,11 +52,8 @@ struct SkParagraphStyle {
   inline SkTextDirection getTextDirection() const { return fTextDirection; }
   inline std::string getEllipsis() const { return fEllipsis; }
 
-  void setStrutStyle(SkStrutStyle strutStyle) { fStrutStyle = strutStyle; }
-  void setTextStyle(SkTextStyle textStyle) {
-
-    fDefaultTextStyle = textStyle;
-  }
+  void setStrutStyle(SkStrutStyle strutStyle) { fStrutStyle = std::move(strutStyle); }
+  void setTextStyle(const SkTextStyle& textStyle) { fDefaultTextStyle = textStyle; }
   void setTextAlign(SkTextAlign align) { fTextAlign = align; }
   SkTextAlign getTextAlign() const { return fTextAlign; }
   void setTextDirection(SkTextDirection direction) {

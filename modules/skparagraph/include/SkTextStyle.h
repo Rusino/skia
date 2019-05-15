@@ -71,7 +71,7 @@ class SkTextStyle {
   inline void setColor(SkColor color) { fColor = color; }
   void setForegroundColor(SkPaint paint) {
     fHasForeground = true;
-    fForeground = paint;
+    fForeground = std::move(paint);
   }
   void clearForegroundColor() {
     fHasForeground = false;
@@ -79,7 +79,7 @@ class SkTextStyle {
 
   void setBackgroundColor(SkPaint paint) {
     fHasBackground = true;
-    fBackground = paint;
+    fBackground = std::move(paint);
   }
 
   void clearBackgroundColor() {
@@ -129,7 +129,7 @@ class SkTextStyle {
   inline std::string getFirstFontFamily() const { return fFontFamilies.front(); };
   inline void setFontFamily(const std::string& family) { fFontFamilies = { family }; }
   inline std::vector<std::string> getFontFamilies() const { return fFontFamilies; }
-  inline void setFontFamilies(const std::vector<std::string> families) { fFontFamilies = families; }
+  inline void setFontFamilies(std::vector<std::string> families) { fFontFamilies = std::move(families); }
 
   inline void setHeight(SkScalar height) { fHeight = height; }
   inline SkScalar getHeight() const { return fHeight; }

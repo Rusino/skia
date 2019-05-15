@@ -17,9 +17,9 @@
 #include "SkTextShadow.h"
 #include "SkColor.h"
 
-SkTextShadow::SkTextShadow() {}
-SkTextShadow::SkTextShadow(SkColor color, SkPoint offset, double blurFadius)
-    : fColor(color), fOffset(offset), fBlurRadius(blurFadius) {}
+SkTextShadow::SkTextShadow() = default;
+SkTextShadow::SkTextShadow(SkColor color, SkPoint offset, double blurRadius)
+    : fColor(color), fOffset(offset), fBlurRadius(blurRadius) {}
 
 bool SkTextShadow::operator==(const SkTextShadow& other) const {
     if (fColor != other.fColor)

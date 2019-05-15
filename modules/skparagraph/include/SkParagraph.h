@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <vector>
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
 #include "SkFontCollection.h"
@@ -17,7 +16,7 @@ class SkCanvas;
 class SkParagraph {
  protected:
   struct Block {
-    Block(size_t start, size_t end, SkTextStyle style)
+    Block(size_t start, size_t end, const SkTextStyle& style)
         : fStart(start), fEnd(end), fStyle(style) {}
     size_t fStart;
     size_t fEnd;
@@ -27,7 +26,7 @@ class SkParagraph {
  public:
   SkParagraph(SkParagraphStyle style, sk_sp<SkFontCollection> fonts)
       : fFontCollection(std::move(fonts))
-      , fParagraphStyle(style) { }
+      , fParagraphStyle(std::move(style)) { }
 
   virtual ~SkParagraph() = default;
 

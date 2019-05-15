@@ -70,7 +70,7 @@ namespace {
     return SkSpan<const char>(begin, end > begin ? end - begin : 0);
   }
 */
-  static inline SkUnichar utf8_next(const char** ptr, const char* end) {
+  inline SkUnichar utf8_next(const char** ptr, const char* end) {
     SkUnichar val = SkUTF::NextUTF8(ptr, end);
     return val < 0 ? 0xFFFD : val;
   }
@@ -109,8 +109,8 @@ void SkParagraphImpl::resolveStrut() {
     typeface = SkTypeface::MakeDefault();
   }
 
-  SkFontMetrics metrics;
   SkFont font(typeface, strutStyle.fFontSize);
+  SkFontMetrics metrics;
   font.getMetrics(&metrics);
 
   fStrutMetrics = SkLineMetrics(
@@ -242,7 +242,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
         , fCurrentChar(utf8.begin())
         , fCurrentStyle(styles.begin())
         , fStyles(styles)
-        , fFontCollection(fonts)
+        , fFontCollection(std::move(fonts))
         , fHintingOn(hintingOn) {
 
       resolveFonts();

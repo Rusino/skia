@@ -26,7 +26,6 @@ SkRun::SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info,
   fOffsets.push_back_n(info.glyphCount + 1, SkScalar(0));
   fClusterIndexes.push_back_n(info.glyphCount + 1);
   info.fFont.getMetrics(&fFontMetrics);
-  fJustified = false;
   fSpaced = false;
   // To make edge cases easier:
   fPositions[info.glyphCount] = fOffset + fAdvance;
@@ -48,7 +47,7 @@ SkScalar SkRun::calculateWidth(size_t start, size_t end, bool clip) const {
   SkASSERT(start <= end);
   clip |= end == size();
   SkScalar offset = 0;
-  if ((fJustified || fSpaced) && end > start) {
+  if (fSpaced && end > start) {
     offset = fOffsets[clip ? end - 1 : end] - fOffsets[start];
   }
   return fPositions[end].fX - fPositions[start].fX + offset;
@@ -62,10 +61,10 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
                     fGlyphs.data() + pos,
                     size * sizeof(SkGlyphID));
 
-  if (fJustified || fSpaced || offset.fX != 0 || offset.fY != 0) {
+  if (fSpaced || offset.fX != 0 || offset.fY != 0) {
     for (size_t i = 0; i < size; ++i) {
       auto point = fPositions[i + pos];
-      if (fJustified || fSpaced) {
+      if (fSpaced) {
         point.fX += fOffsets[i + pos];
       }
       blobBuffer.points()[i] = point + offset;
@@ -79,7 +78,8 @@ void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector
 }
 
 // TODO: Make the search more effective
-std::tuple<bool, SkCluster*, SkCluster*> SkRun::findClusters(SkSpan<const char> text) {
+std::tuple<bool, SkCluster*, SkCluster*> SkRun::findLimitingClusters(SkSpan<
+    const char> text) {
 
   if (text.empty()) {
     SkCluster* found = nullptr;

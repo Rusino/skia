@@ -35,9 +35,9 @@ class SkLine {
 
  public:
 
-  SkLine() { }
-  SkLine(const SkLine&);
-  ~SkLine() { }
+  SkLine() = default;
+  SkLine(SkLine&&);
+  ~SkLine() = default;
 
   SkLine(SkVector offset
         , SkVector advance

@@ -39,6 +39,7 @@ SkTextStyle::SkTextStyle()
     fHeight = 1.0;
     fHasBackground = false;
     fHasForeground = false;
+    fTextBaseline = SkTextBaseline::kAlphabetic;
 }
 
 bool SkTextStyle::equals(const SkTextStyle& other) const {
