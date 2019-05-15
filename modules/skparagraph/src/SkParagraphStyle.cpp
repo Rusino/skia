@@ -14,7 +14,11 @@
  * limitations under the License.
  */
 
+<<<<<<< Updated upstream
 #include "SkParagraphStyle.h"
+=======
+#include "modules/skparagraph/include/SkParagraphStyle.h"
+>>>>>>> Stashed changes
 #include "unicode/unistr.h"
 
 SkStrutStyle::SkStrutStyle() {

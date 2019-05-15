@@ -16,8 +16,13 @@
 
 #pragma once
 
+<<<<<<< Updated upstream
 #include "SkColor.h"
 #include "SkPoint.h"
+=======
+#include "include/core/SkColor.h"
+#include "include/core/SkPoint.h"
+>>>>>>> Stashed changes
 
 class SkTextShadow {
   public:

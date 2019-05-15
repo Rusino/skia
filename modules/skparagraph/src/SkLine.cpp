@@ -9,9 +9,15 @@
 #include <unicode/ubidi.h>
 #include "SkLine.h"
 #include "SkParagraphImpl.h"
+<<<<<<< Updated upstream
 #include "SkDashPathEffect.h"
 #include "SkDiscretePathEffect.h"
 #include "SkMaskFilter.h"
+=======
+#include "include/effects/SkDashPathEffect.h"
+#include "include/effects/SkDiscretePathEffect.h"
+#include "include/core/SkMaskFilter.h"
+>>>>>>> Stashed changes
 
 namespace {
 
@@ -536,7 +542,11 @@ SkRun* SkLine::shapeEllipsis(const std::string& ellipsis, SkRun* run) {
   };
 
   ShapeHandler handler(run->lineHeight());
+<<<<<<< Updated upstream
   std::unique_ptr<SkShaper> shaper = SkShaper::MakeShapeThenWrap();
+=======
+  std::unique_ptr<SkShaper> shaper = SkShaper::MakeShapeDontWrapOrReorder();
+>>>>>>> Stashed changes
   shaper->shape(ellipsis.data(), ellipsis.size(),
                 run->font(),
                 true,

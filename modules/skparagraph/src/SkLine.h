@@ -7,12 +7,21 @@
 
 #pragma once
 
+<<<<<<< Updated upstream
 #include <SkTHash.h>
 #include "SkDartTypes.h"
 #include "SkSpan.h"
 #include "SkTArray.h"
 #include "SkCanvas.h"
 #include "SkTextStyle.h"
+=======
+#include "include/private/SkTHash.h"
+#include "modules/skparagraph/include/SkDartTypes.h"
+#include "src/core/SkSpan.h"
+#include "include/private/SkTArray.h"
+#include "include/core/SkCanvas.h"
+#include "modules/skparagraph/include/SkTextStyle.h"
+>>>>>>> Stashed changes
 #include "SkRun.h"
 
 class SkBlock {

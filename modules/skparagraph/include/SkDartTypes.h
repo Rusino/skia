@@ -7,7 +7,11 @@
 
 #pragma once
 
+<<<<<<< Updated upstream
 #include "SkRect.h"
+=======
+#include "include/core/SkRect.h"
+>>>>>>> Stashed changes
 
 enum Affinity { UPSTREAM, DOWNSTREAM };
 

@@ -18,6 +18,7 @@
 
 #include <string>
 #include <vector>
+<<<<<<< Updated upstream
 #include <SkFontMetrics.h>
 
 #include "SkFontStyle.h"
@@ -26,6 +27,15 @@
 #include "SkPaint.h"
 #include "SkFont.h"
 #include "SkDartTypes.h"
+=======
+#include "include/core/SkFontMetrics.h"
+#include "include/core/SkFontStyle.h"
+#include "include/core/SkColor.h"
+#include "include/core/SkPaint.h"
+#include "include/core/SkFont.h"
+#include "SkDartTypes.h"
+#include "SkTextShadow.h"
+>>>>>>> Stashed changes
 
 // TODO: Make it external so the other platforms (Android) could use it
 #define DEFAULT_FONT_FAMILY "sans-serif"

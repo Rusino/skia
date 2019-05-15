@@ -5,9 +5,15 @@
  * found in the LICENSE file.
  */
 
+<<<<<<< Updated upstream
 #include "SkParagraphBuilder.h"
 #include "SkParagraphImpl.h"
 #include "Resources.h"
+=======
+#include "modules/skparagraph/include/SkParagraphBuilder.h"
+#include "modules/skparagraph/src/SkParagraphImpl.h"
+#include "tools/Resources.h"
+>>>>>>> Stashed changes
 #include "Test.h"
 
 #define VeryLongCanvasWidth 1000000

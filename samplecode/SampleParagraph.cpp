@@ -10,6 +10,7 @@
 #include "Sample.h"
 
 
+<<<<<<< Updated upstream
 #include "Resources.h"
 #include "SkBlurMaskFilter.h"
 #include "SkCanvas.h"
@@ -29,6 +30,27 @@
 #include "SkTime.h"
 #include "SkTypeface.h"
 #include "SkUTF.h"
+=======
+#include "tools/Resources.h"
+#include "include/effects/SkBlurMaskFilter.h"
+#include "include/core/SkCanvas.h"
+#include "include/core/SkColorFilter.h"
+#include "include/core/SkColorPriv.h"
+#include "src/shaders/SkColorShader.h"
+#include "include/effects/SkGradientShader.h"
+#include "include/core/SkGraphics.h"
+#include "src/core/SkOSFile.h"
+#include "include/core/SkPath.h"
+#include "include/utils/SkRandom.h"
+#include "include/core/SkRegion.h"
+#include "include/core/SkShader.h"
+#include "modules/skparagraph/include/SkParagraph.h"
+#include "include/core/SkStream.h"
+#include "include/core/SkTextBlob.h"
+#include "include/core/SkTime.h"
+#include "include/core/SkTypeface.h"
+#include "src/utils/SkUTF.h"
+>>>>>>> Stashed changes
 
 extern void skia_set_text_gamma(float blackGamma, float whiteGamma);
 

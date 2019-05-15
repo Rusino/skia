@@ -18,11 +18,19 @@
 #include <memory>
 #include <set>
 #include <string>
+<<<<<<< Updated upstream
 #include "../../include/private/SkTHash.h" // TODO: Figure out how to deal with it in Flutter engine
 #include "SkFontMgr.h"
 #include "SkRefCnt.h"
 #include "SkTextStyle.h"
 #include "SkFontMgr.h"
+=======
+#include "include/private/SkTHash.h"
+#include "include/core/SkFontMgr.h"
+#include "include/core/SkRefCnt.h"
+#include "include/core/SkFontMgr.h"
+#include "SkTextStyle.h"
+>>>>>>> Stashed changes
 
 class SkFontCollection : public SkRefCnt {
   public:

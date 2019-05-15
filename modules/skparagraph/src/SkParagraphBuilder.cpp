@@ -13,10 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+<<<<<<< Updated upstream
 #include "SkParagraphBuilder.h"
 #include "SkParagraphStyle.h"
 #include "SkPaint.h"
 #include "SkSpan.h"
+=======
+#include "modules/skparagraph/include/SkParagraphBuilder.h"
+#include "modules/skparagraph/include/SkParagraphStyle.h"
+#include "include/core/SkPaint.h"
+#include "src/core/SkSpan.h"
+>>>>>>> Stashed changes
 #include "SkParagraphImpl.h"
 
 SkParagraphBuilder::SkParagraphBuilder(

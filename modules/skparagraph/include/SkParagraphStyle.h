@@ -18,8 +18,13 @@
 
 #include <string>
 
+<<<<<<< Updated upstream
 #include "SkDartTypes.h"
 #include "SkFontStyle.h"
+=======
+#include "include/core/SkFontStyle.h"
+#include "SkDartTypes.h"
+>>>>>>> Stashed changes
 #include "SkTextStyle.h"
 
 struct SkStrutStyle {

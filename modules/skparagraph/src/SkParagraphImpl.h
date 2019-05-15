@@ -7,6 +7,7 @@
 
 #pragma once
 
+<<<<<<< Updated upstream
 #include "SkTextStyle.h"
 #include "SkParagraphStyle.h"
 #include "SkLine.h"
@@ -14,6 +15,15 @@
 #include "SkParagraph.h"
 #include "SkPicture.h"
 #include "SkTHash.h"
+=======
+#include "modules/skparagraph/include/SkTextStyle.h"
+#include "modules/skparagraph/include/SkParagraphStyle.h"
+#include "SkLine.h"
+#include "SkRun.h"
+#include "modules/skparagraph/include/SkParagraph.h"
+#include "include/core/SkPicture.h"
+#include "include/private//SkTHash.h"
+>>>>>>> Stashed changes
 #include "SkTextWrapper.h"
 
 template<typename T>
