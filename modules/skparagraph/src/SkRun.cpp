@@ -5,14 +5,8 @@
  * found in the LICENSE file.
  */
 
-<<<<<<< Updated upstream
-#include <SkFontMetrics.h>
-#include "SkRun.h"
-#include "SkSpan.h"
-=======
 #include "include/core/SkFontMetrics.h"
 #include "SkRun.h"
->>>>>>> Stashed changes
 
 SkRun::SkRun(SkSpan<const char> text, const SkShaper::RunHandler::RunInfo& info, SkScalar lineHeight, size_t index, SkScalar offsetX) {
 

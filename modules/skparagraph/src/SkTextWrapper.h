@@ -7,9 +7,8 @@
 
 #pragma once
 
-#include "SkRun.h"
-#include "SkSpan.h"
-#include "SkTHash.h"
+#include "src/core/SkSpan.h"
+#include "include/private/SkTHash.h"
 #include "SkLine.h"
 
 class SkParagraphImpl;

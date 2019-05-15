@@ -8,16 +8,12 @@
 #pragma once
 
 #include <unicode/brkiter.h>
+#include "include/core/SkPoint.h"
+#include "include/core/SkTextBlob.h"
 #include "uchar.h"
-<<<<<<< Updated upstream
-#include "SkSpan.h"
-#include "SkShaper.h"
-#include "SkFontMetrics.h"
-=======
 #include "src/core/SkSpan.h"
 #include "modules/skshaper/include/SkShaper.h"
 #include "include/core/SkFontMetrics.h"
->>>>>>> Stashed changes
 
 class SkCluster;
 class SkRun {

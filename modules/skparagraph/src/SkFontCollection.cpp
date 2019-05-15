@@ -14,12 +14,7 @@
  * limitations under the License.
  */
 
-<<<<<<< Updated upstream
-#include "SkFontCollection.h"
-#include "SkTextStyle.h"
-=======
 #include "modules/skparagraph/include/SkFontCollection.h"
->>>>>>> Stashed changes
 
 bool SkFontCollection::FamilyKey::operator==(
     const SkFontCollection::FamilyKey& other) const {

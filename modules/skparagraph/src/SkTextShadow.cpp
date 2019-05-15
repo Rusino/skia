@@ -14,13 +14,8 @@
  * limitations under the License.
  */
 
-<<<<<<< Updated upstream
-#include "SkTextShadow.h"
-#include "SkColor.h"
-=======
 #include "include/core/SkColor.h"
 #include "SkTextShadow.h"
->>>>>>> Stashed changes
 
 SkTextShadow::SkTextShadow() = default;
 SkTextShadow::SkTextShadow(SkColor color, SkPoint offset, double blurRadius)

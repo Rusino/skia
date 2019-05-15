@@ -14,15 +14,9 @@
  * limitations under the License.
  */
 
-<<<<<<< Updated upstream
-#include "SkTextStyle.h"
-#include "SkFontStyle.h"
-#include "SkColor.h"
-=======
 #include "include/core/SkFontStyle.h"
 #include "include/core/SkColor.h"
 #include "SkTextStyle.h"
->>>>>>> Stashed changes
 
 SkTextStyle::SkTextStyle()
     : fFontStyle() {

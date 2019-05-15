@@ -6,16 +6,6 @@
  */
 
 #include <unicode/brkiter.h>
-<<<<<<< Updated upstream
-#include <SkBlurTypes.h>
-#include <SkFontMgr.h>
-#include <unicode/ubidi.h>
-#include "SkSpan.h"
-#include "SkParagraphImpl.h"
-#include "SkPictureRecorder.h"
-#include "SkCanvas.h"
-#include "SkUTF.h"
-=======
 #include <unicode/ubidi.h>
 #include "include/core/SkBlurTypes.h"
 #include "include/core/SkFontMgr.h"
@@ -24,7 +14,6 @@
 #include "include/core/SkCanvas.h"
 #include "src/utils/SkUTF.h"
 #include "SkParagraphImpl.h"
->>>>>>> Stashed changes
 
 namespace {
 /*
@@ -429,11 +418,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
   SkSpan<SkBlock> styles(fTextStyles.begin(), fTextStyles.size());
   MultipleFontRunIterator font(fUtf8, styles, fFontCollection, fParagraphStyle.hintingIsOn());
   ShapeHandler handler(*this, &font);
-<<<<<<< Updated upstream
-  std::unique_ptr<SkShaper> shaper = SkShaper::MakeShapeThenWrap();
-=======
   std::unique_ptr<SkShaper> shaper = SkShaper::MakeShapeDontWrapOrReorder();
->>>>>>> Stashed changes
 
   auto bidi = SkShaper::MakeIcuBiDiRunIterator(fUtf8.begin(), fUtf8.size(),
                           fParagraphStyle.getTextDirection() == SkTextDirection::ltr ? (uint8_t)2 : (uint8_t)1);
