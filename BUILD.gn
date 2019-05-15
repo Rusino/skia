@@ -1665,6 +1665,7 @@ if (skia_enable_tools) {
       "//third_party/libpng",
       "//third_party/libwebp",
       "//third_party/zlib",
+      "modules/skparagraph",
     ]
     public_deps = [
       ":gpu_tool_utils",  # Test.h #includes headers from this target.
@@ -1783,6 +1784,7 @@ if (skia_enable_tools) {
         ":flags",
         ":gpu_tool_utils",
         ":xml",
+        "modules/skparagraph",
         "modules/sksg",
         "modules/skshaper",
       ]
@@ -1935,6 +1937,7 @@ if (skia_enable_tools) {
     ]
     deps = [
       ":skia",
+      "modules/skparagraph",
       "modules/skshaper",
     ]
   }
