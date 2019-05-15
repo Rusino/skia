@@ -1122,11 +1122,7 @@ void ShapeThenWrap::wrap(char const * const utf8, size_t utf8Bytes,
             runLevels[i] = runs[previousBreak.fRunIndex + i].fLevel;
         }
         SkAutoSTMalloc<4, int32_t> logicalFromVisual(numRuns);
-        // TODO: this is a temp solution until we find the right one
-        //ubidi_reorderVisual(runLevels, numRuns, logicalFromVisual);
-        for (int i = 0; i < numRuns; ++i) {
-          logicalFromVisual[i] = i;
-        }
+        ubidi_reorderVisual(runLevels, numRuns, logicalFromVisual);
 
         // step through the runs in reverse visual order and the glyphs in reverse logical order
         // until a visible glyph is found and force them to the end of the visual line.
