@@ -20,7 +20,7 @@
 #include "include/core/SkPoint.h"
 
 class SkTextShadow {
-  public:
+public:
     SkColor fColor = SK_ColorBLACK;
     SkPoint fOffset;
     double fBlurRadius = 0.0;

@@ -15,35 +15,31 @@
  */
 
 #include "modules/skparagraph/include/SkParagraphBuilder.h"
-#include "modules/skparagraph/include/SkParagraphStyle.h"
-#include "include/core/SkPaint.h"
-#include "src/core/SkSpan.h"
 #include "SkParagraphImpl.h"
+#include "include/core/SkPaint.h"
+#include "modules/skparagraph/include/SkParagraphStyle.h"
+#include "src/core/SkSpan.h"
 
 SkParagraphBuilder::SkParagraphBuilder(
-    SkParagraphStyle style,
-    sk_sp<SkFontCollection> font_collection)
-    : fFontCollection(std::move(font_collection)) {
-
+        SkParagraphStyle style, sk_sp<SkFontCollection> font_collection)
+        : fFontCollection(std::move(font_collection)) {
     this->setParagraphStyle(style);
 }
 
 SkParagraphBuilder::~SkParagraphBuilder() = default;
 
 void SkParagraphBuilder::setParagraphStyle(const SkParagraphStyle& style) {
-
     fParagraphStyle = style;
     fTextStyles.push(fParagraphStyle.getTextStyle());
     fStyledBlocks.emplace_back(fUtf8.size(), fUtf8.size(), fParagraphStyle.getTextStyle());
 }
 
 void SkParagraphBuilder::pushStyle(const SkTextStyle& style) {
-
     this->endRunIfNeeded();
 
     fTextStyles.push(style);
-    if (!fStyledBlocks.empty() && fStyledBlocks.back().fEnd == fUtf8.size()
-        && fStyledBlocks.back().fStyle == style) {
+    if (!fStyledBlocks.empty() && fStyledBlocks.back().fEnd == fUtf8.size() &&
+        fStyledBlocks.back().fStyle == style) {
         // Just continue with the same style
     } else {
         // Go with the new style
@@ -52,7 +48,6 @@ void SkParagraphBuilder::pushStyle(const SkTextStyle& style) {
 }
 
 void SkParagraphBuilder::pop() {
-
     this->endRunIfNeeded();
 
     if (fTextStyles.size() > 1) {
@@ -67,7 +62,6 @@ void SkParagraphBuilder::pop() {
 }
 
 SkTextStyle SkParagraphBuilder::peekStyle() {
-
     this->endRunIfNeeded();
 
     if (!fTextStyles.empty()) {
@@ -79,28 +73,24 @@ SkTextStyle SkParagraphBuilder::peekStyle() {
 }
 
 void SkParagraphBuilder::addText(const std::u16string& text) {
-
     icu::UnicodeString unicode;
-    unicode.setTo((UChar*) text.data());
+    unicode.setTo((UChar*)text.data());
     unicode.toUTF8String(fUtf8);
 }
 
 void SkParagraphBuilder::addText(const std::string& text) {
-
     icu::UnicodeString unicode;
     unicode.setTo(text.data());
     unicode.toUTF8String(fUtf8);
 }
 
 void SkParagraphBuilder::addText(const char* text) {
-
     icu::UnicodeString unicode;
     unicode.setTo(text);
     unicode.toUTF8String(fUtf8);
 }
 
 void SkParagraphBuilder::endRunIfNeeded() {
-
     if (fStyledBlocks.empty()) {
         return;
     }
@@ -114,9 +104,8 @@ void SkParagraphBuilder::endRunIfNeeded() {
 }
 
 std::unique_ptr<SkParagraph> SkParagraphBuilder::Build() {
-
     this->endRunIfNeeded();
 
-    return std::make_unique<SkParagraphImpl>(fUtf8, fParagraphStyle, fStyledBlocks, fFontCollection);
+    return std::make_unique<SkParagraphImpl>(
+            fUtf8, fParagraphStyle, fStyledBlocks, fFontCollection);
 }
-

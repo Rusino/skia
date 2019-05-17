@@ -13,11 +13,11 @@ enum Affinity { UPSTREAM, DOWNSTREAM };
 
 enum class RectHeightStyle {
     // Provide tight bounding boxes that fit heights per run.
-        kTight,
+    kTight,
 
     // The height of the boxes will be the maximum height of all runs in the
     // line. All rects in the same line will be the same height.
-        kMax,
+    kMax,
 
     // Extends the top and/or bottom edge of the bounds to fully cover any line
     // spacing. The top edge of each line should be the same as the bottom edge
@@ -26,21 +26,21 @@ enum class RectHeightStyle {
     //
     // The top and bottom of each rect will cover half of the
     // space above and half of the space below the line.
-        kIncludeLineSpacingMiddle,
+    kIncludeLineSpacingMiddle,
     // The line spacing will be added to the top of the rect.
-        kIncludeLineSpacingTop,
+    kIncludeLineSpacingTop,
     // The line spacing will be added to the bottom of the rect.
-        kIncludeLineSpacingBottom
+    kIncludeLineSpacingBottom
 };
 
 enum class RectWidthStyle {
     // Provide tight bounding boxes that fit widths to the runs of each line
     // independently.
-        kTight,
+    kTight,
 
     // Extends the width of the last rect of each line to match the position of
     // the widest rect over all the lines.
-        kMax
+    kMax
 };
 
 enum class SkTextAlign {
@@ -71,8 +71,7 @@ struct SkTextBox {
     SkTextBox(SkRect r, SkTextDirection d) : rect(r), direction(d) {}
 };
 
-template<typename T>
-struct SkRange {
+template <typename T> struct SkRange {
     SkRange() : start(), end() {}
     SkRange(T s, T e) : start(s), end(e) {}
 
@@ -91,6 +90,6 @@ struct SkRange {
 };
 
 enum class SkTextBaseline {
-  kAlphabetic,
-  kIdeographic,
+    kAlphabetic,
+    kIdeographic,
 };

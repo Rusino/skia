@@ -14,33 +14,26 @@
  * limitations under the License.
  */
 
-#include "include/core/SkColor.h"
 #include "SkTextShadow.h"
+#include "include/core/SkColor.h"
 
 SkTextShadow::SkTextShadow() = default;
 SkTextShadow::SkTextShadow(SkColor color, SkPoint offset, double blurRadius)
-    : fColor(color), fOffset(offset), fBlurRadius(blurRadius) {}
+        : fColor(color), fOffset(offset), fBlurRadius(blurRadius) {}
 
 bool SkTextShadow::operator==(const SkTextShadow& other) const {
-    if (fColor != other.fColor)
-        return false;
-    if (fOffset != other.fOffset)
-        return false;
-    if (fBlurRadius != other.fBlurRadius)
-        return false;
+    if (fColor != other.fColor) return false;
+    if (fOffset != other.fOffset) return false;
+    if (fBlurRadius != other.fBlurRadius) return false;
 
     return true;
 }
 
-bool SkTextShadow::operator!=(const SkTextShadow& other) const {
-    return !(*this == other);
-}
+bool SkTextShadow::operator!=(const SkTextShadow& other) const { return !(*this == other); }
 
 bool SkTextShadow::hasShadow() const {
-    if (!fOffset.isZero())
-        return true;
-    if (fBlurRadius != 0.0)
-        return true;
+    if (!fOffset.isZero()) return true;
+    if (fBlurRadius != 0.0) return true;
 
     return false;
 }

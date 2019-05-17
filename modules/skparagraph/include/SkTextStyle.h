@@ -18,13 +18,13 @@
 
 #include <string>
 #include <vector>
-#include "include/core/SkFontMetrics.h"
-#include "include/core/SkFontStyle.h"
-#include "include/core/SkColor.h"
-#include "include/core/SkPaint.h"
-#include "include/core/SkFont.h"
 #include "SkDartTypes.h"
 #include "SkTextShadow.h"
+#include "include/core/SkColor.h"
+#include "include/core/SkFont.h"
+#include "include/core/SkFontMetrics.h"
+#include "include/core/SkFontStyle.h"
+#include "include/core/SkPaint.h"
 
 // TODO: Make it external so the other platforms (Android) could use it
 #define DEFAULT_FONT_FAMILY "sans-serif"
@@ -32,161 +32,146 @@
 // Multiple decorations can be applied at once. Ex: Underline and overline is
 // (0x1 | 0x2)
 enum SkTextDecoration {
-  kNoDecoration = 0x0,
-  kUnderline = 0x1,
-  kOverline = 0x2,
-  kLineThrough = 0x4,
+    kNoDecoration = 0x0,
+    kUnderline = 0x1,
+    kOverline = 0x2,
+    kLineThrough = 0x4,
 };
 constexpr std::initializer_list<SkTextDecoration> AllTextDecorations = {
-    kNoDecoration,
-    kUnderline,
-    kOverline,
-    kLineThrough,
+        kNoDecoration,
+        kUnderline,
+        kOverline,
+        kLineThrough,
 };
 
 enum SkTextDecorationStyle { kSolid, kDouble, kDotted, kDashed, kWavy };
 
 enum SkStyleType {
-  AllAttributes,
-  Text,
-  Font,
-  Foreground,
-  Background,
-  Shadow,
-  Decorations,
-  LetterSpacing,
-  WordSpacing
+    AllAttributes,
+    Text,
+    Font,
+    Foreground,
+    Background,
+    Shadow,
+    Decorations,
+    LetterSpacing,
+    WordSpacing
 };
 
 class SkTextStyle {
+public:
+    SkTextStyle();
+    ~SkTextStyle() = default;
 
- public:
+    bool equals(const SkTextStyle& other) const;
+    bool matchOneAttribute(SkStyleType styleType, const SkTextStyle& other) const;
+    bool operator==(const SkTextStyle& rhs) const { return this->equals(rhs); }
 
-  SkTextStyle();
-  ~SkTextStyle() = default;
+    // Colors
+    inline bool hasForeground() const { return fHasForeground; }
+    inline bool hasBackground() const { return fHasBackground; }
+    inline SkPaint getForeground() const { return fForeground; }
+    inline SkPaint getBackground() const { return fBackground; }
+    inline SkColor getColor() const { return fColor; }
 
-  bool equals(const SkTextStyle& other) const;
-  bool matchOneAttribute(SkStyleType styleType, const SkTextStyle& other) const;
-  bool operator==(const SkTextStyle& rhs) const { return this->equals(rhs); }
+    inline void setColor(SkColor color) { fColor = color; }
+    void setForegroundColor(SkPaint paint) {
+        fHasForeground = true;
+        fForeground = std::move(paint);
+    }
+    void clearForegroundColor() { fHasForeground = false; }
 
-  // Colors
-  inline bool hasForeground() const { return fHasForeground; }
-  inline bool hasBackground() const { return fHasBackground; }
-  inline SkPaint getForeground() const { return fForeground; }
-  inline SkPaint getBackground() const { return fBackground; }
-  inline SkColor getColor() const { return fColor; }
+    void setBackgroundColor(SkPaint paint) {
+        fHasBackground = true;
+        fBackground = std::move(paint);
+    }
 
-  inline void setColor(SkColor color) { fColor = color; }
-  void setForegroundColor(SkPaint paint) {
-    fHasForeground = true;
-    fForeground = std::move(paint);
-  }
-  void clearForegroundColor() {
-    fHasForeground = false;
-  }
+    void clearBackgroundColor() { fHasBackground = false; }
 
-  void setBackgroundColor(SkPaint paint) {
-    fHasBackground = true;
-    fBackground = std::move(paint);
-  }
+    // Decorations
+    inline SkTextDecoration getDecoration() const { return fDecoration; }
+    inline SkColor getDecorationColor() const { return fDecorationColor; }
+    inline SkTextDecorationStyle getDecorationStyle() const { return fDecorationStyle; }
+    inline SkScalar getDecorationThicknessMultiplier() const {
+        return fDecorationThicknessMultiplier;
+    }
+    void setDecoration(SkTextDecoration decoration) { fDecoration = decoration; }
+    void setDecorationStyle(SkTextDecorationStyle style) { fDecorationStyle = style; }
+    void setDecorationColor(SkColor color) { fDecorationColor = color; }
+    void setDecorationThicknessMultiplier(SkScalar m) { fDecorationThicknessMultiplier = m; }
 
-  void clearBackgroundColor() {
-    fHasBackground = false;
-  }
+    // Weight/Width/Slant
+    inline SkFontStyle getFontStyle() const { return fFontStyle; }
+    inline void setFontStyle(SkFontStyle fontStyle) { fFontStyle = fontStyle; }
 
-  // Decorations
-  inline SkTextDecoration getDecoration() const { return fDecoration; }
-  inline SkColor getDecorationColor() const { return fDecorationColor; }
-  inline SkTextDecorationStyle getDecorationStyle() const {
-    return fDecorationStyle;
-  }
-  inline SkScalar getDecorationThicknessMultiplier() const {
-    return fDecorationThicknessMultiplier;
-  }
-  void setDecoration(SkTextDecoration decoration) {
-    fDecoration = decoration;
-  }
-  void setDecorationStyle(SkTextDecorationStyle style) {
-    fDecorationStyle = style;
-  }
-  void setDecorationColor(SkColor color) { fDecorationColor = color; }
-  void setDecorationThicknessMultiplier(SkScalar m) {
-    fDecorationThicknessMultiplier = m;
-  }
+    // Shadows
+    inline size_t getShadowNumber() const { return fTextShadows.size(); }
+    std::vector<SkTextShadow> getShadows() const { return fTextShadows; }
+    void addShadow(SkTextShadow shadow) { fTextShadows.emplace_back(shadow); }
+    void resetShadows() { fTextShadows.clear(); }
 
-  // Weight/Width/Slant
-  inline SkFontStyle getFontStyle() const { return fFontStyle; }
-  inline void setFontStyle(SkFontStyle fontStyle) { fFontStyle = fontStyle; }
+    void getFontMetrics(SkFontMetrics* metrics) const {
+        SkFont font(fTypeface, fFontSize);
+        font.getMetrics(metrics);
+        metrics->fAscent =
+                (metrics->fAscent - metrics->fLeading / 2) * (fHeight == 0 ? 1 : fHeight);
+        metrics->fDescent =
+                (metrics->fDescent + metrics->fLeading / 2) * (fHeight == 0 ? 1 : fHeight);
+    }
 
-  // Shadows
-  inline size_t getShadowNumber() const { return fTextShadows.size(); }
-  std::vector<SkTextShadow> getShadows() const { return fTextShadows; }
-  void addShadow(SkTextShadow shadow) { fTextShadows.emplace_back(shadow); }
-  void resetShadows() { fTextShadows.clear(); }
+    inline SkScalar getFontSize() const { return fFontSize; }
+    inline void setFontSize(SkScalar size) { fFontSize = size; }
 
-  void getFontMetrics(SkFontMetrics* metrics) const {
-    SkFont font(fTypeface, fFontSize);
-    font.getMetrics(metrics);
-    metrics->fAscent = (metrics->fAscent - metrics->fLeading / 2) * (fHeight == 0 ? 1 : fHeight);
-    metrics->fDescent = (metrics->fDescent + metrics->fLeading / 2) * (fHeight == 0 ? 1 : fHeight);
-  }
+    inline std::string getFirstFontFamily() const { return fFontFamilies.front(); };
+    inline void setFontFamily(const std::string& family) { fFontFamilies = {family}; }
+    inline std::vector<std::string> getFontFamilies() const { return fFontFamilies; }
+    inline void setFontFamilies(std::vector<std::string> families) {
+        fFontFamilies = std::move(families);
+    }
 
-  inline SkScalar getFontSize() const { return fFontSize; }
-  inline void setFontSize(SkScalar size) { fFontSize = size; }
+    inline void setHeight(SkScalar height) { fHeight = height; }
+    inline SkScalar getHeight() const { return fHeight; }
 
-  inline std::string getFirstFontFamily() const { return fFontFamilies.front(); };
-  inline void setFontFamily(const std::string& family) { fFontFamilies = { family }; }
-  inline std::vector<std::string> getFontFamilies() const { return fFontFamilies; }
-  inline void setFontFamilies(std::vector<std::string> families) { fFontFamilies = std::move(families); }
+    inline void setLetterSpacing(SkScalar letterSpacing) { fLetterSpacing = letterSpacing; }
+    inline SkScalar getLetterSpacing() const { return fLetterSpacing; }
 
-  inline void setHeight(SkScalar height) { fHeight = height; }
-  inline SkScalar getHeight() const { return fHeight; }
+    inline void setWordSpacing(SkScalar wordSpacing) { fWordSpacing = wordSpacing; }
+    inline SkScalar getWordSpacing() const { return fWordSpacing; }
 
-  inline void setLetterSpacing(SkScalar letterSpacing) {
-    fLetterSpacing = letterSpacing;
-  }
-  inline SkScalar getLetterSpacing() const { return fLetterSpacing; }
+    inline sk_sp<SkTypeface> getTypeface() const { return fTypeface; }
+    inline void setTypeface(sk_sp<SkTypeface> typeface) { fTypeface = typeface; }
 
-  inline void setWordSpacing(SkScalar wordSpacing) {
-    fWordSpacing = wordSpacing;
-  }
-  inline SkScalar getWordSpacing() const { return fWordSpacing; }
+    inline std::string getLocale() const { return fLocale; }
+    inline void setLocale(const std::string& locale) { fLocale = locale; }
 
-  inline sk_sp<SkTypeface> getTypeface() const { return fTypeface; }
-  inline void setTypeface(sk_sp<SkTypeface> typeface) { fTypeface = typeface; }
+    inline SkTextBaseline getTextBaseline() const { return fTextBaseline; }
+    inline void setTextBaseline(SkTextBaseline baseline) { fTextBaseline = baseline; }
 
-  inline std::string getLocale() const { return fLocale; }
-  inline void setLocale(const std::string& locale) { fLocale = locale; }
+private:
+    SkTextDecoration fDecoration;
+    SkColor fDecorationColor;
+    SkTextDecorationStyle fDecorationStyle;
+    SkScalar fDecorationThicknessMultiplier;
 
-  inline SkTextBaseline getTextBaseline() const { return fTextBaseline; }
-  inline void setTextBaseline(SkTextBaseline baseline) { fTextBaseline = baseline; }
+    SkFontStyle fFontStyle;
 
- private:
-  SkTextDecoration fDecoration;
-  SkColor fDecorationColor;
-  SkTextDecorationStyle fDecorationStyle;
-  SkScalar fDecorationThicknessMultiplier;
+    std::vector<std::string> fFontFamilies;
+    SkScalar fFontSize;
 
-  SkFontStyle fFontStyle;
+    SkScalar fHeight;
+    std::string fLocale;
+    SkScalar fLetterSpacing;
+    SkScalar fWordSpacing;
 
-  std::vector<std::string> fFontFamilies;
-  SkScalar fFontSize;
+    SkTextBaseline fTextBaseline;
 
-  SkScalar fHeight;
-  std::string fLocale;
-  SkScalar fLetterSpacing;
-  SkScalar fWordSpacing;
+    SkColor fColor;
+    bool fHasBackground;
+    SkPaint fBackground;
+    bool fHasForeground;
+    SkPaint fForeground;
 
-  SkTextBaseline fTextBaseline;
+    std::vector<SkTextShadow> fTextShadows;
 
-  SkColor fColor;
-  bool fHasBackground;
-  SkPaint fBackground;
-  bool fHasForeground;
-  SkPaint fForeground;
-
-  std::vector<SkTextShadow> fTextShadows;
-
-  sk_sp<SkTypeface> fTypeface;
+    sk_sp<SkTypeface> fTypeface;
 };
-

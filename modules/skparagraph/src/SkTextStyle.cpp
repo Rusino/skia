@@ -14,13 +14,11 @@
  * limitations under the License.
  */
 
-#include "include/core/SkFontStyle.h"
-#include "include/core/SkColor.h"
 #include "SkTextStyle.h"
+#include "include/core/SkColor.h"
+#include "include/core/SkFontStyle.h"
 
-SkTextStyle::SkTextStyle()
-    : fFontStyle() {
-
+SkTextStyle::SkTextStyle() : fFontStyle() {
     fFontFamilies.emplace_back(DEFAULT_FONT_FAMILY);
     fColor = SK_ColorWHITE;
     fDecoration = SkTextDecoration::kNoDecoration;
@@ -40,7 +38,6 @@ SkTextStyle::SkTextStyle()
 }
 
 bool SkTextStyle::equals(const SkTextStyle& other) const {
-
     if (fColor != other.fColor) {
         return false;
     }
@@ -53,9 +50,8 @@ bool SkTextStyle::equals(const SkTextStyle& other) const {
     if (fDecorationStyle != other.fDecorationStyle) {
         return false;
     }
-    if (fDecorationThicknessMultiplier
-        != other.fDecorationThicknessMultiplier) {
-            return false;
+    if (fDecorationThicknessMultiplier != other.fDecorationThicknessMultiplier) {
+        return false;
     }
     if (!(fFontStyle == other.fFontStyle)) {
         return false;
@@ -82,7 +78,7 @@ bool SkTextStyle::equals(const SkTextStyle& other) const {
         return false;
     }
     if (fHasBackground != other.fHasBackground || fBackground != other.fBackground) {
-      return false;
+        return false;
     }
     if (fTextShadows.size() != other.fTextShadows.size()) {
         return false;
@@ -98,47 +94,45 @@ bool SkTextStyle::equals(const SkTextStyle& other) const {
 }
 
 bool SkTextStyle::matchOneAttribute(SkStyleType styleType, const SkTextStyle& other) const {
+    switch (styleType) {
+        case Foreground:
+            if (fHasForeground) {
+                return other.fHasForeground && fForeground == other.fForeground;
+            } else {
+                return !other.fHasForeground && fColor == other.fColor;
+            }
 
-  switch (styleType) {
-    case Foreground:
-      if (fHasForeground) {
-          return other.fHasForeground && fForeground == other.fForeground;
-      } else {
-        return !other.fHasForeground && fColor == other.fColor;
-      }
+        case Background:
+            return (fHasBackground == other.fHasBackground && fBackground == other.fBackground);
 
-    case Background:
-      return (fHasBackground == other.fHasBackground && fBackground == other.fBackground);
+        case Shadow:
+            if (fTextShadows.size() != other.fTextShadows.size()) {
+                return false;
+            }
 
-    case Shadow:
-      if (fTextShadows.size() != other.fTextShadows.size()) {
-          return false;
-      }
+            for (int32_t i = 0; i < SkToInt(fTextShadows.size()); ++i) {
+                if (fTextShadows[i] != other.fTextShadows[i]) {
+                    return false;
+                }
+            }
+            return true;
 
-      for (int32_t i = 0; i < SkToInt(fTextShadows.size()); ++i) {
-          if (fTextShadows[i] != other.fTextShadows[i]) {
-              return false;
-          }
-      }
-      return true;
+        case Decorations:
+            return fDecoration == other.fDecoration && fDecorationColor == other.fDecorationColor &&
+                   fDecorationStyle == other.fDecorationStyle &&
+                   fDecorationThicknessMultiplier == other.fDecorationThicknessMultiplier;
 
-    case Decorations:
-      return fDecoration == other.fDecoration &&
-          fDecorationColor == other.fDecorationColor &&
-          fDecorationStyle == other.fDecorationStyle &&
-          fDecorationThicknessMultiplier == other.fDecorationThicknessMultiplier;
+        case LetterSpacing:
+            return fLetterSpacing == other.fLetterSpacing;
 
-    case LetterSpacing:
-      return fLetterSpacing == other.fLetterSpacing;
+        case WordSpacing:
+            return fWordSpacing == other.fWordSpacing;
 
-    case WordSpacing:
-      return fWordSpacing == other.fWordSpacing;
+        case AllAttributes:
+            return this->equals(other);
 
-    case AllAttributes:
-      return this->equals(other);
-
-    default:
-        SkASSERT(false);
-    return false;
-  }
+        default:
+            SkASSERT(false);
+            return false;
+    }
 }

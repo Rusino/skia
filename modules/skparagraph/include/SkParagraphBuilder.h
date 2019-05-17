@@ -16,19 +16,19 @@
 #pragma once
 
 #include <memory>
+#include <stack>
 #include <string>
 #include <tuple>
-#include <stack>
 
 #include "unicode/unistr.h"
 
+#include "SkFontCollection.h"
 #include "SkParagraph.h"
 #include "SkParagraphStyle.h"
-#include "SkFontCollection.h"
 #include "SkTextStyle.h"
 
 class SkParagraphBuilder {
-  public:
+public:
     SkParagraphBuilder(SkParagraphStyle style, sk_sp<SkFontCollection> fontCollection);
 
     ~SkParagraphBuilder();
@@ -67,8 +67,7 @@ class SkParagraphBuilder {
     // Constructs a SkParagraph object that can be used to layout and paint the text to a SkCanvas.
     std::unique_ptr<SkParagraph> Build();
 
-  private:
-
+private:
     void endRunIfNeeded();
 
     std::string fUtf8;

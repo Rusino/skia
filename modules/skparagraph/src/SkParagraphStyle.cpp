@@ -36,11 +36,9 @@ SkParagraphStyle::SkParagraphStyle() {
 
 SkTextAlign SkParagraphStyle::effective_align() const {
     if (fTextAlign == SkTextAlign::start) {
-        return (fTextDirection == SkTextDirection::ltr) ? SkTextAlign::left
-                                                        : SkTextAlign::right;
+        return (fTextDirection == SkTextDirection::ltr) ? SkTextAlign::left : SkTextAlign::right;
     } else if (fTextAlign == SkTextAlign::end) {
-        return (fTextDirection == SkTextDirection::ltr) ? SkTextAlign::right
-                                                        : SkTextAlign::left;
+        return (fTextDirection == SkTextDirection::ltr) ? SkTextAlign::right : SkTextAlign::left;
     } else {
         return fTextAlign;
     }
@@ -48,6 +46,6 @@ SkTextAlign SkParagraphStyle::effective_align() const {
 
 void SkParagraphStyle::setEllipsis(const std::u16string& ellipsis) {
     icu::UnicodeString unicode;
-    unicode.setTo((UChar*) ellipsis.data());
+    unicode.setTo((UChar*)ellipsis.data());
     unicode.toUTF8String(fEllipsis);
 }

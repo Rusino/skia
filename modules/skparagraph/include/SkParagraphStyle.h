@@ -18,68 +18,62 @@
 
 #include <string>
 
-#include "include/core/SkFontStyle.h"
 #include "SkDartTypes.h"
 #include "SkTextStyle.h"
+#include "include/core/SkFontStyle.h"
 
 struct SkStrutStyle {
-
-  SkStrutStyle();
-  SkFontStyle fFontStyle;
-  std::vector<std::string> fFontFamilies;
-  SkScalar fFontSize;
-  SkScalar fHeight;
-  SkScalar fLeading;
-  bool fForceStrutHeight;
-  bool fStrutEnabled;
+    SkStrutStyle();
+    SkFontStyle fFontStyle;
+    std::vector<std::string> fFontFamilies;
+    SkScalar fFontSize;
+    SkScalar fHeight;
+    SkScalar fLeading;
+    bool fForceStrutHeight;
+    bool fStrutEnabled;
 };
 
 struct SkParagraphStyle {
-  SkParagraphStyle();
+    SkParagraphStyle();
 
-  bool operator==(const SkParagraphStyle& rhs) const {
+    bool operator==(const SkParagraphStyle& rhs) const {
+        return this->fHeight == rhs.fHeight && this->fEllipsis == rhs.fEllipsis &&
+               this->fTextDirection == rhs.fTextDirection && this->fTextAlign == rhs.fTextAlign &&
+               this->fDefaultTextStyle == rhs.fDefaultTextStyle;
+    }
 
-    return this->fHeight == rhs.fHeight &&
-        this->fEllipsis == rhs.fEllipsis &&
-        this->fTextDirection == rhs.fTextDirection &&
-        this->fTextAlign == rhs.fTextAlign &&
-        this->fDefaultTextStyle == rhs.fDefaultTextStyle;
-  }
+    SkStrutStyle& getStrutStyle() { return fStrutStyle; }
+    SkTextStyle& getTextStyle() { return fDefaultTextStyle; }
+    inline size_t getMaxLines() const { return fLinesLimit; }
+    inline SkTextDirection getTextDirection() const { return fTextDirection; }
+    inline std::string getEllipsis() const { return fEllipsis; }
 
-  SkStrutStyle& getStrutStyle() { return fStrutStyle; }
-  SkTextStyle& getTextStyle() { return fDefaultTextStyle; }
-  inline size_t getMaxLines() const { return fLinesLimit; }
-  inline SkTextDirection getTextDirection() const { return fTextDirection; }
-  inline std::string getEllipsis() const { return fEllipsis; }
+    void setStrutStyle(SkStrutStyle strutStyle) { fStrutStyle = std::move(strutStyle); }
+    void setTextStyle(const SkTextStyle& textStyle) { fDefaultTextStyle = textStyle; }
+    void setTextAlign(SkTextAlign align) { fTextAlign = align; }
+    SkTextAlign getTextAlign() const { return fTextAlign; }
+    void setTextDirection(SkTextDirection direction) { fTextDirection = direction; }
+    void setMaxLines(size_t maxLines) { fLinesLimit = maxLines; }
+    void setEllipsis(const std::u16string& ellipsis);
+    void setHeight(SkScalar height) { fHeight = height; }
+    SkScalar getHeight() const { return fHeight; }
 
-  void setStrutStyle(SkStrutStyle strutStyle) { fStrutStyle = std::move(strutStyle); }
-  void setTextStyle(const SkTextStyle& textStyle) { fDefaultTextStyle = textStyle; }
-  void setTextAlign(SkTextAlign align) { fTextAlign = align; }
-  SkTextAlign getTextAlign() const { return fTextAlign; }
-  void setTextDirection(SkTextDirection direction) {
+    inline bool unlimited_lines() const {
+        return fLinesLimit == std::numeric_limits<size_t>::max();
+    }
+    inline bool ellipsized() const { return !fEllipsis.empty(); }
+    SkTextAlign effective_align() const;
 
-    fTextDirection = direction;
-  }
-  void setMaxLines(size_t maxLines) { fLinesLimit = maxLines; }
-  void setEllipsis(const std::u16string& ellipsis);
-  void setHeight(SkScalar height) { fHeight = height; }
-  SkScalar getHeight() const { return fHeight; }
+    bool hintingIsOn() const { return fHintingIsOn; }
+    void turnHintingOff() { fHintingIsOn = false; }
 
-  inline bool unlimited_lines() const { return fLinesLimit == std::numeric_limits<size_t>::max(); }
-  inline bool ellipsized() const { return !fEllipsis.empty(); }
-  SkTextAlign effective_align() const;
-
-  bool hintingIsOn() const { return fHintingIsOn; }
-  void turnHintingOff() { fHintingIsOn = false; }
-
- private:
-  SkStrutStyle fStrutStyle;
-  SkTextStyle fDefaultTextStyle;
-  SkTextAlign fTextAlign;
-  SkTextDirection fTextDirection;
-  size_t fLinesLimit;
-  std::string fEllipsis;
-  SkScalar fHeight;
-  bool fHintingIsOn;
+private:
+    SkStrutStyle fStrutStyle;
+    SkTextStyle fDefaultTextStyle;
+    SkTextAlign fTextAlign;
+    SkTextDirection fTextDirection;
+    size_t fLinesLimit;
+    std::string fEllipsis;
+    SkScalar fHeight;
+    bool fHintingIsOn;
 };
-

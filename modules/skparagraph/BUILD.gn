@@ -8,10 +8,6 @@ import("../../gn/skia.gni")
 config("public_config") {
   include_dirs = [
     "include",
-    "src",
-    "../shaper/include",
-    "../../src/core",
-    "../../include/private",
   ]
 }
 
@@ -24,8 +20,5 @@ source_set("skparagraph") {
   deps = [
     "../..:skia",
     "../skshaper",
-    "//third_party/icu",
   ]
-
-  configs += [ "../../:skia_private" ]
 }
