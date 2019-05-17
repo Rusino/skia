@@ -6,9 +6,7 @@
 import("../../gn/skia.gni")
 
 config("public_config") {
-  include_dirs = [
-    "include",
-  ]
+  include_dirs = [ "include" ]
 }
 
 source_set("skparagraph") {
