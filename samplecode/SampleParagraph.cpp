@@ -5,6 +5,8 @@
  * found in the LICENSE file.
  */
 
+#include <dirent.h>
+#include <sstream>
 #include "Sample.h"
 #include "tools/Resources.h"
 #include "include/effects/SkBlurMaskFilter.h"
@@ -21,6 +23,7 @@
 #include "include/core/SkShader.h"
 #include "modules/skparagraph/include/SkParagraph.h"
 #include "modules/skparagraph/include/SkParagraphBuilder.h"
+#include "modules/skparagraph/src/SkTypefaceFontProvider.h"
 #include "modules/skparagraph/src/SkParagraphImpl.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkTextBlob.h"
@@ -64,6 +67,13 @@ static const std::vector<std::tuple<std::string,
 };
 
 namespace {
+
+static sk_sp<SkShader> setgrad(const SkRect& r, SkColor c0, SkColor c1) {
+    SkColor colors[] = { c0, c1 };
+    SkPoint pts[] = { { r.fLeft, r.fTop }, { r.fRight, r.fTop } };
+    return SkGradientShader::MakeLinear(pts, colors, nullptr, 2, SkTileMode::kClamp);
+}
+
 class TestFontStyleSet : public SkFontStyleSet {
  public:
   TestFontStyleSet() {}
@@ -93,7 +103,8 @@ class TestFontStyleSet : public SkFontStyleSet {
 
   SkTypeface* matchStyle(const SkFontStyle& pattern) override {
 
-    return SkRef(_typeface.get());
+    //return SkRef(_typeface.get());
+    return (pattern == _typeface->fontStyle() ? SkRef(_typeface.get()) : nullptr);
   }
 
  private:
@@ -168,6 +179,45 @@ class TestFontProvider : public SkFontMgr {
  private:
   TestFontStyleSet _set;
   SkString _familyName;
+};
+
+class TestFontCollection : public SkFontCollection {
+public:
+    TestFontCollection() : fResourceDir(GetResourcePath().c_str()) {
+        auto directory_closer = [](DIR* directory) {
+          if (directory != nullptr) {
+              ::closedir(directory);
+          }
+        };
+        auto fontDir = fResourceDir + "/fonts";
+        std::unique_ptr<DIR, decltype(directory_closer)> directory(::opendir(fontDir.c_str()),
+                                                                   directory_closer);
+
+        if (directory == nullptr) {
+            return;
+        }
+
+        auto fontProvider = sk_make_sp<SkTypefaceFontProvider>();
+        for (struct dirent* entry = ::readdir(directory.get()); entry != nullptr;
+             entry = ::readdir(directory.get())) {
+            if (entry->d_type != DT_REG) {
+                continue;
+            }
+
+            std::string file_name(entry->d_name);
+            std::stringstream file_path;
+            file_path << fontDir << "/" << file_name;
+
+            fontProvider->registerTypeface(SkTypeface::MakeFromFile(file_path.str().c_str()));
+        }
+        this->setTestFontManager(std::move(fontProvider));
+        this->disableFontFallback();
+    }
+
+    ~TestFontCollection() = default;
+
+private:
+    std::string fResourceDir;
 };
 }
 
@@ -879,6 +929,7 @@ class ParagraphView4 : public Sample {
         "fonts/GoogleSans-Regular.ttf"));
 
     fontCollection = sk_make_sp<SkFontCollection>();
+    fontCollection->setTestFontManager(testFontProvider);
   }
 
   ~ParagraphView4() {
@@ -1056,11 +1107,6 @@ class ParagraphView5 : public Sample {
         tf0->unref();
         tf1->unref();
 #endif
-
-    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
-        "fonts/GoogleSans-Regular.ttf"));
-
-    fontCollection = sk_make_sp<SkFontCollection>();
   }
 
   ~ParagraphView5() {
@@ -1091,6 +1137,11 @@ class ParagraphView5 : public Sample {
              std::string ff = "sans-serif",
              SkScalar fs = 30,
              const std::u16string& ellipsis = u"\u2026") {
+
+      sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
+      fontCollection->disableFontFallback();
+      fontCollection->setTestFontManager(
+              sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/GoogleSans-Regular.ttf")));
 
     SkAutoCanvasRestore acr(canvas, true);
 
@@ -1125,7 +1176,6 @@ class ParagraphView5 : public Sample {
     paraStyle.setMaxLines(lineLimit);
 
     paraStyle.setEllipsis(ellipsis);
-    fontCollection->setTestFontManager(testFontProvider);
 
     SkParagraphBuilder builder(paraStyle, fontCollection);
 
@@ -1200,9 +1250,6 @@ class ParagraphView5 : public Sample {
 
  private:
   typedef Sample INHERITED;
-
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
 };
 
 class ParagraphView6 : public Sample {
@@ -1220,11 +1267,6 @@ class ParagraphView6 : public Sample {
         tf0->unref();
         tf1->unref();
 #endif
-
-    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
-        "fonts/HangingS.ttf"));
-
-    fontCollection = sk_make_sp<SkFontCollection>();
   }
 
   ~ParagraphView6() {
@@ -1251,6 +1293,11 @@ class ParagraphView6 : public Sample {
   void hangingS(SkCanvas* canvas, SkScalar w, SkScalar h, SkScalar fs = 60.0) {
 
     auto ff = "HangingS";
+
+    sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
+    fontCollection->disableFontFallback();
+    fontCollection->setTestFontManager(
+          sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/HangingS.ttf")));
 
     canvas->drawColor(SK_ColorLTGRAY);
 
@@ -1280,7 +1327,7 @@ class ParagraphView6 : public Sample {
     magenta.setAntiAlias(true);
     magenta.setColor(SK_ColorMAGENTA);
 
-    SkFontStyle fontStyle(SkFontStyle::kBold_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kItalic_Slant);
+    SkFontStyle fontStyle/*(SkFontStyle::kBold_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kItalic_Slant)*/;
 
     SkTextStyle style;
     style.setFontFamily(ff);
@@ -1663,18 +1710,12 @@ class ParagraphView9 : public Sample {
     return this->INHERITED::onQuery(evt);
   }
 
-  static sk_sp<SkShader> setgrad(const SkRect& r, SkColor c0, SkColor c1) {
-    SkColor colors[] = { c0, c1 };
-    SkPoint pts[] = { { r.fLeft, r.fTop }, { r.fRight, r.fTop } };
-    return SkGradientShader::MakeLinear(pts, colors, nullptr, 2, SkTileMode::kClamp);
-  }
-
   void drawText(SkCanvas* canvas, SkColor background, SkScalar w, SkScalar h) {
 
     SkAutoCanvasRestore acr(canvas, true);
     canvas->clipRect(SkRect::MakeWH(w, h));
     canvas->drawColor(background);
-
+/*
     // The chinese extra height should be absorbed by the strut.
     const char* text = "World domination is such an ugly phrase - I prefer to call it world optimisation";
     std::vector<size_t> sizes = {
@@ -1703,6 +1744,44 @@ class ParagraphView9 : public Sample {
     auto paragraph = builder.Build();
     paragraph->layout(w - 20);
     paragraph->paint(canvas, 0, 0);
+*/
+      sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
+      fontCollection->disableFontFallback();
+      //fontCollection->setTestFontManager(
+      //          sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/NotoSansCJK-Regular.ttc")));
+      //fontCollection->setTestFontManager(
+      //        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/Roboto-Medium.ttf")));
+      const char* text =
+              "(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)("
+              "　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)("
+              "　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)";
+
+      SkParagraphStyle paragraphStyle;
+      paragraphStyle.setTextAlign(SkTextAlign::left);
+      paragraphStyle.setMaxLines(10);
+      paragraphStyle.turnHintingOff();
+      SkTextStyle textStyle;
+      textStyle.setFontFamilies({ "Roboto" });
+      textStyle.setFontSize(50);
+      textStyle.setHeight(1.3);
+      textStyle.setColor(SK_ColorBLACK);
+      textStyle.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
+
+      SkParagraphBuilder builder(paragraphStyle, fontCollection);
+      builder.pushStyle(textStyle);
+      builder.addText(text);
+      builder.pop();
+
+      auto paragraph = builder.Build();
+      paragraph->layout(550);
+
+      std::vector<size_t> sizes = {
+              0, 1, 2, 8, 19, 21, 22, 30, 150
+      };
+
+      std::vector<size_t> colors = {
+              SK_ColorBLUE, SK_ColorCYAN, SK_ColorLTGRAY, SK_ColorGREEN, SK_ColorRED, SK_ColorWHITE, SK_ColorYELLOW, SK_ColorMAGENTA
+      };
 
     RectHeightStyle rect_height_style = RectHeightStyle::kTight;
     RectWidthStyle rect_width_style = RectWidthStyle::kTight;
@@ -1773,46 +1852,57 @@ class ParagraphView0 : public Sample {
     return this->INHERITED::onQuery(evt);
   }
 
-  void onDrawContent(SkCanvas* canvas) override {
+    void onDrawContent(SkCanvas* canvas) override {
+        canvas->drawColor(SK_ColorWHITE);
 
-    canvas->drawColor(SK_ColorWHITE);
+        sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
+        const char* text =
+            "line1\nline2 test1 test2 test3 test4 test5 test6 test7\nline3\n\nline4 "
+            "test1 test2 test3 test4";
+        SkParagraphStyle paragraph_style;
+        paragraph_style.turnHintingOff();
+        SkParagraphBuilder builder(paragraph_style, fontCollection);
 
-    sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
-    fontCollection->setTestFontManager(
-        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/Katibeh-Regular.ttf")));
+        SkTextStyle text_style;
+        text_style.setFontFamilies({"Roboto"});
+        text_style.setColor(SK_ColorRED);
+        text_style.setFontSize(60);
+        text_style.setLetterSpacing(0);
+        text_style.setWordSpacing(0);
+        text_style.setColor(SK_ColorBLACK);
+        text_style.setHeight(1);
+        builder.pushStyle(text_style);
+        builder.addText(text);
+        builder.pop();
 
-    const char* text =
-        "من أسر وإعلان الخاصّة وهولندا،, عل قائمة الضغوط بالمطالبة تلك. الصفحة "
-        "بمباركة التقليدية قام عن. تصفح";
+        auto paragraph = builder.Build();
+        paragraph->layout(1000 - 300);
 
-    SkParagraphStyle paragraph_style;
-    paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::justify);
-    paragraph_style.turnHintingOff();
-    SkParagraphBuilder builder(paragraph_style, fontCollection);
+        std::vector<size_t> sizes = { 0 };
 
-    auto decoration = (SkTextDecoration)(SkTextDecoration::kUnderline |
-        SkTextDecoration::kOverline |
-        SkTextDecoration::kLineThrough);
+        std::vector<size_t> colors = {
+            SK_ColorBLUE, SK_ColorCYAN, SK_ColorLTGRAY, SK_ColorGREEN, SK_ColorRED, SK_ColorWHITE, SK_ColorYELLOW, SK_ColorMAGENTA
+        };
 
-    SkTextStyle text_style;
-    text_style.setFontFamilies({ "Katibeh" });
-    text_style.setFontSize(35);
-    text_style.setColor(SK_ColorBLACK);
-    text_style.setLetterSpacing(2);
-    text_style.setDecoration(decoration);
-    text_style.setDecorationColor(SK_ColorBLACK);
-    text_style.setDecorationStyle(SkTextDecorationStyle::kSolid);
-    builder.pushStyle(text_style);
-    builder.addText(text);
-    builder.pop();
+        RectHeightStyle rect_height_style = RectHeightStyle::kTight;
+        RectWidthStyle rect_width_style = RectWidthStyle::kTight;
 
-    auto paragraph = builder.Build();
-    paragraph->layout(1000 - 100);
-    paragraph->paint(canvas, 0, 0);
+        for (size_t i = 0; i < sizes.size() - 1; ++i) {
+            auto boxes = paragraph->getRectsForRange(sizes[i], sizes[i + 1], rect_height_style, rect_width_style);
+            if (boxes.empty()) {
+                continue;
+            }
+            for (auto& box : boxes) {
+                SkPaint paint;
+                paint.setColor(colors[i % colors.size()]);
+                //paint.setShader(setgrad(box.rect, colors[i % colors.size()], SK_ColorWHITE));
+                canvas->drawRect(box.rect, paint);
+            }
+        }
 
+        paragraph->paint(canvas, 0, 0);
+    }
 
-  }
  private:
   typedef Sample INHERITED;
 
@@ -1830,4 +1920,4 @@ DEF_SAMPLE(return new ParagraphView6();)
 DEF_SAMPLE(return new ParagraphView7();)
 DEF_SAMPLE(return new ParagraphView8();)
 DEF_SAMPLE(return new ParagraphView9();)
-//DEF_SAMPLE(return new ParagraphView0();)
+DEF_SAMPLE(return new ParagraphView0();)

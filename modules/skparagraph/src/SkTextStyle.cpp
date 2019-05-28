@@ -131,6 +131,10 @@ bool SkTextStyle::matchOneAttribute(SkStyleType styleType, const SkTextStyle& ot
         case AllAttributes:
             return this->equals(other);
 
+        case Font:
+            return fFontStyle == other.fFontStyle && fFontFamilies == other.fFontFamilies &&
+                   fFontSize == other.fFontSize && fHeight == other.fHeight;
+
         default:
             SkASSERT(false);
             return false;

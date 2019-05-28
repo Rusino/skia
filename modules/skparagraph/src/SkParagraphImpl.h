@@ -143,6 +143,8 @@ public:
         return !fParagraphStyle.unlimited_lines() && fLines.size() > fParagraphStyle.getMaxLines();
     }
 
+    size_t lineNumber() override { return fLines.size(); }
+
     SkLine& addLine(SkVector offset,
                     SkVector advance,
                     SkSpan<const char>

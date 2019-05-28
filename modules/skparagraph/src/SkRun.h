@@ -13,6 +13,7 @@
 #include "include/core/SkTextBlob.h"
 #include "modules/skshaper/include/SkShaper.h"
 #include "src/core/SkSpan.h"
+#include "src/core/SkTraceEvent.h"
 #include "uchar.h"
 
 class SkCluster;
@@ -123,8 +124,7 @@ public:
     SkCluster(SkRun* run,
               size_t start,
               size_t end,
-              SkSpan<const char>
-                      text,
+              SkSpan<const char> text,
               SkScalar width,
               SkScalar height)
             : fText(text)

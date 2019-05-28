@@ -8,6 +8,7 @@
 #include "SkParagraphImpl.h"
 #include <unicode/brkiter.h>
 #include <unicode/ubidi.h>
+#include "SkFontIterator.h"
 #include "include/core/SkBlurTypes.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkFontMgr.h"
@@ -17,7 +18,7 @@
 
 namespace {
 /*
-  std::string toString(SkSpan<const char> text) {
+  std::string toString(SkSpan<const char> text) {3
     icu::UnicodeString
         utf16 = icu::UnicodeString(text.begin(), SkToS32(text.size()));
     std::string str;
@@ -80,6 +81,7 @@ inline SkUnichar utf8_next(const char** ptr, const char* end) {
 SkParagraphImpl::~SkParagraphImpl() = default;
 
 void SkParagraphImpl::layout(SkScalar width) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     this->resetContext();
 
     this->resolveStrut();
@@ -92,6 +94,7 @@ void SkParagraphImpl::layout(SkScalar width) {
 }
 
 void SkParagraphImpl::resolveStrut() {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     auto strutStyle = this->paragraphStyle().getStrutStyle();
     if (!strutStyle.fStrutEnabled) {
         return;
@@ -120,6 +123,7 @@ void SkParagraphImpl::resolveStrut() {
 }
 
 void SkParagraphImpl::paint(SkCanvas* canvas, SkScalar x, SkScalar y) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     if (nullptr == fPicture) {
         // Build the picture lazily not until we actually have to paint (or never)
         this->formatLines(fWidth);
@@ -131,6 +135,7 @@ void SkParagraphImpl::paint(SkCanvas* canvas, SkScalar x, SkScalar y) {
 }
 
 void SkParagraphImpl::resetContext() {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     fAlphabeticBaseline = 0;
     fHeight = 0;
     fWidth = 0;
@@ -148,6 +153,7 @@ void SkParagraphImpl::resetContext() {
 
 // Clusters in the order of the input text
 void SkParagraphImpl::buildClusterTable() {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     // Find all possible (soft) line breaks
     SkTextBreaker breaker;
     if (!breaker.initialize(fUtf8, UBRK_LINE)) {
@@ -203,8 +209,7 @@ void SkParagraphImpl::buildClusterTable() {
             if (currentStyle->style().getWordSpacing() != 0 &&
                 fParagraphStyle.getTextAlign() != SkTextAlign::justify) {
                 if (cluster.isWhitespaces() && cluster.isSoftBreak()) {
-                    shift +=
-                            run.addSpacesAtTheEnd(currentStyle->style().getWordSpacing(), &cluster);
+                    shift += run.addSpacesAtTheEnd(currentStyle->style().getWordSpacing(), &cluster);
                 }
             }
             if (currentStyle->style().getLetterSpacing() != 0) {
@@ -227,145 +232,11 @@ void SkParagraphImpl::buildClusterTable() {
 }
 
 void SkParagraphImpl::shapeTextIntoEndlessLine() {
-    class MultipleFontRunIterator final : public SkShaper::FontRunIterator {
-    public:
-        MultipleFontRunIterator(SkSpan<const char> utf8,
-                                SkSpan<SkBlock>
-                                        styles,
-                                sk_sp<SkFontCollection>
-                                        fonts,
-                                bool hintingOn)
-                : fText(utf8)
-                , fCurrentChar(utf8.begin())
-                , fCurrentStyle(styles.begin())
-                , fStyles(styles)
-                , fFontCollection(std::move(fonts))
-                , fHintingOn(hintingOn) {
-            resolveFonts();
-        }
-
-        bool existsInFont(sk_sp<SkTypeface> typeface, SkUnichar u) {
-            return typeface->unicharToGlyph(u) != 0;
-        }
-
-        // TODO: Resolve fonts via harfbuzz
-        void resolveFonts() {
-            fResolvedFont.reset();
-
-            sk_sp<SkTypeface> prevTypeface;
-            SkScalar prevFontSize = 0;
-            SkScalar prevLineHeight = 0;
-            while (fCurrentChar != fText.end()) {
-                SkFontStyle currentFontStyle = fCurrentStyle->style().getFontStyle();
-                SkScalar currentFontSize = fCurrentStyle->style().getFontSize();
-                SkScalar currentLineHeight = fCurrentStyle->style().getHeight();
-
-                const char* current = fCurrentChar;
-                SkUnichar u = utf8_next(&fCurrentChar, fText.end());
-
-                // Find the first typeface from the collection that exists in the current text style
-                sk_sp<SkTypeface> typeface = nullptr;
-                for (auto& fontFamily : fCurrentStyle->style().getFontFamilies()) {
-                    typeface = fFontCollection->matchTypeface(fontFamily, currentFontStyle);
-                    if (typeface.get() != nullptr && existsInFont(typeface, u)) {
-                        if (!SkTypeface::Equal(typeface.get(), prevTypeface.get()) ||
-                            prevFontSize != currentFontSize ||
-                            prevLineHeight != currentLineHeight) {
-                            fResolvedFont.set(current, makeFont(typeface, currentFontSize,
-                                                                currentLineHeight));
-                            prevTypeface = typeface;
-                            prevFontSize = currentFontSize;
-                            prevLineHeight = currentLineHeight;
-                        }
-                        break;
-                    }
-                }
-                if (prevTypeface.get() == nullptr) {
-                    // We didn't find anything
-                    SkTypeface* candidate =
-                            fFontCollection->geFallbackManager()->matchFamilyStyleCharacter(
-                                    nullptr, currentFontStyle, nullptr, 0, u);
-                    if (candidate) {
-                        // We found a font with this character
-                        prevTypeface.reset(candidate);
-                    } else if (typeface != nullptr && typeface.get() != nullptr) {
-                        // We cannot resolve the character we may as well continue with the current
-                        // font
-                        prevTypeface = typeface;
-                    } else {
-                        // Anything...
-                        prevTypeface = SkTypeface::MakeDefault();
-                    }
-                    fResolvedFont.set(current,
-                                      makeFont(prevTypeface, currentFontSize, currentLineHeight));
-                    prevFontSize = currentFontSize;
-                    prevLineHeight = currentLineHeight;
-                }
-
-                // Find the text style that contains the next character
-                while (fCurrentStyle != fStyles.end() &&
-                       fCurrentStyle->text().end() <= fCurrentChar) {
-                    ++fCurrentStyle;
-                }
-            }
-
-            fCurrentChar = fText.begin();
-            fCurrentStyle = fStyles.begin();
-        }
-
-        void consume() override {
-            SkASSERT(fCurrentChar < fText.end());
-
-            auto found = fResolvedFont.find(fCurrentChar);
-            if (found == nullptr) {
-                fFont = SkFont();
-                fLineHeight = 1;
-            } else {
-                // Get the font
-                fFont = found->first;
-                fLineHeight = found->second;
-            }
-
-            // Find the first character (index) that cannot be resolved with the current font
-            while (++fCurrentChar != fText.end()) {
-                found = fResolvedFont.find(fCurrentChar);
-                if (found != nullptr) {
-                    break;
-                }
-            }
-        }
-
-        std::pair<SkFont, SkScalar> makeFont(sk_sp<SkTypeface> typeface, SkScalar size,
-                                             SkScalar height) {
-            SkFont font(typeface, size);
-            font.setEdging(SkFont::Edging::kAntiAlias);
-            if (!fHintingOn) {
-                font.setHinting(SkFontHinting::kSlight);
-                font.setSubpixel(true);
-            }
-            return std::make_pair(font, height);
-        }
-
-        size_t endOfCurrentRun() const override { return fCurrentChar - fText.begin(); }
-        bool atEnd() const override { return fCurrentChar == fText.end(); }
-        const SkFont& currentFont() const override { return fFont; }
-        SkScalar lineHeight() const { return fLineHeight; }
-
-    private:
-        SkSpan<const char> fText;
-        const char* fCurrentChar;
-        SkFont fFont;
-        SkScalar fLineHeight;
-        SkBlock* fCurrentStyle;
-        SkSpan<SkBlock> fStyles;
-        sk_sp<SkFontCollection> fFontCollection;
-        SkTHashMap<const char*, std::pair<SkFont, SkScalar>> fResolvedFont;
-        bool fHintingOn;
-    };
+    TRACE_EVENT0("skia", TRACE_FUNC);
 
     class ShapeHandler final : public SkShaper::RunHandler {
     public:
-        explicit ShapeHandler(SkParagraphImpl& paragraph, MultipleFontRunIterator* fontIterator)
+        explicit ShapeHandler(SkParagraphImpl& paragraph, SkFontIterator* fontIterator)
                 : fParagraph(&paragraph)
                 , fFontIterator(fontIterator)
                 , fAdvance(SkVector::Make(0, 0)) {}
@@ -380,6 +251,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
         void commitRunInfo() override {}
 
         Buffer runBuffer(const RunInfo& info) override {
+            TRACE_EVENT0("skia", TRACE_FUNC);
             auto& run = fParagraph->fRuns.emplace_back(fParagraph->text(),
                                                        info,
                                                        fFontIterator->lineHeight(),
@@ -389,6 +261,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
         }
 
         void commitRunBuffer(const RunInfo&) override {
+            TRACE_EVENT0("skia", TRACE_FUNC);
             auto& run = fParagraph->fRuns.back();
             if (run.size() == 0) {
                 fParagraph->fRuns.pop_back();
@@ -402,12 +275,12 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
         void commitLine() override {}
 
         SkParagraphImpl* fParagraph;
-        MultipleFontRunIterator* fFontIterator;
+        SkFontIterator* fFontIterator;
         SkVector fAdvance;
     };
 
     SkSpan<SkBlock> styles(fTextStyles.begin(), fTextStyles.size());
-    MultipleFontRunIterator font(fUtf8, styles, fFontCollection, fParagraphStyle.hintingIsOn());
+    SkFontIterator font(fUtf8, styles, fFontCollection, fParagraphStyle.hintingIsOn());
     ShapeHandler handler(*this, &font);
     std::unique_ptr<SkShaper> shaper = SkShaper::MakeShapeDontWrapOrReorder();
 
@@ -424,6 +297,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
 }
 
 void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     fTextWrapper.formatText(SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
                             maxWidth,
                             fParagraphStyle.getMaxLines(),
@@ -436,6 +310,7 @@ void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
 }
 
 void SkParagraphImpl::formatLines(SkScalar maxWidth) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     auto effectiveAlign = fParagraphStyle.effective_align();
     for (auto& line : fLines) {
         line.format(effectiveAlign, maxWidth, &line != &fLines.back());
@@ -443,6 +318,7 @@ void SkParagraphImpl::formatLines(SkScalar maxWidth) {
 }
 
 void SkParagraphImpl::paintLinesIntoPicture() {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     SkPictureRecorder recorder;
     SkCanvas* textCanvas = recorder.beginRecording(fWidth, fHeight, nullptr, 0);
 
@@ -454,6 +330,7 @@ void SkParagraphImpl::paintLinesIntoPicture() {
 }
 
 SkSpan<const SkBlock> SkParagraphImpl::findAllBlocks(SkSpan<const char> text) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     const SkBlock* begin = nullptr;
     const SkBlock* end = nullptr;
     for (auto& block : fTextStyles) {
@@ -481,6 +358,7 @@ SkLine& SkParagraphImpl::addLine(SkVector offset,
                                  SkSpan<const SkCluster>
                                          end,
                                  SkLineMetrics sizes) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     // Define a list of styles that covers the line
     auto blocks = findAllBlocks(text);
 
@@ -547,9 +425,8 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(unsigned start,
                     rect.fTop = line.offset().fY;
 
                 } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingMiddle) {
-                    auto delta = (line.height() - rect.height()) / 2;
-                    rect.fTop = line.offset().fY + delta;
-                    rect.fBottom = line.offset().fY + line.height() - delta;
+                    rect.fTop -= (rect.fTop - line.offset().fY) / 2;
+                    rect.fBottom += (line.offset().fY + line.height() - rect.fBottom) / 2;
 
                 } else if (rectHeightStyle == RectHeightStyle::kIncludeLineSpacingBottom) {
                     rect.fBottom = line.offset().fY + line.height();
@@ -570,8 +447,9 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(unsigned start,
                     ++i;
                 }
                 if (clip.fRight < line.offset().fX + line.width()) {
-                    SkRect right = SkRect::MakeXYWH(0, clip.fTop,
-                                                    line.offset().fX + line.width() - clip.fRight,
+                    SkRect right = SkRect::MakeXYWH(clip.fRight - line.offset().fX,
+                                                    clip.fTop,
+                                                    line.width() - (clip.fRight - line.offset().fX),
                                                     clip.fBottom);
                     results.insert(results.begin() + i, {right, dir});
                     ++i;
@@ -592,7 +470,7 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx
                 line.text(),
                 0,
                 true,
-                [&](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift,
+                [dx, dy, &result](SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift,
                     bool clippingNeeded) {
                     if (dx < clip.fLeft) {
                         // All the other runs are placed right of this one

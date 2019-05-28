@@ -62,6 +62,8 @@ public:
     // the glyph at index offset
     virtual SkRange<size_t> getWordBoundary(unsigned offset) = 0;
 
+    virtual size_t lineNumber() = 0;
+
 protected:
     friend class SkParagraphBuilder;
 
