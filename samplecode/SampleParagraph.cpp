@@ -469,10 +469,7 @@ class ParagraphView2 : public Sample {
         tf1->unref();
 #endif
 
-    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
-        "fonts/GoogleSans-Regular.ttf"));
-
-    fontCollection = sk_make_sp<SkFontCollection>();
+    fontCollection = sk_make_sp<TestFontCollection>();
   }
 
   ~ParagraphView2() {
@@ -595,7 +592,6 @@ class ParagraphView2 : public Sample {
 
     paraStyle.setEllipsis(ellipsis);
     paraStyle.getTextStyle().setFontSize(20);
-    fontCollection->setTestFontManager(testFontProvider);
     SkParagraphBuilder builder(paraStyle, fontCollection);
 
     SkPaint foreground;
@@ -739,8 +735,7 @@ class ParagraphView2 : public Sample {
  private:
   typedef Sample INHERITED;
 
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
+  sk_sp<TestFontCollection> fontCollection;
 };
 
 class ParagraphView3 : public Sample {
@@ -1294,10 +1289,7 @@ class ParagraphView6 : public Sample {
 
     auto ff = "HangingS";
 
-    sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
-    fontCollection->disableFontFallback();
-    fontCollection->setTestFontManager(
-          sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/HangingS.ttf")));
+    sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
 
     canvas->drawColor(SK_ColorLTGRAY);
 
@@ -1327,7 +1319,7 @@ class ParagraphView6 : public Sample {
     magenta.setAntiAlias(true);
     magenta.setColor(SK_ColorMAGENTA);
 
-    SkFontStyle fontStyle/*(SkFontStyle::kBold_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kItalic_Slant)*/;
+    SkFontStyle fontStyle(SkFontStyle::kBold_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kItalic_Slant);
 
     SkTextStyle style;
     style.setFontFamily(ff);
@@ -1368,8 +1360,6 @@ class ParagraphView6 : public Sample {
 
     SkParagraphStyle paraStyle;
     paraStyle.setTextStyle(style);
-
-    fontCollection->setTestFontManager(testFontProvider);
 
     const std::string logo1 = "S";
     const std::string logo2 = "kia";
