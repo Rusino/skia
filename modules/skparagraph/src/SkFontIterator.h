@@ -39,20 +39,20 @@ private:
         }
     };
 
-    bool resolveFonts();
+    bool mapAllUnicodesToFonts();
 
-    bool resolveStyle(const SkTextStyle& style, SkSpan<const char> text);
+    bool mapStyledBlockToFonts(const SkTextStyle& style, SkSpan<const char> text);
 
     std::pair<SkFont, SkScalar> makeFont(sk_sp<SkTypeface> typeface, SkScalar size,
                                          SkScalar height);
 
-    size_t resolveByTypeface(std::pair<SkFont, SkScalar> font);
+    size_t findAllCoveredUnicodesByFont(std::pair<SkFont, SkScalar> font);
     void addWhitespacesToResolved();
 
     SkUnichar firstUnresolved() {
         if (fUnresolved == 0) return 0;
         auto index = fUnresolvedIndexes[0];
-        return fUnresolvedUnicodes[index];
+        return fUnicodes[index];
     }
 
     SkSpan<const char> fText;
@@ -68,8 +68,7 @@ private:
     std::pair<SkFont, SkScalar> fFirstResolvedFont;
 
     SkTArray<SkUnichar> fUnicodes;
-    SkTArray<const char*> fCharacters;
-    SkTArray<SkUnichar> fUnresolvedUnicodes;
+    SkTArray<const char*> fCodepoints;
     SkTArray<size_t> fUnresolvedIndexes;
     SkTHashMap<size_t, std::pair<SkFont, SkScalar>> fWhitespaces;
     size_t fUnresolved;
