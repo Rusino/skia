@@ -24,8 +24,10 @@ inline SkUnichar utf8_next(const char** ptr, const char* end) {
 }  // namespace
 
 SkFontIterator::SkFontIterator(SkSpan<const char> utf8,
-                               SkSpan<SkBlock> styles,
-                               sk_sp<SkFontCollection> fonts,
+                               SkSpan<SkBlock>
+                                       styles,
+                               sk_sp<SkFontCollection>
+                                       fonts,
                                bool hintingOn)
         : fText(utf8)
         , fCurrentChar(utf8.begin())
@@ -33,7 +35,6 @@ SkFontIterator::SkFontIterator(SkSpan<const char> utf8,
         , fStyles(styles)
         , fFontCollection(std::move(fonts))
         , fHintingOn(hintingOn) {
-
     mapAllUnicodesToFonts();
 }
 
@@ -94,81 +95,77 @@ bool SkFontIterator::mapAllUnicodesToFonts() {
 }
 
 size_t SkFontIterator::findAllCoveredUnicodesByFont(std::pair<SkFont, SkScalar> font) {
-    size_t stillUnresolved = 0;
-
     // Consolidate all unresolved unicodes in one array to make a batch call
     SkTArray<SkGlyphID> glyphs(fUnresolved);
     glyphs.push_back_n(fUnresolved, SkGlyphID(0));
-    if (fUnresolved == fUnicodes.size()) {
-        font.first.getTypeface()->unicharsToGlyphs(fUnicodes.data(), fUnresolved, glyphs.data());
-    } else {
-        SkTArray<SkUnichar> unresolved(fUnresolved);
-        for (size_t i = 0; i < fUnresolved; ++i) {
-            unresolved.emplace_back(fUnicodes[fUnresolvedIndexes[i]]);
-        }
-        font.first.getTypeface()->unicharsToGlyphs(unresolved.data(), fUnresolved, glyphs.data());
-    }
+    font.first.getTypeface()->unicharsToGlyphs(
+            fUnresolved == fUnicodes.size() ? fUnicodes.data() : fUnresolvedUnicodes.data(),
+            fUnresolved, glyphs.data());
 
-    // Try to resolve all the unresolved unicodes at once
-    SkRange<size_t> resolvedRun(0, 0);
-    SkRange<size_t> whitespaceRun(0, 0);
+    SkRange<size_t> resolved(0, 0);
+    SkRange<size_t> whitespaces(0, 0);
+    size_t stillUnresolved = 0;
 
     auto processRuns = [&]() {
-      if (resolvedRun.width() == whitespaceRun.width()) {
-          // The entire run is just whitespaces; unresolve it
-          for (auto w = whitespaceRun.start; w != whitespaceRun.end; ++w) {
-              if (fWhitespaces.find(w) == nullptr) {
-                  fWhitespaces.set(w, font);
-              }
-              fUnresolvedIndexes[stillUnresolved] = w;
-              ++stillUnresolved;
-          }
-      } else {
-          fFontMapping.set(fCodepoints[resolvedRun.start], font);
-      }
-    };
+        if (resolved.width() == 0) {
+            return;
+        }
 
-    for (size_t i = 0; i <= glyphs.size(); ++i) {
-        auto glyph = i == glyphs.size() ? 0 : glyphs[i];
-        if (glyph != 0) {
-            auto index = fUnresolvedIndexes[i];
-            if (index == resolvedRun.end) {
-                ++resolvedRun.end;
-            } else {
-                processRuns();
-                resolvedRun = SkRange<size_t>(index, index + 1);
-            }
-            if (u_isUWhiteSpace(fUnicodes[index])) {
-                if (index == whitespaceRun.end) {
-                    ++whitespaceRun.end;
-                } else {
-                    whitespaceRun = SkRange<size_t>(index, index + 1);
+        if (resolved.width() == whitespaces.width()) {
+            // The entire run is just whitespaces; unresolve it
+            for (auto w = whitespaces.start; w != whitespaces.end; ++w) {
+                if (fWhitespaces.find(w) == nullptr) {
+                    fWhitespaces.set(w, font);
                 }
-            } else {
-                whitespaceRun = SkRange<size_t>(0, 0);
+                fUnresolvedIndexes[stillUnresolved++] = w;
+                fUnresolvedUnicodes.emplace_back(fUnicodes[w]);
             }
         } else {
-            // We have an extra glyph == 0 to take care of the last resolved run
-            if (resolvedRun.width() > 0) {
-                processRuns();
-                resolvedRun = SkRange<size_t>(0, 0);
-                whitespaceRun = SkRange<size_t>(0, 0);
-            }
+            fFontMapping.set(fCodepoints[resolved.start], font);
+        }
+    };
 
-            if (i < glyphs.size()) {
-                fUnresolvedIndexes[stillUnresolved] = fUnresolvedIndexes[i];
-                ++stillUnresolved;
+    // Try to resolve all the unresolved unicodes at once
+    for (size_t i = 0; i < glyphs.size(); ++i) {
+        auto glyph = glyphs[i];
+        auto index = fUnresolvedIndexes[i];
+
+        if (glyph == 0) {
+            processRuns();
+
+            resolved = SkRange<size_t>(0, 0);
+            whitespaces = SkRange<size_t>(0, 0);
+
+            fUnresolvedIndexes[stillUnresolved++] = index;
+            fUnresolvedUnicodes.emplace_back(fUnicodes[index]);
+            continue;
+        }
+
+        if (index == resolved.end) {
+            ++resolved.end;
+        } else {
+            processRuns();
+            resolved = SkRange<size_t>(index, index + 1);
+        }
+        if (u_isUWhiteSpace(fUnicodes[index])) {
+            if (index == whitespaces.end) {
+                ++whitespaces.end;
+            } else {
+                whitespaces = SkRange<size_t>(index, index + 1);
             }
+        } else {
+            whitespaces = SkRange<size_t>(0, 0);
         }
     }
+    // One last time to take care of the tail run
+    processRuns();
 
     size_t wasUnresolved = fUnresolved;
     fUnresolved = stillUnresolved;
-    return stillUnresolved < wasUnresolved;
+    return fUnresolved < wasUnresolved;
 }
 
 void SkFontIterator::addWhitespacesToResolved() {
-    // Remember all the whitespaces that still can look unresolved
     size_t resolvedWhitespaces = 0;
     for (size_t i = 0; i < fUnresolved; ++i) {
         auto index = fUnresolvedIndexes[i];
@@ -182,14 +179,15 @@ void SkFontIterator::addWhitespacesToResolved() {
 }
 
 bool SkFontIterator::mapStyledBlockToFonts(const SkTextStyle& style, SkSpan<const char> text) {
-
     fUnicodes.reset();
     fCodepoints.reset();
     fUnresolvedIndexes.reset();
+    fUnresolvedUnicodes.reset();
 
     fUnicodes.reserve(text.size());
     fCodepoints.reserve(text.size());
     fUnresolvedIndexes.reserve(text.size());
+    fUnresolvedUnicodes.reserve(text.size());
 
     const char* current = text.begin();
     while (current != text.end()) {

@@ -51,7 +51,9 @@ private:
 
     SkUnichar firstUnresolved() {
         if (fUnresolved == 0) return 0;
-        auto index = fUnresolvedIndexes[0];
+
+        bool firstTry = fUnresolved == fUnicodes.size();
+        auto index = firstTry ? 0 : fUnresolvedIndexes[0];
         return fUnicodes[index];
     }
 
@@ -70,6 +72,7 @@ private:
     SkTArray<SkUnichar> fUnicodes;
     SkTArray<const char*> fCodepoints;
     SkTArray<size_t> fUnresolvedIndexes;
+    SkTArray<SkUnichar> fUnresolvedUnicodes;
     SkTHashMap<size_t, std::pair<SkFont, SkScalar>> fWhitespaces;
     size_t fUnresolved;
 };
