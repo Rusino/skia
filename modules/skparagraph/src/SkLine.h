@@ -23,6 +23,11 @@ public:
     inline SkSpan<const char> text() const { return fText; }
     inline SkTextStyle style() const { return fTextStyle; }
 
+    void add(SkSpan<const char> tail) {
+        SkASSERT(fText.end() == tail.begin());
+        fText = SkSpan<const char>(fText.begin(), fText.size() + tail.size());
+    }
+
 protected:
     SkSpan<const char> fText;
     SkTextStyle fTextStyle;
