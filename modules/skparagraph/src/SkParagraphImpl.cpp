@@ -6,6 +6,7 @@
  */
 
 #include "SkParagraphImpl.h"
+#include "SkTextWrapper.h"
 #include <unicode/brkiter.h>
 #include <unicode/ubidi.h>
 #include "SkFontIterator.h"
@@ -148,7 +149,6 @@ void SkParagraphImpl::resetContext() {
     fRuns.reset();
     fClusters.reset();
     fLines.reset();
-    fTextWrapper.reset();
 }
 
 // Clusters in the order of the input text
@@ -298,6 +298,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
 
 void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
     TRACE_EVENT0("skia", TRACE_FUNC);
+    /*
     fTextWrapper.formatText(SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
                             maxWidth,
                             fParagraphStyle.getMaxLines(),
@@ -305,6 +306,38 @@ void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
     fHeight = fTextWrapper.height();
     fWidth = maxWidth;  // fTextWrapper.width();
     fMinIntrinsicWidth = fTextWrapper.intrinsicWidth();
+    fAlphabeticBaseline = fLines.empty() ? 0 : fLines.front().alphabeticBaseline();
+    fIdeographicBaseline = fLines.empty() ? 0 : fLines.front().ideographicBaseline();
+     */
+    SkTextWrapper textWrapper;
+    textWrapper.breakTextIntoLines(
+            this,
+            SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
+            maxWidth,
+            fParagraphStyle.getMaxLines(),
+            fParagraphStyle.getEllipsis(),
+            [&](SkCluster* start,
+                SkCluster* end,
+                SkScalar startClip,
+                SkScalar endClip,
+                SkVector offset,
+                SkVector advance,
+                SkLineMetrics metrics,
+                bool addEllipsis) {
+              // Add the line
+              // TODO: Take in account clipped edges
+              SkSpan<const char> text(start->text().begin(),
+                                      end->text().end() - start->text().begin());
+              SkSpan<const SkCluster> clusters(start, end - start + 1);
+              auto& line = this->addLine(offset, advance, text, clusters, metrics);
+              if (addEllipsis) {
+                  line.createEllipsis(maxWidth, fParagraphStyle.getEllipsis(), true);
+              }
+            });
+
+    fHeight = textWrapper.height();
+    fWidth = maxWidth;  // fTextWrapper.width();
+    fMinIntrinsicWidth = textWrapper.intrinsicWidth();
     fAlphabeticBaseline = fLines.empty() ? 0 : fLines.front().alphabeticBaseline();
     fIdeographicBaseline = fLines.empty() ? 0 : fLines.front().ideographicBaseline();
 }
@@ -351,18 +384,14 @@ SkSpan<const SkBlock> SkParagraphImpl::findAllBlocks(SkSpan<const char> text) {
 
 SkLine& SkParagraphImpl::addLine(SkVector offset,
                                  SkVector advance,
-                                 SkSpan<const char>
-                                         text,
-                                 SkSpan<const SkCluster>
-                                         clusters,
-                                 SkSpan<const SkCluster>
-                                         end,
+                                 SkSpan<const char> text,
+                                 SkSpan<const SkCluster> clusters,
                                  SkLineMetrics sizes) {
     TRACE_EVENT0("skia", TRACE_FUNC);
     // Define a list of styles that covers the line
     auto blocks = findAllBlocks(text);
 
-    return fLines.emplace_back(offset, advance, blocks, text, clusters, end, sizes);
+    return fLines.emplace_back(offset, advance, blocks, text, clusters, sizes);
 }
 
 // Returns a vector of bounding boxes that enclose all text between

@@ -9,7 +9,7 @@
 
 #include "SkLine.h"
 #include "SkRun.h"
-#include "SkTextWrapper.h"
+#include "SkTextWrapperOld.h"
 #include "include/core/SkPicture.h"
 #include "include/private//SkTHash.h"
 #include "modules/skparagraph/include/SkParagraph.h"
@@ -147,12 +147,8 @@ public:
 
     SkLine& addLine(SkVector offset,
                     SkVector advance,
-                    SkSpan<const char>
-                            text,
-                    SkSpan<const SkCluster>
-                            clusters,
-                    SkSpan<const SkCluster>
-                            end,
+                    SkSpan<const char> text,
+                    SkSpan<const SkCluster> clusters,
                     SkLineMetrics sizes);
 
     inline SkSpan<const char> text() const { return fUtf8; }
@@ -190,7 +186,7 @@ private:
     SkTArray<SkRun> fRuns;
     SkTArray<SkCluster, true> fClusters;
     SkTArray<SkLine> fLines;
-    SkTextWrapper fTextWrapper;
+    SkTextWrapperOld fTextWrapper;
     SkLineMetrics fStrutMetrics;
 
     // Painting

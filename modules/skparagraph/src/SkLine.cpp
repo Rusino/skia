@@ -43,11 +43,10 @@ SkTHashMap<SkFont, SkRun> SkLine::fEllipsisCache;
 
 SkLine::SkLine(SkVector offset, SkVector advance, SkSpan<const SkBlock> blocks,
                SkSpan<const char> text, SkSpan<const SkCluster> clusters,
-               SkSpan<const SkCluster> tail, SkLineMetrics sizes)
+               SkLineMetrics sizes)
         : fBlocks(blocks)
         , fText(text)
         , fClusters(clusters)
-        , fInvisibleTail(tail)
         , fLogical()
         , fShift(0)
         , fAdvance(advance)
@@ -88,7 +87,6 @@ SkLine::SkLine(SkLine&& other) {
     this->fEllipsis = std::move(other.fEllipsis);
     this->fSizes = other.sizes();
     this->fClusters = other.fClusters;
-    this->fInvisibleTail = other.fInvisibleTail;
 }
 
 void SkLine::paint(SkCanvas* textCanvas) {
@@ -130,8 +128,7 @@ void SkLine::paint(SkCanvas* textCanvas) {
 void SkLine::format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool notLastLine) {
     TRACE_EVENT0("skia", TRACE_FUNC);
     SkScalar delta = maxWidth - this->width();
-    SkASSERT(delta >= 0);
-    if (delta == 0) {
+    if (delta <= 0) {
         return;
     }
 

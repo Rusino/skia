@@ -1812,9 +1812,9 @@ class ParagraphView9 : public Sample {
   SkScalar wordSpacing;
 };
 
-class ParagraphView0 : public Sample {
+class ParagraphView10 : public Sample {
  public:
-  ParagraphView0() {
+  ParagraphView10() {
 #if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
     LOGFONT lf;
         sk_bzero(&lf, sizeof(lf));
@@ -1827,15 +1827,13 @@ class ParagraphView0 : public Sample {
         tf0->unref();
         tf1->unref();
 #endif
-
-    fontCollection = sk_make_sp<SkFontCollection>();
   }
 
-  ~ParagraphView0() = default;
+  ~ParagraphView10() = default;
  protected:
   bool onQuery(Sample::Event* evt) override {
       if (Sample::TitleQ(*evt)) {
-          Sample::TitleR(evt, "Paragraph0");
+          Sample::TitleR(evt, "Paragraph10");
           return true;
       }
       return this->INHERITED::onQuery(evt);
@@ -1874,9 +1872,69 @@ class ParagraphView0 : public Sample {
 
   private:
   typedef Sample INHERITED;
+};
 
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
+class ParagraphView11 : public Sample {
+public:
+    ParagraphView11() {
+#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
+        LOGFONT lf;
+        sk_bzero(&lf, sizeof(lf));
+        lf.lfHeight = 9;
+        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
+        lf.lfHeight = 12;
+        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
+        // we assert that different sizes should not affect which face we get
+        SkASSERT(tf0 == tf1);
+        tf0->unref();
+        tf1->unref();
+#endif
+    }
+
+    ~ParagraphView11() = default;
+protected:
+    bool onQuery(Sample::Event* evt) override {
+        if (Sample::TitleQ(*evt)) {
+            Sample::TitleR(evt, "Paragraph11");
+            return true;
+        }
+        return this->INHERITED::onQuery(evt);
+    }
+
+    void onDrawContent(SkCanvas* canvas) override {
+        canvas->drawColor(SK_ColorWHITE);
+
+        sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
+
+        const char* text = "google_logo google_logo google_logo";
+
+        SkParagraphStyle paragraph_style;
+        paragraph_style.turnHintingOff();
+        SkParagraphBuilder builder(paragraph_style, fontCollection);
+
+        SkTextStyle text_style;
+        text_style.setFontFamilies({"Google Sans"});
+        text_style.setFontSize(100);
+        text_style.setColor(SK_ColorBLACK);
+        SkPaint paint;
+        paint.setColor(SK_ColorLTGRAY);
+        text_style.setBackgroundColor(paint);
+        builder.pushStyle(text_style);
+        builder.addText(text);
+        builder.pop();
+
+        auto paragraph = builder.Build();
+        paragraph->layout(width() / 4);
+        auto height = paragraph->getHeight() / paragraph->lineNumber();
+        auto width = paragraph->getMaxWidth();
+        paragraph->paint(canvas, 0 * width, 0 * height);
+        paragraph->paint(canvas, 1 * width, 1 * height);
+        paragraph->paint(canvas, 2 * width, 2 * height);
+        paragraph->paint(canvas, 3 * width, 3 * height);
+    }
+
+private:
+    typedef Sample INHERITED;
 };
 //////////////////////////////////////////////////////////////////////////////
 
@@ -1889,4 +1947,5 @@ DEF_SAMPLE(return new ParagraphView6();)
 DEF_SAMPLE(return new ParagraphView7();)
 DEF_SAMPLE(return new ParagraphView8();)
 DEF_SAMPLE(return new ParagraphView9();)
-DEF_SAMPLE(return new ParagraphView0();)
+DEF_SAMPLE(return new ParagraphView10();)
+DEF_SAMPLE(return new ParagraphView11();)
