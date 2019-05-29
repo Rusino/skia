@@ -30,9 +30,8 @@ SkFontIterator::SkFontIterator(SkSpan<const char> utf8,
                                        fonts,
                                bool hintingOn)
         : fText(utf8)
-        , fCurrentChar(utf8.begin())
-        , fCurrentStyle(styles.begin())
         , fStyles(styles)
+        , fCurrentChar(utf8.begin())
         , fFontCollection(std::move(fonts))
         , fHintingOn(hintingOn) {
     findAllFontsForAllStyledBlocks();
@@ -108,13 +107,12 @@ void SkFontIterator::findAllFontsForStyledBlock(const SkTextStyle& style, SkSpan
         // Resolve all unresolved characters
         auto font = makeFont(typeface, style.getFontSize(), style.getHeight());
         resolveAllCharactersByFont(font);
-
         if (fUnresolved == 0) {
             break;
         }
     }
 
-    addWhitespacesToResolved();
+    addResolvedWhitespacesToMapping();
 
     if (fFontCollection->fontFallbackEnabled()) {
         while (fUnresolved > 0) {
@@ -157,7 +155,9 @@ size_t SkFontIterator::resolveAllCharactersByFont(std::pair<SkFont, SkScalar> fo
         }
 
         if (resolved.width() == whitespaces.width()) {
-            // The entire run is just whitespaces; unresolve it
+            // The entire run is just whitespaces;
+            // Remember the font and mark whitespaces back unresolved
+            // to calculate its mapping for the other fonts
             for (auto w = whitespaces.start; w != whitespaces.end; ++w) {
                 if (fWhitespaces.find(w) == nullptr) {
                     fWhitespaces.set(w, font);
@@ -170,7 +170,7 @@ size_t SkFontIterator::resolveAllCharactersByFont(std::pair<SkFont, SkScalar> fo
         }
     };
 
-    // Try to resolve all the unresolved unicodes at once
+    // Try to resolve all the unresolved unicode points
     for (size_t i = 0; i < glyphs.size(); ++i) {
         auto glyph = glyphs[i];
         auto index = fUnresolvedIndexes[i];
@@ -202,6 +202,7 @@ size_t SkFontIterator::resolveAllCharactersByFont(std::pair<SkFont, SkScalar> fo
             whitespaces = SkRange<size_t>(0, 0);
         }
     }
+
     // One last time to take care of the tail run
     processRuns();
 
@@ -210,7 +211,7 @@ size_t SkFontIterator::resolveAllCharactersByFont(std::pair<SkFont, SkScalar> fo
     return fUnresolved < wasUnresolved;
 }
 
-void SkFontIterator::addWhitespacesToResolved() {
+void SkFontIterator::addResolvedWhitespacesToMapping() {
     size_t resolvedWhitespaces = 0;
     for (size_t i = 0; i < fUnresolved; ++i) {
         auto index = fUnresolvedIndexes[i];
@@ -223,7 +224,8 @@ void SkFontIterator::addWhitespacesToResolved() {
     fUnresolved -= resolvedWhitespaces;
 }
 
-std::pair<SkFont, SkScalar> SkFontIterator::makeFont(sk_sp<SkTypeface> typeface, SkScalar size,
+std::pair<SkFont, SkScalar> SkFontIterator::makeFont(sk_sp<SkTypeface> typeface,
+                                                     SkScalar size,
                                                      SkScalar height) {
     SkFont font(typeface, size);
     font.setEdging(SkFont::Edging::kAntiAlias);

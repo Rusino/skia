@@ -30,12 +30,10 @@ public:
     SkScalar lineHeight() const { return fLineHeight; }
 
 private:
-
     struct Hash {
         uint32_t operator()(const std::pair<SkFont, SkScalar>& key) const {
-            return  SkTypeface::UniqueID(key.first.getTypeface()) +
-                    SkScalarCeilToInt(key.first.getSize()) +
-                    SkScalarCeilToInt(key.second);
+            return SkTypeface::UniqueID(key.first.getTypeface()) +
+                   SkScalarCeilToInt(key.first.getSize()) + SkScalarCeilToInt(key.second);
         }
     };
 
@@ -47,7 +45,7 @@ private:
                                          SkScalar height);
 
     size_t resolveAllCharactersByFont(std::pair<SkFont, SkScalar> font);
-    void addWhitespacesToResolved();
+    void addResolvedWhitespacesToMapping();
 
     SkUnichar firstUnresolved() {
         if (fUnresolved == 0) return 0;
@@ -58,11 +56,10 @@ private:
     }
 
     SkSpan<const char> fText;
+    SkSpan<SkBlock> fStyles;
     const char* fCurrentChar;
     SkFont fFont;
     SkScalar fLineHeight;
-    SkBlock* fCurrentStyle;
-    SkSpan<SkBlock> fStyles;
     sk_sp<SkFontCollection> fFontCollection;
     SkTHashMap<const char*, std::pair<SkFont, SkScalar>> fFontMapping;
     SkTHashSet<std::pair<SkFont, SkScalar>, Hash> fResolvedFonts;

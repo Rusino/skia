@@ -2815,3 +2815,26 @@ DEF_TEST(SkParagraph_StrutForceParagraph, reporter) {
     REPORTER_ASSERT(reporter, SkScalarNearlyEqual(boxes7[0].rect.right(), 300, epsilon));
     REPORTER_ASSERT(reporter, SkScalarNearlyEqual(boxes7[0].rect.bottom(), 320, epsilon));
 }
+
+DEF_TEST(SkParagraph_WhitespacesInMultipleFonts, reporter) {
+    sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
+    const char* text = "English English 字典 字典 😀😃😄 😀😃😄";
+    SkParagraphStyle paragraph_style;
+    paragraph_style.turnHintingOff();
+    SkParagraphBuilder builder(paragraph_style, fontCollection);
+
+    SkTextStyle text_style;
+    text_style.setFontFamilies({"Roboto", "Noto Color Emoji", "Source Han Serif CN"});
+    text_style.setFontSize(60);
+    builder.pushStyle(text_style);
+    builder.addText(text);
+    builder.pop();
+
+    auto paragraph = builder.Build();
+    paragraph->layout(TestCanvasWidth);
+
+    auto impl = static_cast<SkParagraphImpl*>(paragraph.get());
+    SkASSERT(impl->runs().size() == 3);
+    SkASSERT(impl->runs()[0].text().end() == impl->runs()[1].text().begin());
+    SkASSERT(impl->runs()[1].text().end() == impl->runs()[2].text().begin());
+}

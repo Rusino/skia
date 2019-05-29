@@ -1831,69 +1831,48 @@ class ParagraphView0 : public Sample {
     fontCollection = sk_make_sp<SkFontCollection>();
   }
 
-  ~ParagraphView0() {
-  }
+  ~ParagraphView0() = default;
  protected:
   bool onQuery(Sample::Event* evt) override {
-    if (Sample::TitleQ(*evt)) {
-      Sample::TitleR(evt, "Paragraph0");
-      return true;
-    }
-    return this->INHERITED::onQuery(evt);
+      if (Sample::TitleQ(*evt)) {
+          Sample::TitleR(evt, "Paragraph0");
+          return true;
+      }
+      return this->INHERITED::onQuery(evt);
   }
 
-    void onDrawContent(SkCanvas* canvas) override {
-        canvas->drawColor(SK_ColorWHITE);
+  void onDrawContent(SkCanvas* canvas) override {
+      canvas->drawColor(SK_ColorWHITE);
 
-        sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
-        const char* text =
-            "line1\nline2 test1 test2 test3 test4 test5 test6 test7\nline3\n\nline4 "
-            "test1 test2 test3 test4";
-        SkParagraphStyle paragraph_style;
-        paragraph_style.turnHintingOff();
-        SkParagraphBuilder builder(paragraph_style, fontCollection);
+      sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
+      const char* text = "English English 字典 字典 😀😃😄 😀😃😄";
+      SkParagraphStyle paragraph_style;
+      paragraph_style.turnHintingOff();
+      SkParagraphBuilder builder(paragraph_style, fontCollection);
 
-        SkTextStyle text_style;
-        text_style.setFontFamilies({"Roboto"});
-        text_style.setColor(SK_ColorRED);
-        text_style.setFontSize(60);
-        text_style.setLetterSpacing(0);
-        text_style.setWordSpacing(0);
-        text_style.setColor(SK_ColorBLACK);
-        text_style.setHeight(1);
-        builder.pushStyle(text_style);
-        builder.addText(text);
-        builder.pop();
+      SkTextStyle text_style;
+      text_style.setFontFamilies({"Roboto", "Noto Color Emoji", "Source Han Serif CN"});
+      text_style.setColor(SK_ColorRED);
+      text_style.setFontSize(60);
+      text_style.setLetterSpacing(0);
+      text_style.setWordSpacing(0);
+      text_style.setColor(SK_ColorBLACK);
+      text_style.setHeight(1);
+      builder.pushStyle(text_style);
+      builder.addText(text);
+      builder.pop();
 
-        auto paragraph = builder.Build();
-        paragraph->layout(1000 - 300);
+      auto paragraph = builder.Build();
+      paragraph->layout(width());
 
-        std::vector<size_t> sizes = { 0 };
+      paragraph->paint(canvas, 0, 0);
+      auto impl = static_cast<SkParagraphImpl*>(paragraph.get());
+      SkASSERT(impl->runs().size() == 3);
+      SkASSERT(impl->runs()[0].text().end() == impl->runs()[1].text().begin());
+      SkASSERT(impl->runs()[1].text().end() == impl->runs()[2].text().begin());
+  }
 
-        std::vector<size_t> colors = {
-            SK_ColorBLUE, SK_ColorCYAN, SK_ColorLTGRAY, SK_ColorGREEN, SK_ColorRED, SK_ColorWHITE, SK_ColorYELLOW, SK_ColorMAGENTA
-        };
-
-        RectHeightStyle rect_height_style = RectHeightStyle::kTight;
-        RectWidthStyle rect_width_style = RectWidthStyle::kTight;
-
-        for (size_t i = 0; i < sizes.size() - 1; ++i) {
-            auto boxes = paragraph->getRectsForRange(sizes[i], sizes[i + 1], rect_height_style, rect_width_style);
-            if (boxes.empty()) {
-                continue;
-            }
-            for (auto& box : boxes) {
-                SkPaint paint;
-                paint.setColor(colors[i % colors.size()]);
-                //paint.setShader(setgrad(box.rect, colors[i % colors.size()], SK_ColorWHITE));
-                canvas->drawRect(box.rect, paint);
-            }
-        }
-
-        paragraph->paint(canvas, 0, 0);
-    }
-
- private:
+  private:
   typedef Sample INHERITED;
 
   sk_sp<TestFontProvider> testFontProvider;
