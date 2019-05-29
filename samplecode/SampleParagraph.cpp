@@ -1906,31 +1906,27 @@ protected:
 
         sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
 
-        const char* text = "google_logo google_logo google_logo";
+        const char* text =
+                "😀😃😄😁😆😅😂🤣☺😇🙂😍😡😟😢😻👽💩👍👎🙏👌👋👄👁👦👼👨‍🚀👨‍🚒🙋‍♂️👳👨‍👨‍👧‍👧"
+                "💼👡👠☂🐶🐰🐻🐼🐷🐒🐵🐔🐧🐦🐋🐟🐡🕸🐌🐴🐊🐄🐪🐘🌸🌏🔥🌟🌚🌝💦💧"
+                "❄🍕🍔🍟🥝🍱🕶🎩🏈⚽🚴‍♀️🎻🎼🎹🚨🚎🚐⚓🛳🚀🚁🏪🏢🖱⏰📱💾💉📉🛏🔑🔓"
+                "📁🗓📊❤💯🚫🔻♠♣🕓❗🏳🏁🏳️‍🌈🇮🇹🇱🇷🇺🇸🇬🇧🇨🇳🇧🇴";
 
         SkParagraphStyle paragraph_style;
         paragraph_style.turnHintingOff();
         SkParagraphBuilder builder(paragraph_style, fontCollection);
 
         SkTextStyle text_style;
-        text_style.setFontFamilies({"Google Sans"});
-        text_style.setFontSize(100);
+        text_style.setFontFamilies({"Noto Color Emoji"});
         text_style.setColor(SK_ColorBLACK);
-        SkPaint paint;
-        paint.setColor(SK_ColorLTGRAY);
-        text_style.setBackgroundColor(paint);
+        text_style.setFontSize(50);
         builder.pushStyle(text_style);
         builder.addText(text);
         builder.pop();
 
         auto paragraph = builder.Build();
-        paragraph->layout(width() / 4);
-        auto height = paragraph->getHeight() / paragraph->lineNumber();
-        auto width = paragraph->getMaxWidth();
-        paragraph->paint(canvas, 0 * width, 0 * height);
-        paragraph->paint(canvas, 1 * width, 1 * height);
-        paragraph->paint(canvas, 2 * width, 2 * height);
-        paragraph->paint(canvas, 3 * width, 3 * height);
+        paragraph->layout(1000);
+        paragraph->paint(canvas, 0, 0);
     }
 
 private:

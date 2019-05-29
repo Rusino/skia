@@ -75,6 +75,9 @@ public:
                                                    visitor);
 
     std::tuple<bool, SkCluster*, SkCluster*> findLimitingClusters(SkSpan<const char> text);
+    SkSpan<const SkGlyphID> glyphs() { return SkSpan<const SkGlyphID>(fGlyphs.begin(), fGlyphs.size()); }
+    SkSpan<const SkPoint> positions() { return SkSpan<const SkPoint>(fPositions.begin(), fPositions.size()); }
+    SkSpan<const uint32_t> clusterIndexes() { return SkSpan<const uint32_t>(fClusterIndexes.begin(), fClusterIndexes.size()); }
 
 private:
     friend class SkParagraphImpl;

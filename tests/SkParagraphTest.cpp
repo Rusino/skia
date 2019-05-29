@@ -12,6 +12,7 @@
 #include "modules/skparagraph/src/SkParagraphImpl.h"
 #include "modules/skparagraph/src/SkTypefaceFontProvider.h"
 #include "tools/Resources.h"
+#include "src/utils/SkShaperJSONWriter.h"
 
 #define VeryLongCanvasWidth 1000000
 #define TestCanvasWidth 1000
@@ -2002,26 +2003,10 @@ DEF_TEST(SkParagraph_EmojiParagraph, reporter) {
     sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
 
     const char* text =
-            "😀😃😄😁😆😅😂🤣☺😇🙂😍😡😟😢😻👽💩👍👎🙏👌👋👄👁👦👼👨‍🚀👨‍🚒🙋‍♂️👳👨‍👨"
-            "‍"
-            "👧"
-            "‍"
-            "👧"
-            "💼👡👠☂🐶🐰🐻🐼🐷🐒🐵🐔🐧🐦🐋🐟🐡🕸🐌🐴🐊🐄🐪🐘🌸🌏🔥🌟"
-            "🌚"
-            "🌝"
-            "💦"
-            "💧"
-            "❄🍕🍔🍟🥝🍱🕶🎩🏈⚽🚴‍♀️🎻🎼🎹🚨🚎🚐⚓🛳🚀🚁🏪🏢🖱⏰📱💾💉"
-            "📉"
-            "🛏"
-            "🔑"
-            "🔓"
-            "📁🗓📊❤💯🚫🔻♠♣🕓❗🏳🏁🏳️‍🌈🇮🇹🇱🇷🇺🇸🇬🇧"
-            "🇨"
-            "🇳"
-            "🇧"
-            "🇴";
+            "😀😃😄😁😆😅😂🤣☺😇🙂😍😡😟😢😻👽💩👍👎🙏👌👋👄👁👦👼👨‍🚀👨‍🚒🙋‍♂️👳👨‍👨‍👧‍👧"
+            "💼👡👠☂🐶🐰🐻🐼🐷🐒🐵🐔🐧🐦🐋🐟🐡🕸🐌🐴🐊🐄🐪🐘🌸🌏🔥🌟🌚🌝💦💧"
+            "❄🍕🍔🍟🥝🍱🕶🎩🏈⚽🚴‍♀️🎻🎼🎹🚨🚎🚐⚓🛳🚀🚁🏪🏢🖱⏰📱💾💉📉🛏🔑🔓"
+            "📁🗓📊❤💯🚫🔻♠♣🕓❗🏳🏁🏳️‍🌈🇮🇹🇱🇷🇺🇸🇬🇧🇨🇳🇧🇴";
 
     SkParagraphStyle paragraph_style;
     paragraph_style.turnHintingOff();
@@ -2311,29 +2296,29 @@ DEF_TEST(SkParagraph_ComplexShadow, reporter) {
     size_t index = 0;
     for (auto& line : impl->lines()) {
         line.scanStyles(SkStyleType::Shadow,
-                        [&index, text_style, reporter](SkTextStyle style, SkSpan<const char> text) {
-                            ++index;
-                            switch (index) {
-                                case 1:
-                                    REPORTER_ASSERT(reporter, style.getShadowNumber() == 1);
-                                    break;
-                                case 2:
-                                    REPORTER_ASSERT(reporter, style.getShadowNumber() == 3);
-                                    break;
-                                case 3:
-                                    REPORTER_ASSERT(reporter, style.getShadowNumber() == 1);
-                                    break;
-                                case 4:
-                                    REPORTER_ASSERT(reporter, style.getShadowNumber() == 4);
-                                    REPORTER_ASSERT(reporter, style.equals(text_style));
-                                    break;
-                                case 5:
-                                    REPORTER_ASSERT(reporter, style.getShadowNumber() == 1);
-                                    break;
-                                default:
-                                    REPORTER_ASSERT(reporter, false);
-                            }
-                        });
+            [&index, text_style, reporter](SkTextStyle style, SkSpan<const char> text) {
+                ++index;
+                switch (index) {
+                    case 1:
+                        REPORTER_ASSERT(reporter, style.getShadowNumber() == 1);
+                        break;
+                    case 2:
+                        REPORTER_ASSERT(reporter, style.getShadowNumber() == 3);
+                        break;
+                    case 3:
+                        REPORTER_ASSERT(reporter, style.getShadowNumber() == 1);
+                        break;
+                    case 4:
+                        REPORTER_ASSERT(reporter, style.getShadowNumber() == 4);
+                        REPORTER_ASSERT(reporter, style.equals(text_style));
+                        break;
+                    case 5:
+                        REPORTER_ASSERT(reporter, style.getShadowNumber() == 1);
+                        break;
+                    default:
+                        REPORTER_ASSERT(reporter, false);
+                }
+            });
     }
 }
 
@@ -2816,6 +2801,7 @@ DEF_TEST(SkParagraph_StrutForceParagraph, reporter) {
     REPORTER_ASSERT(reporter, SkScalarNearlyEqual(boxes7[0].rect.bottom(), 320, epsilon));
 }
 
+// Not in Minikin
 DEF_TEST(SkParagraph_WhitespacesInMultipleFonts, reporter) {
     sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     const char* text = "English English 字典 字典 😀😃😄 😀😃😄";
@@ -2837,4 +2823,123 @@ DEF_TEST(SkParagraph_WhitespacesInMultipleFonts, reporter) {
     SkASSERT(impl->runs().size() == 3);
     SkASSERT(impl->runs()[0].text().end() == impl->runs()[1].text().begin());
     SkASSERT(impl->runs()[1].text().end() == impl->runs()[2].text().begin());
+}
+
+// 11 to 1
+DEF_TEST(SkParagraph_JSON1, reporter) {
+    sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
+    const char* text = "google_logo";
+
+    SkParagraphStyle paragraph_style;
+    paragraph_style.turnHintingOff();
+    SkParagraphBuilder builder(paragraph_style, fontCollection);
+
+    SkTextStyle text_style;
+    text_style.setFontFamilies({"Google Sans"});
+    builder.pushStyle(text_style);
+    builder.addText(text);
+    builder.pop();
+
+    auto paragraph = builder.Build();
+    paragraph->layout(TestCanvasWidth);
+
+    auto impl = static_cast<SkParagraphImpl*>(paragraph.get());
+    REPORTER_ASSERT(reporter, impl->runs().size() == 1);
+    auto run = impl->runs().front();
+
+    auto cluster = 0;
+    SkShaperJSONWriter::VisualizeClusters(
+        text, 0, std::strlen(text), run.glyphs(), run.clusterIndexes(),
+        [&](int codePointCount, SkSpan<const char> utf1to1, SkSpan<const SkGlyphID> glyph1to1) {
+            if (cluster == 0) {
+                std::string toCheckUtf8{utf1to1.data(), utf1to1.size()};
+                SkASSERT(std::strcmp(text, utf1to1.data()) == 0);
+                SkASSERT(glyph1to1.size() == 1);
+                SkASSERT(*glyph1to1.begin() == 1028);
+            }
+            ++cluster;
+        });
+    SkASSERT(cluster <= 2);
+}
+
+// 4 to 1
+DEF_TEST(SkParagraph_JSON2, reporter) {
+    sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
+    const char* text = "👨‍👩‍👧‍👦";
+
+    SkParagraphStyle paragraph_style;
+    paragraph_style.turnHintingOff();
+    SkParagraphBuilder builder(paragraph_style, fontCollection);
+
+    SkTextStyle text_style;
+    text_style.setFontFamilies({"Noto Color Emoji"});
+    builder.pushStyle(text_style);
+    builder.addText(text);
+    builder.pop();
+
+    auto paragraph = builder.Build();
+    paragraph->layout(TestCanvasWidth);
+
+    auto impl = static_cast<SkParagraphImpl*>(paragraph.get());
+    REPORTER_ASSERT(reporter, impl->runs().size() == 1);
+    auto run = impl->runs().front();
+
+    auto cluster = 0;
+    SkShaperJSONWriter::VisualizeClusters(
+        text, 0, std::strlen(text), run.glyphs(), run.clusterIndexes(),
+        [&](int codePointCount, SkSpan<const char> utf1to1, SkSpan<const SkGlyphID> glyph1to1) {
+            if (cluster == 0) {
+                std::string toCheckUtf8{utf1to1.data(), utf1to1.size()};
+                SkASSERT(std::strcmp(text, utf1to1.data()) == 0);
+                SkASSERT(glyph1to1.size() == 1);
+                SkASSERT(*glyph1to1.begin() == 1611);
+            }
+            ++cluster;
+        });
+    SkASSERT(cluster <= 2);
+}
+
+// 5 to 3
+DEF_TEST(SkParagraph_JSON3, reporter) {
+    sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
+    std::u16string text = u"p\u3020q";
+
+    icu::UnicodeString unicode(text.data(), text.size());
+    std::string str;
+    unicode.toUTF8String(str);
+
+    SkParagraphStyle paragraph_style;
+    paragraph_style.turnHintingOff();
+    SkParagraphBuilder builder(paragraph_style, fontCollection);
+
+    SkTextStyle text_style;
+    text_style.setFontFamilies({"Noto Sans CJK JP"});
+    text_style.setColor(SK_ColorBLACK);
+    text_style.setFontSize(50);
+    builder.pushStyle(text_style);
+    builder.addText(text);
+    builder.pop();
+
+    auto paragraph = builder.Build();
+    paragraph->layout(TestCanvasWidth);
+
+    auto impl = static_cast<SkParagraphImpl*>(paragraph.get());
+    REPORTER_ASSERT(reporter, impl->runs().size() == 1);
+    auto run = impl->runs().front();
+
+    auto cluster = 0;
+    for (auto& run : impl->runs()) {
+        SkShaperJSONWriter::VisualizeClusters(
+                run.text().data(), 0, run.text().size(), run.glyphs(), run.clusterIndexes(),
+                [&](int codePointCount, SkSpan<const char> utf1to1, SkSpan<const SkGlyphID> glyph1to1) {
+                  if (cluster == 0) {
+                      std::string toCheckUtf8{utf1to1.data(), utf1to1.size()};
+                      SkASSERT(std::strcmp(str.c_str(), utf1to1.data()) == 0);
+                      SkASSERT(glyph1to1.size() == 3);
+                  }
+                  ++cluster;
+                });
+    }
+
+    SkASSERT(cluster <= 2);
 }
