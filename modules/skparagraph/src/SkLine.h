@@ -61,21 +61,19 @@ public:
     inline SkScalar baseline() const { return fSizes.baseline(); }
     inline SkScalar roundingDelta() const { return fSizes.delta(); }
 
-    void iterateThroughStylesInTextOrder(
-            SkStyleType styleType,
-            std::function<SkScalar(SkSpan<const char> text, const SkTextStyle& style,
-                                   SkScalar offsetX)>
-                    visitor) const;
+    using StyleVisitor = std::function<SkScalar(SkSpan<const char> text, const SkTextStyle& style,
+                                                SkScalar offsetX)>;
+    void iterateThroughStylesInTextOrder(SkStyleType styleType, const StyleVisitor& visitor) const;
 
+    using RunVisitor = std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip,
+                                          SkScalar shift, bool clippingNeeded)>;
     SkScalar iterateThroughRuns(SkSpan<const char> text,
                                 SkScalar offsetX,
                                 bool includeEmptyText,
-                                std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip,
-                                                   SkScalar shift, bool clippingNeeded)>
-                                        visitor) const;
+                                const RunVisitor& visitor) const;
 
-    void iterateThroughClustersInGlyphsOrder(
-            bool reverse, std::function<bool(const SkCluster* cluster)> visitor) const;
+    using ClustersVisitor = std::function<bool(const SkCluster* cluster)>;
+    void iterateThroughClustersInGlyphsOrder(bool reverse, const ClustersVisitor& visitor) const;
 
     void format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool last);
     void paint(SkCanvas* canvas);
@@ -83,9 +81,8 @@ public:
     void createEllipsis(SkScalar maxWidth, const std::string& ellipsis, bool ltr);
 
     // For testing internal structures
-    void scanStyles(SkStyleType style,
-                    std::function<void(SkTextStyle, SkSpan<const char>)> visitor);
-    void scanRuns(std::function<void(SkRun*, int32_t, size_t, SkRect)> visitor);
+    void scanStyles(SkStyleType style, const StyleVisitor& visitor);
+    void scanRuns(const RunVisitor& visitor);
 
 private:
     SkRun* shapeEllipsis(const std::string& ellipsis, SkRun* run);

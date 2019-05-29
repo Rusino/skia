@@ -35,10 +35,14 @@ class SkTextWrapper {
             return endOfCluster() && (fLastCluster->isHardBreak() || fLastCluster->isSoftBreak());
         }
 
-        void next() {
+        void next(const SkCluster* until) {
             fLastCluster += 1;
-            fLength = fLastCluster->width();
-            fPos = fLastCluster->width();
+            fMetrics.clean();
+            if (fLastCluster != until) {
+                fLength = fLastCluster->width();
+                fPos = fLastCluster->width();
+                fMetrics.add(fLastCluster->run());
+            }
         }
 
         void clean() {
@@ -54,11 +58,11 @@ class SkTextWrapper {
             fLastCluster = s.fLastCluster;
             fLength += len;
             fPos += s.fPos;
-            fMetrics.add(s.fLastCluster->run());
+            fMetrics.add(s.fMetrics);
         }
 
         SkTextStretch shift(SkScalar value) {
-            return SkTextStretch(fLastCluster, fLength - value, fPos - value);
+            return { fLastCluster, fLength - value, fPos - value };
         }
 
     private:
@@ -70,19 +74,21 @@ class SkTextWrapper {
 
 public:
     SkTextWrapper() { fLineNumber = 1; }
+
+    using AddLineToParagraph = std::function<void(SkCluster* start,
+                                                  SkCluster* end,
+                                                  SkScalar startClip,
+                                                  SkScalar endClip,
+                                                  SkVector offset,
+                                                  SkVector advance,
+                                                  SkLineMetrics metrics,
+                                                  bool addEllipsis)>;
     void breakTextIntoLines(SkParagraphImpl* parent,
                             SkSpan<SkCluster> span,
                             SkScalar maxWidth,
                             size_t maxLines,
                             const std::string& ellipsisStr,
-                            const std::function<void(SkCluster* start,
-                                                     SkCluster* end,
-                                                     SkScalar startClip,
-                                                     SkScalar endClip,
-                                                     SkVector offset,
-                                                     SkVector advance,
-                                                     SkLineMetrics metrics,
-                                                     bool addEllipsis)>& addLine);
+                            const AddLineToParagraph& addLine);
 
     inline SkScalar height() const { return fHeight; }
     inline SkScalar intrinsicWidth() const { return fMinIntrinsicWidth; }
@@ -103,6 +109,8 @@ private:
     SkScalar fWidth;
     SkScalar fHeight;
     SkScalar fMinIntrinsicWidth;
+
+    SkSpan<SkCluster> fAllClusters;
 
     void reset() {
         fWords.clean();

@@ -42,8 +42,7 @@ int32_t intersects(SkSpan<const char> a, SkSpan<const char> b) {
 SkTHashMap<SkFont, SkRun> SkLine::fEllipsisCache;
 
 SkLine::SkLine(SkVector offset, SkVector advance, SkSpan<const SkBlock> blocks,
-               SkSpan<const char> text, SkSpan<const SkCluster> clusters,
-               SkLineMetrics sizes)
+               SkSpan<const char> text, SkSpan<const SkCluster> clusters, SkLineMetrics sizes)
         : fBlocks(blocks)
         , fText(text)
         , fClusters(clusters)
@@ -53,7 +52,6 @@ SkLine::SkLine(SkVector offset, SkVector advance, SkSpan<const SkBlock> blocks,
         , fOffset(offset)
         , fEllipsis(nullptr)
         , fSizes(sizes) {
-
     TRACE_EVENT0("skia", TRACE_FUNC);
     // Reorder visual runs
     auto start = fClusters.begin();
@@ -141,26 +139,25 @@ void SkLine::format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool notLastL
     }
 }
 
-void SkLine::scanStyles(
-        SkStyleType style, std::function<void(SkTextStyle, SkSpan<const char> text)> visitor) {
+void SkLine::scanStyles(SkStyleType style, const StyleVisitor& visitor) {
     if (this->empty()) {
         return;
     }
 
     this->iterateThroughStylesInTextOrder(
             style, [this, visitor](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
-                visitor(style, text);
+                visitor(text, style, offsetX);
                 return this->iterateThroughRuns(
                         text, offsetX, false,
                         [](SkRun*, int32_t, size_t, SkRect, SkScalar, bool) { return true; });
             });
 }
 
-void SkLine::scanRuns(std::function<void(SkRun*, int32_t, size_t, SkRect)> visitor) {
+void SkLine::scanRuns(const RunVisitor& visitor) {
     this->iterateThroughRuns(
             fText, 0, false,
-            [visitor](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar, bool) {
-                visitor(run, pos, size, clip);
+            [visitor](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar sc , bool b) {
+                visitor(run, pos, size, clip, sc, b);
                 return true;
             });
 }
@@ -552,8 +549,8 @@ SkRect SkLine::measureTextInsideOneRun(SkSpan<const char> text,
     return clip;
 }
 
-void SkLine::iterateThroughClustersInGlyphsOrder(
-        bool reverse, std::function<bool(const SkCluster* cluster)> visitor) const {
+void SkLine::iterateThroughClustersInGlyphsOrder(bool reverse,
+                                                 const ClustersVisitor& visitor) const {
     TRACE_EVENT0("skia", TRACE_FUNC);
     for (size_t r = 0; r != fLogical.size(); ++r) {
         auto& run = fLogical[reverse ? fLogical.size() - r - 1 : r];
@@ -573,13 +570,10 @@ void SkLine::iterateThroughClustersInGlyphsOrder(
 }
 
 // Walk through the runs in the logical order
-SkScalar SkLine::iterateThroughRuns(
-        SkSpan<const char> text,
-        SkScalar runOffset,
-        bool includeEmptyText,
-        std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip, SkScalar shift,
-                           bool clippingNeeded)>
-                visitor) const {
+SkScalar SkLine::iterateThroughRuns(SkSpan<const char> text,
+                                    SkScalar runOffset,
+                                    bool includeEmptyText,
+                                    const RunVisitor& visitor) const {
     TRACE_EVENT0("skia", TRACE_FUNC);
 
     SkScalar width = 0;
@@ -630,10 +624,8 @@ SkScalar SkLine::iterateThroughRuns(
     return width;
 }
 
-void SkLine::iterateThroughStylesInTextOrder(
-        SkStyleType styleType,
-        std::function<SkScalar(SkSpan<const char> text, const SkTextStyle& style, SkScalar offsetX)>
-                visitor) const {
+void SkLine::iterateThroughStylesInTextOrder(SkStyleType styleType,
+                                             const StyleVisitor& visitor) const {
     TRACE_EVENT0("skia", TRACE_FUNC);
     const char* start = nullptr;
     size_t size = 0;

@@ -55,7 +55,7 @@ void SkTextWrapper::lookAhead(SkScalar maxWidth, SkCluster* endOfClusters) {
             break;
         }
 
-        currentCluster.next();
+        currentCluster.next(fAllClusters.end());
     }
 }
 
@@ -110,7 +110,7 @@ SkTextWrapper::SkTextStretch SkTextWrapper::trimEndSpaces() {
 
     if (fStartLine.cluster()->isWhitespaces()) {
         fWidth -= fStartLine.width();
-        return SkTextStretch(fStartLine.cluster(), 0, 0);
+        return {fStartLine.cluster(), 0, 0};
     } else if (fStartLine.cluster()->trimmedWidth() < fStartLine.position()) {
         auto delta = SkTMax(0.0f, fStartLine.position() - fStartLine.cluster()->trimmedWidth());
         if (delta > 0) {
@@ -139,23 +139,15 @@ void SkTextWrapper::trimStartSpaces(SkCluster* endOfClusters) {
     fStartLine = SkTextStretch(endOfClusters, false);
 }
 
-void SkTextWrapper::breakTextIntoLines(
-        SkParagraphImpl* parent,
-        SkSpan<SkCluster> span,
-        SkScalar maxWidth,
-        size_t maxLines,
-        const std::string& ellipsisStr,
-        const std::function<void(SkCluster* start,
-                                 SkCluster* end,
-                                 SkScalar startClip,
-                                 SkScalar endClip,
-                                 SkVector offset,
-                                 SkVector advance,
-                                 SkLineMetrics metrics,
-                                 bool addEllipsis)>& addLine) {
-
+void SkTextWrapper::breakTextIntoLines(SkParagraphImpl* parent,
+                                       SkSpan<SkCluster> span,
+                                       SkScalar maxWidth,
+                                       size_t maxLines,
+                                       const std::string& ellipsisStr,
+                                       const AddLineToParagraph& addLine) {
     fWidth = 0;
     fHeight = 0;
+    fAllClusters = span;
     fStartLine = SkTextStretch(span.begin());
     while (fStartLine.cluster() != span.end()) {
         reset();

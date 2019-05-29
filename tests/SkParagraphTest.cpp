@@ -92,10 +92,11 @@ DEF_TEST(SkParagraph_SimpleParagraph, reporter) {
     size_t index = 0;
     for (auto& line : impl->lines()) {
         line.scanStyles(SkStyleType::Decorations,
-                        [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
+                        [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                             REPORTER_ASSERT(reporter, index == 0);
                             REPORTER_ASSERT(reporter, style.getColor() == SK_ColorBLACK);
                             ++index;
+                            return true;
                         });
     }
 }
@@ -129,10 +130,11 @@ DEF_TEST(SkParagraph_SimpleRedParagraph, reporter) {
     size_t index = 0;
     for (auto& line : impl->lines()) {
         line.scanStyles(SkStyleType::Decorations,
-                        [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
+                        [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                             REPORTER_ASSERT(reporter, index == 0);
                             REPORTER_ASSERT(reporter, style.getColor() == SK_ColorRED);
                             ++index;
+                            return true;
                         });
     }
 }
@@ -210,30 +212,31 @@ DEF_TEST(SkParagraph_RainbowParagraph, reporter) {
 
     size_t index = 0;
     impl->lines()[0].scanStyles(
-            SkStyleType::AllAttributes, [&](SkTextStyle style, SkSpan<const char> text) {
-                switch (index) {
-                    case 0:
-                        REPORTER_ASSERT(reporter, style.equals(text_style1));
-                        REPORTER_ASSERT(reporter, equal(text, text1));
-                        break;
-                    case 1:
-                        REPORTER_ASSERT(reporter, style.equals(text_style2));
-                        REPORTER_ASSERT(reporter, equal(text, text2));
-                        break;
-                    case 2:
-                        REPORTER_ASSERT(reporter, style.equals(text_style3));
-                        REPORTER_ASSERT(reporter, equal(text, text3));
-                        break;
-                    case 3:
-                        REPORTER_ASSERT(reporter, style.equals(text_style4));
-                        REPORTER_ASSERT(reporter, equal(text, text45));
-                        break;
-                    default:
-                        REPORTER_ASSERT(reporter, false);
-                        break;
-                }
-                ++index;
-            });
+        SkStyleType::AllAttributes, [&](SkSpan<const char> text, SkTextStyle style, SkScalar) {
+            switch (index) {
+                case 0:
+                    REPORTER_ASSERT(reporter, style.equals(text_style1));
+                    REPORTER_ASSERT(reporter, equal(text, text1));
+                    break;
+                case 1:
+                    REPORTER_ASSERT(reporter, style.equals(text_style2));
+                    REPORTER_ASSERT(reporter, equal(text, text2));
+                    break;
+                case 2:
+                    REPORTER_ASSERT(reporter, style.equals(text_style3));
+                    REPORTER_ASSERT(reporter, equal(text, text3));
+                    break;
+                case 3:
+                    REPORTER_ASSERT(reporter, style.equals(text_style4));
+                    REPORTER_ASSERT(reporter, equal(text, text45));
+                    break;
+                default:
+                    REPORTER_ASSERT(reporter, false);
+                    break;
+            }
+            ++index;
+            return true;
+        });
     REPORTER_ASSERT(reporter, index == 4);
 }
 
@@ -260,12 +263,13 @@ DEF_TEST(SkParagraph_DefaultStyleParagraph, reporter) {
 
     size_t index = 0;
     impl->lines()[0].scanStyles(
-            SkStyleType::AllAttributes, [&](SkTextStyle style, SkSpan<const char> text1) {
-                REPORTER_ASSERT(reporter, style.equals(paragraph_style.getTextStyle()));
-                REPORTER_ASSERT(reporter, equal(text1, text));
-                ++index;
-            });
-    REPORTER_ASSERT(reporter, index == 1);
+        SkStyleType::AllAttributes, [&](SkSpan<const char> text1, SkTextStyle style, SkScalar) {
+            REPORTER_ASSERT(reporter, style.equals(paragraph_style.getTextStyle()));
+            REPORTER_ASSERT(reporter, equal(text1, text));
+            ++index;
+            return true;
+        });
+REPORTER_ASSERT(reporter, index == 1);
 }
 
 DEF_TEST(SkParagraph_BoldParagraph, reporter) {
@@ -300,11 +304,12 @@ DEF_TEST(SkParagraph_BoldParagraph, reporter) {
 
     size_t index = 0;
     impl->lines()[0].scanStyles(SkStyleType::AllAttributes,
-                                [&](SkTextStyle style, SkSpan<const char> text1) {
-                                    REPORTER_ASSERT(reporter, style.equals(text_style));
-                                    REPORTER_ASSERT(reporter, equal(text1, text));
-                                    ++index;
-                                });
+        [&](SkSpan<const char> text1, SkTextStyle style, SkScalar) {
+            REPORTER_ASSERT(reporter, style.equals(text_style));
+            REPORTER_ASSERT(reporter, equal(text1, text));
+            ++index;
+            return true;
+        });
     REPORTER_ASSERT(reporter, index == 1);
 }
 
@@ -755,55 +760,56 @@ DEF_TEST(SkParagraph_DecorationsParagraph, reporter) {
     size_t index = 0;
     for (auto& line : impl->lines()) {
         line.scanStyles(
-                SkStyleType::Decorations,
-                [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
-                    auto decoration = (SkTextDecoration)(SkTextDecoration::kUnderline |
-                                                         SkTextDecoration::kOverline |
-                                                         SkTextDecoration::kLineThrough);
-                    REPORTER_ASSERT(reporter, style.getDecoration() == decoration);
-                    switch (index) {
-                        case 0:
-                            REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
-                                                              SkTextDecorationStyle::kSolid);
-                            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
-                            REPORTER_ASSERT(reporter,
-                                            style.getDecorationThicknessMultiplier() == 2.0);
-                            break;
-                        case 1:  // The style appears on 2 lines so it has 2 pieces
-                            REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
-                                                              SkTextDecorationStyle::kDouble);
-                            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLUE);
-                            REPORTER_ASSERT(reporter,
-                                            style.getDecorationThicknessMultiplier() == 1.0);
-                            break;
-                        case 2:
-                            REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
-                                                              SkTextDecorationStyle::kDotted);
-                            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
-                            REPORTER_ASSERT(reporter,
-                                            style.getDecorationThicknessMultiplier() == 1.0);
-                            break;
-                        case 3:
-                        case 4:
-                            REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
-                                                              SkTextDecorationStyle::kDashed);
-                            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
-                            REPORTER_ASSERT(reporter,
-                                            style.getDecorationThicknessMultiplier() == 3.0);
-                            break;
-                        case 5:
-                            REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
-                                                              SkTextDecorationStyle::kWavy);
-                            REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorRED);
-                            REPORTER_ASSERT(reporter,
-                                            style.getDecorationThicknessMultiplier() == 1.0);
-                            break;
-                        default:
-                            REPORTER_ASSERT(reporter, false);
-                            break;
-                    }
-                    ++index;
-                });
+            SkStyleType::Decorations,
+            [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
+                auto decoration = (SkTextDecoration)(SkTextDecoration::kUnderline |
+                                                     SkTextDecoration::kOverline |
+                                                     SkTextDecoration::kLineThrough);
+                REPORTER_ASSERT(reporter, style.getDecoration() == decoration);
+                switch (index) {
+                    case 0:
+                        REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
+                                                          SkTextDecorationStyle::kSolid);
+                        REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
+                        REPORTER_ASSERT(reporter,
+                                        style.getDecorationThicknessMultiplier() == 2.0);
+                        break;
+                    case 1:  // The style appears on 2 lines so it has 2 pieces
+                        REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
+                                                          SkTextDecorationStyle::kDouble);
+                        REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLUE);
+                        REPORTER_ASSERT(reporter,
+                                        style.getDecorationThicknessMultiplier() == 1.0);
+                        break;
+                    case 2:
+                        REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
+                                                          SkTextDecorationStyle::kDotted);
+                        REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
+                        REPORTER_ASSERT(reporter,
+                                        style.getDecorationThicknessMultiplier() == 1.0);
+                        break;
+                    case 3:
+                    case 4:
+                        REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
+                                                          SkTextDecorationStyle::kDashed);
+                        REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorBLACK);
+                        REPORTER_ASSERT(reporter,
+                                        style.getDecorationThicknessMultiplier() == 3.0);
+                        break;
+                    case 5:
+                        REPORTER_ASSERT(reporter, style.getDecorationStyle() ==
+                                                          SkTextDecorationStyle::kWavy);
+                        REPORTER_ASSERT(reporter, style.getDecorationColor() == SK_ColorRED);
+                        REPORTER_ASSERT(reporter,
+                                        style.getDecorationThicknessMultiplier() == 1.0);
+                        break;
+                    default:
+                        REPORTER_ASSERT(reporter, false);
+                        break;
+                }
+                ++index;
+                return true;
+            });
     }
 }
 
@@ -841,29 +847,30 @@ DEF_TEST(SkParagraph_ItalicsParagraph, reporter) {
     auto& line = impl->lines()[0];
     size_t index = 0;
     line.scanStyles(
-            SkStyleType::Foreground,
-            [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
-                switch (index) {
-                    case 0:
-                        REPORTER_ASSERT(
-                                reporter,
-                                style.getFontStyle().slant() == SkFontStyle::kUpright_Slant);
-                        break;
-                    case 1:
-                        REPORTER_ASSERT(reporter,
-                                        style.getFontStyle().slant() == SkFontStyle::kItalic_Slant);
-                        break;
-                    case 2:
-                        REPORTER_ASSERT(
-                                reporter,
-                                style.getFontStyle().slant() == SkFontStyle::kUpright_Slant);
-                        break;
-                    default:
-                        REPORTER_ASSERT(reporter, false);
-                        break;
-                }
-                ++index;
-            });
+        SkStyleType::Foreground,
+        [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
+            switch (index) {
+                case 0:
+                    REPORTER_ASSERT(
+                            reporter,
+                            style.getFontStyle().slant() == SkFontStyle::kUpright_Slant);
+                    break;
+                case 1:
+                    REPORTER_ASSERT(reporter,
+                                    style.getFontStyle().slant() == SkFontStyle::kItalic_Slant);
+                    break;
+                case 2:
+                    REPORTER_ASSERT(
+                            reporter,
+                            style.getFontStyle().slant() == SkFontStyle::kUpright_Slant);
+                    break;
+                default:
+                    REPORTER_ASSERT(reporter, false);
+                    break;
+            }
+            ++index;
+            return true;
+        });
 }
 
 DEF_TEST(SkParagraph_ChineseParagraph, reporter) {
@@ -1859,12 +1866,12 @@ DEF_TEST(SkParagraph_SpacingParagraph, reporter) {
     size_t index = 0;
     impl->lines().begin()->scanStyles(
             SkStyleType::LetterSpacing,
-            [&index](SkTextStyle style, SkSpan<const char> text) { ++index; });
+            [&index](SkSpan<const char> text, SkTextStyle style, SkScalar) { ++index; return true; });
     REPORTER_ASSERT(reporter, index == 4);
     index = 0;
     impl->lines().begin()->scanStyles(
             SkStyleType::WordSpacing,
-            [&index](SkTextStyle style, SkSpan<const char> text) { ++index; });
+            [&index](SkSpan<const char> text, SkTextStyle style, SkScalar) { ++index; return true; });
     REPORTER_ASSERT(reporter, index == 4);
 }
 
@@ -2112,11 +2119,12 @@ DEF_TEST(SkParagraph_Ellipsize, reporter) {
     auto& line = impl->lines()[0];
     REPORTER_ASSERT(reporter, line.ellipsis() != nullptr);
     size_t index = 0;
-    line.scanRuns([&index, &line, reporter](SkRun* run, int32_t, size_t, SkRect) {
+    line.scanRuns([&index, &line, reporter](SkRun* run, int32_t, size_t, SkRect, SkScalar, bool) {
         ++index;
         if (index == 2) {
             REPORTER_ASSERT(reporter, run->text() == line.ellipsis()->text());
         }
+        return true;
     });
     REPORTER_ASSERT(reporter, index == 2);
 }
@@ -2167,7 +2175,7 @@ DEF_TEST(SkParagraph_UnderlineShiftParagraph, reporter) {
         size_t index = 0;
         line.scanStyles(
                 SkStyleType::Decorations,
-                [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
+                [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                     switch (index) {
                         case 0:
                             REPORTER_ASSERT(reporter, style.getDecoration() ==
@@ -2182,6 +2190,7 @@ DEF_TEST(SkParagraph_UnderlineShiftParagraph, reporter) {
                             break;
                     }
                     ++index;
+                    return true;
                 });
         REPORTER_ASSERT(reporter, index == 2);
     }
@@ -2189,7 +2198,7 @@ DEF_TEST(SkParagraph_UnderlineShiftParagraph, reporter) {
         auto& line = impl1->lines()[0];
         size_t index = 0;
         line.scanStyles(SkStyleType::Decorations,
-                        [&index, reporter](SkTextStyle style, SkSpan<const char> text) {
+                        [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                             if (index == 0) {
                                 REPORTER_ASSERT(reporter, style.getDecoration() ==
                                                                   SkTextDecoration::kNoDecoration);
@@ -2197,6 +2206,7 @@ DEF_TEST(SkParagraph_UnderlineShiftParagraph, reporter) {
                                 REPORTER_ASSERT(reporter, false);
                             }
                             ++index;
+                            return true;
                         });
         REPORTER_ASSERT(reporter, index == 1);
     }
@@ -2251,10 +2261,11 @@ DEF_TEST(SkParagraph_SimpleShadow, reporter) {
     size_t index = 0;
     for (auto& line : impl->lines()) {
         line.scanStyles(SkStyleType::Shadow,
-                        [&index, text_style, reporter](SkTextStyle style, SkSpan<const char> text) {
-                            REPORTER_ASSERT(reporter, index == 0 && style.equals(text_style));
-                            ++index;
-                        });
+            [&index, text_style, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
+                REPORTER_ASSERT(reporter, index == 0 && style.equals(text_style));
+                ++index;
+                return true;
+            });
     }
 }
 
@@ -2296,7 +2307,7 @@ DEF_TEST(SkParagraph_ComplexShadow, reporter) {
     size_t index = 0;
     for (auto& line : impl->lines()) {
         line.scanStyles(SkStyleType::Shadow,
-            [&index, text_style, reporter](SkTextStyle style, SkSpan<const char> text) {
+            [&index, text_style, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                 ++index;
                 switch (index) {
                     case 1:
@@ -2318,6 +2329,7 @@ DEF_TEST(SkParagraph_ComplexShadow, reporter) {
                     default:
                         REPORTER_ASSERT(reporter, false);
                 }
+                return true;
             });
     }
 }

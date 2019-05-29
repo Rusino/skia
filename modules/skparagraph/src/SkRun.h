@@ -66,13 +66,13 @@ public:
 
     void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 
-    void iterateThroughClustersInTextOrder(std::function<void(size_t glyphStart,
-                                                              size_t glyphEnd,
-                                                              size_t charStart,
-                                                              size_t charEnd,
-                                                              SkScalar width,
-                                                              SkScalar height)>
-                                                   visitor);
+    using ClusterVisitor = std::function<void(size_t glyphStart,
+                                              size_t glyphEnd,
+                                              size_t charStart,
+                                              size_t charEnd,
+                                              SkScalar width,
+                                              SkScalar height)>;
+    void iterateThroughClustersInTextOrder(const ClusterVisitor& visitor);
 
     std::tuple<bool, SkCluster*, SkCluster*> findLimitingClusters(SkSpan<const char> text);
     SkSpan<const SkGlyphID> glyphs() { return SkSpan<const SkGlyphID>(fGlyphs.begin(), fGlyphs.size()); }

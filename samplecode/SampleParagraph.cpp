@@ -74,113 +74,6 @@ static sk_sp<SkShader> setgrad(const SkRect& r, SkColor c0, SkColor c1) {
     return SkGradientShader::MakeLinear(pts, colors, nullptr, 2, SkTileMode::kClamp);
 }
 
-class TestFontStyleSet : public SkFontStyleSet {
- public:
-  TestFontStyleSet() {}
-
-  ~TestFontStyleSet() override {}
-
-  void registerTypeface(sk_sp<SkTypeface> typeface) {
-
-    _typeface = std::move(typeface);
-  }
-
-  int count() override {
-
-    return 1;
-  }
-
-  void getStyle(int index, SkFontStyle* style, SkString* name) override {
-
-    if (style != nullptr) { *style = _typeface->fontStyle(); }
-    if (name != nullptr) { _typeface->getFamilyName(name); }
-  }
-
-  SkTypeface* createTypeface(int index) override {
-
-    return SkRef(_typeface.get());
-  }
-
-  SkTypeface* matchStyle(const SkFontStyle& pattern) override {
-
-    //return SkRef(_typeface.get());
-    return (pattern == _typeface->fontStyle() ? SkRef(_typeface.get()) : nullptr);
-  }
-
- private:
-  sk_sp<SkTypeface> _typeface;
-};
-
-class TestFontProvider : public SkFontMgr {
- public:
-  TestFontProvider(sk_sp<SkTypeface> typeface) {
-
-    RegisterTypeface(std::move(typeface));
-  }
-  ~TestFontProvider() override {}
-
-  void RegisterTypeface(sk_sp<SkTypeface> typeface) {
-
-    _set.registerTypeface(std::move(typeface));
-    _set.getStyle(0, nullptr, &_familyName);
-  }
-
-  void
-  RegisterTypeface(sk_sp<SkTypeface> typeface, std::string family_name_alias) {
-
-    RegisterTypeface(std::move(typeface));
-  }
-
-  int onCountFamilies() const override {
-
-    return 1;
-  }
-
-  void onGetFamilyName(int index, SkString* familyName) const override {
-
-    *familyName = _familyName;
-  }
-
-  SkFontStyleSet* onMatchFamily(const char familyName[]) const override {
-
-    if (std::strncmp(familyName, _familyName.c_str(), _familyName.size())
-        == 0) {
-      return (SkFontStyleSet*) &_set;
-    }
-    return nullptr;
-  }
-
-  SkFontStyleSet*
-  onCreateStyleSet(int index) const override { return nullptr; }
-  SkTypeface* onMatchFamilyStyle(const char familyName[],
-                                 const SkFontStyle& style) const override { return nullptr; }
-  SkTypeface* onMatchFamilyStyleCharacter(const char familyName[],
-                                          const SkFontStyle& style,
-                                          const char* bcp47[], int bcp47Count,
-                                          SkUnichar character) const override { return nullptr; }
-  SkTypeface* onMatchFaceStyle(const SkTypeface* tf,
-                               const SkFontStyle& style) const override { return nullptr; }
-
-  sk_sp<SkTypeface>
-  onMakeFromData(sk_sp<SkData>, int ttcIndex) const override { return nullptr; }
-  sk_sp<SkTypeface> onMakeFromStreamIndex(std::unique_ptr<SkStreamAsset>,
-                                          int ttcIndex) const override { return nullptr; }
-  sk_sp<SkTypeface> onMakeFromStreamArgs(std::unique_ptr<SkStreamAsset>,
-                                         const SkFontArguments&) const override { return nullptr; }
-  sk_sp<SkTypeface>
-  onMakeFromFontData(std::unique_ptr<SkFontData>) const override { return nullptr; }
-  sk_sp<SkTypeface>
-  onMakeFromFile(const char path[],
-                 int ttcIndex) const override { return nullptr; }
-
-  sk_sp<SkTypeface> onLegacyMakeTypeface(const char familyName[],
-                                         SkFontStyle style) const override { return nullptr; }
-
- private:
-  TestFontStyleSet _set;
-  SkString _familyName;
-};
-
 class TestFontCollection : public SkFontCollection {
 public:
     TestFontCollection() : fResourceDir(GetResourcePath().c_str()) {
@@ -236,11 +129,6 @@ class ParagraphView1 : public Sample {
         tf0->unref();
         tf1->unref();
 #endif
-
-    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
-        "fonts/GoogleSans-Regular.ttf"));
-
-    fontCollection = sk_make_sp<SkFontCollection>();
   }
 
   ~ParagraphView1() {
@@ -350,75 +238,6 @@ class ParagraphView1 : public Sample {
     }
   }
 
-  void drawSimpleTest(SkCanvas* canvas, SkScalar w, SkScalar h,
-                      SkTextDecoration decoration,
-                      SkTextDecorationStyle decorationStyle
-  ) {
-
-    SkColor fg = SK_ColorDKGRAY;
-    SkColor bg = SK_ColorWHITE;
-    std::string ff = "sans-serif";
-    SkScalar fs = 20;
-    bool shadow = false;
-    bool has_decoration = true;
-
-    SkAutoCanvasRestore acr(canvas, true);
-
-    canvas->clipRect(SkRect::MakeWH(w, h));
-    canvas->drawColor(bg);
-
-    SkScalar margin = 20;
-
-    SkPaint paint;
-    paint.setAntiAlias(true);
-    paint.setColor(fg);
-
-    SkPaint background;
-    background.setColor(bg);
-
-    SkPaint blue;
-    blue.setColor(SK_ColorBLUE);
-
-    SkTextStyle style;
-    style.setBackgroundColor(blue);
-    style.setForegroundColor(paint);
-    SkParagraphStyle paraStyle;
-    paraStyle.setTextStyle(style);
-
-    paraStyle.getTextStyle().setFontSize(10);
-    SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
-
-    style.setBackgroundColor(background);
-    style.setForegroundColor(paint);
-    style.setFontFamily(ff);
-    style.setFontStyle(SkFontStyle());
-    style.setFontSize(fs);
-    style.setBackgroundColor(background);
-    SkPaint foreground;
-    foreground.setColor(fg);
-    style.setForegroundColor(foreground);
-
-    if (shadow) {
-      style.addShadow(SkTextShadow(SK_ColorBLACK, SkPoint::Make(5, 5), 2));
-    }
-
-    if (has_decoration) {
-      style.setDecoration(decoration);
-      style.setDecorationStyle(decorationStyle);
-      style.setDecorationColor(SK_ColorBLACK);
-    }
-    builder.pushStyle(style);
-    builder.addText(gText);
-    builder.pop();
-
-    auto paragraph = builder.Build();
-    paragraph->layout(w - margin);
-
-    paragraph->paint(canvas, margin, margin);
-
-    canvas->translate(0, paragraph->getHeight() + margin);
-  }
-
   void onDrawContent(SkCanvas* canvas) override {
     drawTest(canvas, this->width(), this->height(), SK_ColorRED, SK_ColorWHITE);
     /*
@@ -448,9 +267,6 @@ class ParagraphView1 : public Sample {
 
  private:
   typedef Sample INHERITED;
-
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
 };
 
 class ParagraphView2 : public Sample {
@@ -753,11 +569,6 @@ class ParagraphView3 : public Sample {
         tf0->unref();
         tf1->unref();
 #endif
-
-    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
-        "fonts/GoogleSans-Regular.ttf"));
-
-    fontCollection = sk_make_sp<SkFontCollection>();
   }
 
   ~ParagraphView3() {
@@ -899,9 +710,6 @@ class ParagraphView3 : public Sample {
 
  private:
   typedef Sample INHERITED;
-
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
 };
 
 class ParagraphView4 : public Sample {
@@ -919,12 +727,6 @@ class ParagraphView4 : public Sample {
         tf0->unref();
         tf1->unref();
 #endif
-
-    testFontProvider = sk_make_sp<TestFontProvider>(MakeResourceAsTypeface(
-        "fonts/GoogleSans-Regular.ttf"));
-
-    fontCollection = sk_make_sp<SkFontCollection>();
-    fontCollection->setTestFontManager(testFontProvider);
   }
 
   ~ParagraphView4() {
@@ -1028,7 +830,6 @@ class ParagraphView4 : public Sample {
     paraStyle.setMaxLines(lineLimit);
 
     paraStyle.setEllipsis(ellipsis);
-    fontCollection->setTestFontManager(testFontProvider);
 
     const std::string logo1 = "google_";
     const std::string logo2 = "logo";
@@ -1037,7 +838,7 @@ class ParagraphView4 : public Sample {
     const std::string logo5 = "google_lo";
     const std::string logo6 = "go";
     {
-      SkParagraphBuilder builder(paraStyle, fontCollection);
+      SkParagraphBuilder builder(paraStyle, sk_make_sp<TestFontCollection>());
 
       builder.pushStyle(style0);
       builder.addText(logo1);
@@ -1082,9 +883,6 @@ class ParagraphView4 : public Sample {
 
  private:
   typedef Sample INHERITED;
-
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
 };
 
 class ParagraphView5 : public Sample {
@@ -1133,11 +931,6 @@ class ParagraphView5 : public Sample {
              SkScalar fs = 30,
              const std::u16string& ellipsis = u"\u2026") {
 
-      sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
-      fontCollection->disableFontFallback();
-      fontCollection->setTestFontManager(
-              sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/GoogleSans-Regular.ttf")));
-
     SkAutoCanvasRestore acr(canvas, true);
 
     canvas->clipRect(SkRect::MakeWH(w, h));
@@ -1172,7 +965,7 @@ class ParagraphView5 : public Sample {
 
     paraStyle.setEllipsis(ellipsis);
 
-    SkParagraphBuilder builder(paraStyle, fontCollection);
+    SkParagraphBuilder builder(paraStyle, sk_make_sp<TestFontCollection>());
 
     if (text.empty()) {
       const std::u16string text0 = u"\u202Dabc";
@@ -1289,8 +1082,6 @@ class ParagraphView6 : public Sample {
 
     auto ff = "HangingS";
 
-    sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
-
     canvas->drawColor(SK_ColorLTGRAY);
 
     SkPaint black;
@@ -1368,7 +1159,7 @@ class ParagraphView6 : public Sample {
     const std::string logo5 = "Ski";
     const std::string logo6 = "a";
     {
-      SkParagraphBuilder builder(paraStyle, fontCollection);
+      SkParagraphBuilder builder(paraStyle, sk_make_sp<TestFontCollection>());
 
       builder.pushStyle(style0);
       builder.addText(logo1);
@@ -1408,7 +1199,7 @@ class ParagraphView6 : public Sample {
     const std::string logo15 = "S";
     const std::string logo16 = "S";
     {
-      SkParagraphBuilder builder(paraStyle, fontCollection);
+      SkParagraphBuilder builder(paraStyle, sk_make_sp<TestFontCollection>());
 
       builder.pushStyle(style0);
       builder.addText(logo11);
@@ -1455,9 +1246,6 @@ class ParagraphView6 : public Sample {
 
  private:
   typedef Sample INHERITED;
-
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
 };
 
 class ParagraphView7 : public Sample {
@@ -1475,8 +1263,6 @@ class ParagraphView7 : public Sample {
         tf0->unref();
         tf1->unref();
 #endif
-
-    fontCollection = sk_make_sp<SkFontCollection>();
   }
 
   ~ParagraphView7() {
@@ -1496,7 +1282,6 @@ class ParagraphView7 : public Sample {
     canvas->clipRect(SkRect::MakeWH(w, h));
     canvas->drawColor(background);
 
-    fontCollection = sk_make_sp<SkFontCollection>();
     const char* line = "World domination is such an ugly phrase - I prefer to call it world optimisation";
 
     SkParagraphStyle paragraphStyle;
@@ -1510,7 +1295,7 @@ class ParagraphView7 : public Sample {
     textStyle.setColor(SK_ColorBLACK);
     textStyle.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
 
-    SkParagraphBuilder builder(paragraphStyle, fontCollection);
+    SkParagraphBuilder builder(paragraphStyle, sk_make_sp<TestFontCollection>());
     builder.pushStyle(textStyle);
     builder.addText(line);
     builder.pop();
@@ -1553,9 +1338,6 @@ class ParagraphView7 : public Sample {
   }
  private:
   typedef Sample INHERITED;
-
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
 };
 
 class ParagraphView8 : public Sample {
@@ -1573,8 +1355,6 @@ class ParagraphView8 : public Sample {
         tf0->unref();
         tf1->unref();
 #endif
-
-    fontCollection = sk_make_sp<SkFontCollection>();
   }
 
   ~ParagraphView8() {
@@ -1594,7 +1374,6 @@ class ParagraphView8 : public Sample {
     canvas->clipRect(SkRect::MakeWH(w, h));
     canvas->drawColor(background);
 
-    fontCollection = sk_make_sp<SkFontCollection>();
     const char* line = "World domination is such an ugly phrase - I prefer to call it world optimisation";
 
     SkParagraphStyle paragraphStyle;
@@ -1608,7 +1387,7 @@ class ParagraphView8 : public Sample {
     textStyle.setColor(SK_ColorBLACK);
     textStyle.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width, SkFontStyle::kUpright_Slant));
 
-    SkParagraphBuilder builder(paragraphStyle, fontCollection);
+    SkParagraphBuilder builder(paragraphStyle, sk_make_sp<TestFontCollection>());
     builder.pushStyle(textStyle);
     builder.addText(line);
     builder.pop();
@@ -1651,9 +1430,6 @@ class ParagraphView8 : public Sample {
   }
  private:
   typedef Sample INHERITED;
-
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
 };
 
 class ParagraphView9 : public Sample {
@@ -1672,7 +1448,6 @@ class ParagraphView9 : public Sample {
         tf1->unref();
 #endif
 
-    fontCollection = sk_make_sp<SkFontCollection>();
     wordSpacing = 0;
     letterSpacing = 0;
   }
@@ -1805,9 +1580,6 @@ class ParagraphView9 : public Sample {
   }
  private:
   typedef Sample INHERITED;
-
-  sk_sp<TestFontProvider> testFontProvider;
-  sk_sp<SkFontCollection> fontCollection;
   SkScalar letterSpacing;
   SkScalar wordSpacing;
 };

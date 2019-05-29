@@ -9,7 +9,6 @@
 
 #include "SkLine.h"
 #include "SkRun.h"
-#include "SkTextWrapperOld.h"
 #include "include/core/SkPicture.h"
 #include "include/private//SkTHash.h"
 #include "modules/skparagraph/include/SkParagraph.h"
@@ -97,7 +96,6 @@ public:
                             fonts)
             : SkParagraph(std::move(style), std::move(fonts))
             , fUtf8(text.data(), text.size())
-            , fTextWrapper(this)
             , fPicture(nullptr) {
         fTextStyles.reserve(blocks.size());
         for (auto& block : blocks) {
@@ -114,7 +112,6 @@ public:
                     sk_sp<SkFontCollection>
                             fonts)
             : SkParagraph(std::move(style), std::move(fonts))
-            , fTextWrapper(this)
             , fPicture(nullptr) {
         icu::UnicodeString unicode((UChar*)utf16text.data(), SkToS32(utf16text.size()));
         std::string str;
@@ -186,7 +183,6 @@ private:
     SkTArray<SkRun> fRuns;
     SkTArray<SkCluster, true> fClusters;
     SkTArray<SkLine> fLines;
-    SkTextWrapperOld fTextWrapper;
     SkLineMetrics fStrutMetrics;
 
     // Painting

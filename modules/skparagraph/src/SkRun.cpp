@@ -99,13 +99,7 @@ std::tuple<bool, SkCluster*, SkCluster*> SkRun::findLimitingClusters(SkSpan<cons
     return std::make_tuple(start != nullptr && end != nullptr, start, end);
 }
 
-void SkRun::iterateThroughClustersInTextOrder(std::function<void(size_t glyphStart,
-                                                                 size_t glyphEnd,
-                                                                 size_t charStart,
-                                                                 size_t charEnd,
-                                                                 SkScalar width,
-                                                                 SkScalar height)>
-                                                      visitor) {
+void SkRun::iterateThroughClustersInTextOrder(const ClusterVisitor& visitor) {
     TRACE_EVENT0("skia", TRACE_FUNC);
     // Can't figure out how to do it with one code for both cases without 100 ifs
     // Can't go through clusters because there are no cluster table yet
