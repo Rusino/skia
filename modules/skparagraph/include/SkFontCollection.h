@@ -38,11 +38,11 @@ public:
 
     sk_sp<SkFontMgr> geFallbackManager() const { return fDefaultFontManager; }
 
-    sk_sp<SkTypeface> findTypeface(const std::string& familyName, SkFontStyle fontStyle);
     sk_sp<SkTypeface> matchTypeface(const std::string& familyName, SkFontStyle fontStyle);
-    sk_sp<SkTypeface> defaultFallback(const std::string& familyName, SkFontStyle fontStyle);
+    sk_sp<SkTypeface> defaultFallback(SkUnichar unicode, SkFontStyle fontStyle);
 
     void disableFontFallback();
+    bool fontFallbackEnabled() { return fEnableFontFallback; }
 
 private:
     std::vector<sk_sp<SkFontMgr>> getFontManagerOrder() const;

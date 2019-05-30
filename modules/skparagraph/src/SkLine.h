@@ -23,6 +23,11 @@ public:
     inline SkSpan<const char> text() const { return fText; }
     inline SkTextStyle style() const { return fTextStyle; }
 
+    void add(SkSpan<const char> tail) {
+        SkASSERT(fText.end() == tail.begin());
+        fText = SkSpan<const char>(fText.begin(), fText.size() + tail.size());
+    }
+
 protected:
     SkSpan<const char> fText;
     SkTextStyle fTextStyle;
@@ -35,7 +40,7 @@ public:
     ~SkLine() = default;
 
     SkLine(SkVector offset, SkVector advance, SkSpan<const SkBlock> blocks, SkSpan<const char> text,
-           SkSpan<const SkCluster> clusters, SkSpan<const SkCluster> tail, SkLineMetrics sizes);
+           SkSpan<const SkCluster> clusters, size_t start, size_t end, SkLineMetrics sizes);
 
     inline SkSpan<const char> text() const { return fText; }
     inline SkSpan<const SkCluster> clusters() const { return fClusters; }
@@ -56,21 +61,19 @@ public:
     inline SkScalar baseline() const { return fSizes.baseline(); }
     inline SkScalar roundingDelta() const { return fSizes.delta(); }
 
-    void iterateThroughStylesInTextOrder(
-            SkStyleType styleType,
-            std::function<SkScalar(SkSpan<const char> text, const SkTextStyle& style,
-                                   SkScalar offsetX)>
-                    visitor) const;
+    using StyleVisitor = std::function<SkScalar(SkSpan<const char> text, const SkTextStyle& style,
+                                                SkScalar offsetX)>;
+    void iterateThroughStylesInTextOrder(SkStyleType styleType, const StyleVisitor& visitor) const;
 
+    using RunVisitor = std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip,
+                                          SkScalar shift, bool clippingNeeded)>;
     SkScalar iterateThroughRuns(SkSpan<const char> text,
                                 SkScalar offsetX,
                                 bool includeEmptyText,
-                                std::function<bool(SkRun* run, size_t pos, size_t size, SkRect clip,
-                                                   SkScalar shift, bool clippingNeeded)>
-                                        visitor) const;
+                                const RunVisitor& visitor) const;
 
-    void iterateThroughClustersInGlyphsOrder(
-            bool reverse, std::function<bool(const SkCluster* cluster)> visitor) const;
+    using ClustersVisitor = std::function<bool(const SkCluster* cluster)>;
+    void iterateThroughClustersInGlyphsOrder(bool reverse, const ClustersVisitor& visitor) const;
 
     void format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool last);
     void paint(SkCanvas* canvas);
@@ -78,9 +81,8 @@ public:
     void createEllipsis(SkScalar maxWidth, const std::string& ellipsis, bool ltr);
 
     // For testing internal structures
-    void scanStyles(SkStyleType style,
-                    std::function<void(SkTextStyle, SkSpan<const char>)> visitor);
-    void scanRuns(std::function<void(SkRun*, int32_t, size_t, SkRect)> visitor);
+    void scanStyles(SkStyleType style, const StyleVisitor& visitor);
+    void scanRuns(const RunVisitor& visitor);
 
 private:
     SkRun* shapeEllipsis(const std::string& ellipsis, SkRun* run);
@@ -111,7 +113,8 @@ private:
     SkSpan<const SkBlock> fBlocks;
     SkSpan<const char> fText;
     SkSpan<const SkCluster> fClusters;
-    SkSpan<const SkCluster> fInvisibleTail;  // all invisible symbols, spaces, new lines
+    size_t fStartPos;
+    size_t fEndPos;
     SkTArray<SkRun*, true> fLogical;
     SkScalar fShift;                   // Shift to left - right - center
     SkVector fAdvance;                 // Text size

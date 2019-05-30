@@ -9,7 +9,6 @@
 
 #include "SkLine.h"
 #include "SkRun.h"
-#include "SkTextWrapper.h"
 #include "include/core/SkPicture.h"
 #include "include/private//SkTHash.h"
 #include "modules/skparagraph/include/SkParagraph.h"
@@ -97,7 +96,6 @@ public:
                             fonts)
             : SkParagraph(std::move(style), std::move(fonts))
             , fUtf8(text.data(), text.size())
-            , fTextWrapper(this)
             , fPicture(nullptr) {
         fTextStyles.reserve(blocks.size());
         for (auto& block : blocks) {
@@ -113,9 +111,7 @@ public:
                             blocks,
                     sk_sp<SkFontCollection>
                             fonts)
-            : SkParagraph(std::move(style), std::move(fonts))
-            , fTextWrapper(this)
-            , fPicture(nullptr) {
+            : SkParagraph(std::move(style), std::move(fonts)), fPicture(nullptr) {
         icu::UnicodeString unicode((UChar*)utf16text.data(), SkToS32(utf16text.size()));
         std::string str;
         unicode.toUTF8String(str);
@@ -143,14 +139,10 @@ public:
         return !fParagraphStyle.unlimited_lines() && fLines.size() > fParagraphStyle.getMaxLines();
     }
 
-    SkLine& addLine(SkVector offset,
-                    SkVector advance,
-                    SkSpan<const char>
-                            text,
-                    SkSpan<const SkCluster>
-                            clusters,
-                    SkSpan<const SkCluster>
-                            end,
+    size_t lineNumber() override { return fLines.size(); }
+
+    SkLine& addLine(SkVector offset, SkVector advance, SkSpan<const char> text,
+                    SkSpan<const SkCluster> clusters, size_t start, size_t end,
                     SkLineMetrics sizes);
 
     inline SkSpan<const char> text() const { return fUtf8; }
@@ -188,7 +180,6 @@ private:
     SkTArray<SkRun> fRuns;
     SkTArray<SkCluster, true> fClusters;
     SkTArray<SkLine> fLines;
-    SkTextWrapper fTextWrapper;
     SkLineMetrics fStrutMetrics;
 
     // Painting

@@ -22,6 +22,7 @@
 #include "SkTextStyle.h"
 #include "include/core/SkFontStyle.h"
 
+// TODO: Group getters/setters
 struct SkStrutStyle {
     SkStrutStyle();
     SkFontStyle fFontStyle;

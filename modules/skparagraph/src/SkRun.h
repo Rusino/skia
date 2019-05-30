@@ -13,6 +13,7 @@
 #include "include/core/SkTextBlob.h"
 #include "modules/skshaper/include/SkShaper.h"
 #include "src/core/SkSpan.h"
+#include "src/core/SkTraceEvent.h"
 #include "uchar.h"
 
 class SkCluster;
@@ -65,15 +66,18 @@ public:
 
     void copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const;
 
-    void iterateThroughClustersInTextOrder(std::function<void(size_t glyphStart,
-                                                              size_t glyphEnd,
-                                                              size_t charStart,
-                                                              size_t charEnd,
-                                                              SkScalar width,
-                                                              SkScalar height)>
-                                                   visitor);
+    using ClusterVisitor = std::function<void(size_t glyphStart,
+                                              size_t glyphEnd,
+                                              size_t charStart,
+                                              size_t charEnd,
+                                              SkScalar width,
+                                              SkScalar height)>;
+    void iterateThroughClustersInTextOrder(const ClusterVisitor& visitor);
 
     std::tuple<bool, SkCluster*, SkCluster*> findLimitingClusters(SkSpan<const char> text);
+    SkSpan<const SkGlyphID> glyphs() { return SkSpan<const SkGlyphID>(fGlyphs.begin(), fGlyphs.size()); }
+    SkSpan<const SkPoint> positions() { return SkSpan<const SkPoint>(fPositions.begin(), fPositions.size()); }
+    SkSpan<const uint32_t> clusterIndexes() { return SkSpan<const uint32_t>(fClusterIndexes.begin(), fClusterIndexes.size()); }
 
 private:
     friend class SkParagraphImpl;
@@ -123,8 +127,7 @@ public:
     SkCluster(SkRun* run,
               size_t start,
               size_t end,
-              SkSpan<const char>
-                      text,
+              SkSpan<const char> text,
               SkScalar width,
               SkScalar height)
             : fText(text)
@@ -140,8 +143,9 @@ public:
     ~SkCluster() = default;
 
     SkScalar sizeToChar(const char* ch) const;
-
     SkScalar sizeFromChar(const char* ch) const;
+
+    size_t roundPos(SkScalar s) const;
 
     void space(SkScalar shift, SkScalar space) {
         fSpacing += space;
@@ -164,6 +168,9 @@ public:
     inline SkScalar lastSpacing() const { return fSpacing; }
     inline SkScalar height() const { return fHeight; }
     inline SkSpan<const char> text() const { return fText; }
+    inline size_t size() const { return fEnd - fStart; }
+
+    SkScalar trimmedWidth(size_t pos) const;
 
     void shift(SkScalar offset) const { this->run()->shift(this, offset); }
 

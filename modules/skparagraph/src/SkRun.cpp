@@ -13,6 +13,7 @@ SkRun::SkRun(SkSpan<const char> text,
              SkScalar lineHeight,
              size_t index,
              SkScalar offsetX) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     fFont = info.fFont;
     fHeightMultiplier = lineHeight;
     fBidiLevel = info.fBidiLevel;
@@ -34,12 +35,14 @@ SkRun::SkRun(SkSpan<const char> text,
 }
 
 SkShaper::RunHandler::Buffer SkRun::newRunBuffer() {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     return {fGlyphs.data(), fPositions.data(), nullptr, fClusterIndexes.data(), fOffset};
 }
 
 SkScalar SkRun::calculateWidth(size_t start, size_t end, bool clip) const {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     SkASSERT(start <= end);
-    clip |= end == size();  // Clip at the end of the run?
+    //clip |= end == size();  // Clip at the end of the run?
     SkScalar offset = 0;
     if (fSpaced && end > start) {
         offset = fOffsets[clip ? end - 1 : end] - fOffsets[start];
@@ -48,6 +51,7 @@ SkScalar SkRun::calculateWidth(size_t start, size_t end, bool clip) const {
 }
 
 void SkRun::copyTo(SkTextBlobBuilder& builder, size_t pos, size_t size, SkVector offset) const {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     SkASSERT(pos + size <= this->size());
     const auto& blobBuffer = builder.allocRunPos(fFont, SkToInt(size));
     sk_careful_memcpy(blobBuffer.glyphs, fGlyphs.data() + pos, size * sizeof(SkGlyphID));
@@ -95,13 +99,8 @@ std::tuple<bool, SkCluster*, SkCluster*> SkRun::findLimitingClusters(SkSpan<cons
     return std::make_tuple(start != nullptr && end != nullptr, start, end);
 }
 
-void SkRun::iterateThroughClustersInTextOrder(std::function<void(size_t glyphStart,
-                                                                 size_t glyphEnd,
-                                                                 size_t charStart,
-                                                                 size_t charEnd,
-                                                                 SkScalar width,
-                                                                 SkScalar height)>
-                                                      visitor) {
+void SkRun::iterateThroughClustersInTextOrder(const ClusterVisitor& visitor) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     // Can't figure out how to do it with one code for both cases without 100 ifs
     // Can't go through clusters because there are no cluster table yet
     if (leftToRight()) {
@@ -147,6 +146,7 @@ void SkRun::iterateThroughClustersInTextOrder(std::function<void(size_t glyphSta
 }
 
 SkScalar SkRun::addSpacesAtTheEnd(SkScalar space, SkCluster* cluster) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     if (cluster->endPos() == cluster->startPos()) {
         return 0;
     }
@@ -162,11 +162,16 @@ SkScalar SkRun::addSpacesAtTheEnd(SkScalar space, SkCluster* cluster) {
 }
 
 SkScalar SkRun::addSpacesEvenly(SkScalar space, SkCluster* cluster) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     // Offset all the glyphs in the cluster
     SkScalar shift = 0;
     for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
         fOffsets[i] += shift;
         shift += space;
+    }
+    if (this->size() == cluster->endPos()) {
+        // To make calculations easier
+        fOffsets[cluster->endPos()] += shift;
     }
     // Increment the run width
     fSpaced = true;
@@ -178,6 +183,7 @@ SkScalar SkRun::addSpacesEvenly(SkScalar space, SkCluster* cluster) {
 }
 
 void SkRun::shift(const SkCluster* cluster, SkScalar offset) {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     if (offset == 0) {
         return;
     }
@@ -186,9 +192,14 @@ void SkRun::shift(const SkCluster* cluster, SkScalar offset) {
     for (size_t i = cluster->startPos(); i < cluster->endPos(); ++i) {
         fOffsets[i] += offset;
     }
+    if (this->size() == cluster->endPos()) {
+        // To make calculations easier
+        fOffsets[cluster->endPos()] += offset;
+    }
 }
 
 void SkCluster::setIsWhiteSpaces() {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     auto pos = fText.end();
     while (--pos >= fText.begin()) {
         auto ch = *pos;
@@ -201,6 +212,7 @@ void SkCluster::setIsWhiteSpaces() {
 }
 
 SkScalar SkCluster::sizeToChar(const char* ch) const {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     if (ch < fText.begin() || ch >= fText.end()) {
         return 0;
     }
@@ -211,6 +223,7 @@ SkScalar SkCluster::sizeToChar(const char* ch) const {
 }
 
 SkScalar SkCluster::sizeFromChar(const char* ch) const {
+    TRACE_EVENT0("skia", TRACE_FUNC);
     if (ch < fText.begin() || ch >= fText.end()) {
         return 0;
     }
@@ -218,4 +231,15 @@ SkScalar SkCluster::sizeFromChar(const char* ch) const {
     auto ratio = shift * 1.0 / fText.size();
 
     return SkDoubleToScalar(fWidth * ratio);
+}
+
+size_t SkCluster::roundPos(SkScalar s) const {
+    TRACE_EVENT0("skia", TRACE_FUNC);
+    auto ratio = (s * 1.0) / fWidth;
+    return  sk_double_floor2int(ratio * size());
+}
+
+SkScalar SkCluster::trimmedWidth(size_t pos) const {
+    // Find the width until the pos and return the min between trimmedWidth and the width(pos)
+    return SkTMin(this->run()->positionX(pos) - this->run()->positionX(fStart), fWidth - fSpacing);
 }
