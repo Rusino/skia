@@ -229,6 +229,8 @@ void SkParagraphImpl::buildClusterTable() {
         auto size = std::get<2>(update);
         run->setClusters(SkSpan<SkCluster>(&fClusters[start], size));
     }
+
+    fClusters.emplace_back(nullptr, 0, 0, SkSpan<const char>(), 0, 0);
 }
 
 void SkParagraphImpl::shapeTextIntoEndlessLine() {
@@ -298,17 +300,6 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
 
 void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
     TRACE_EVENT0("skia", TRACE_FUNC);
-    /*
-    fTextWrapper.formatText(SkSpan<SkCluster>(fClusters.begin(), fClusters.size()),
-                            maxWidth,
-                            fParagraphStyle.getMaxLines(),
-                            fParagraphStyle.getEllipsis());
-    fHeight = fTextWrapper.height();
-    fWidth = maxWidth;  // fTextWrapper.width();
-    fMinIntrinsicWidth = fTextWrapper.intrinsicWidth();
-    fAlphabeticBaseline = fLines.empty() ? 0 : fLines.front().alphabeticBaseline();
-    fIdeographicBaseline = fLines.empty() ? 0 : fLines.front().ideographicBaseline();
-     */
     SkTextWrapper textWrapper;
     textWrapper.breakTextIntoLines(
             this,
@@ -318,8 +309,8 @@ void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
             fParagraphStyle.getEllipsis(),
             [&](SkCluster* start,
                 SkCluster* end,
-                SkScalar startClip,
-                SkScalar endClip,
+                size_t startPos,
+                size_t endPos,
                 SkVector offset,
                 SkVector advance,
                 SkLineMetrics metrics,
@@ -329,7 +320,7 @@ void SkParagraphImpl::breakShapedTextIntoLines(SkScalar maxWidth) {
               SkSpan<const char> text(start->text().begin(),
                                       end->text().end() - start->text().begin());
               SkSpan<const SkCluster> clusters(start, end - start + 1);
-              auto& line = this->addLine(offset, advance, text, clusters, metrics);
+              auto& line = this->addLine(offset, advance, text, clusters, startPos, endPos, metrics);
               if (addEllipsis) {
                   line.createEllipsis(maxWidth, fParagraphStyle.getEllipsis(), true);
               }
@@ -386,12 +377,14 @@ SkLine& SkParagraphImpl::addLine(SkVector offset,
                                  SkVector advance,
                                  SkSpan<const char> text,
                                  SkSpan<const SkCluster> clusters,
+                                 size_t start,
+                                 size_t end,
                                  SkLineMetrics sizes) {
     TRACE_EVENT0("skia", TRACE_FUNC);
     // Define a list of styles that covers the line
     auto blocks = findAllBlocks(text);
 
-    return fLines.emplace_back(offset, advance, blocks, text, clusters, sizes);
+    return fLines.emplace_back(offset, advance, blocks, text, clusters, start, end, sizes);
 }
 
 // Returns a vector of bounding boxes that enclose all text between

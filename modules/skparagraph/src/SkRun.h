@@ -143,8 +143,9 @@ public:
     ~SkCluster() = default;
 
     SkScalar sizeToChar(const char* ch) const;
-
     SkScalar sizeFromChar(const char* ch) const;
+
+    size_t roundPos(SkScalar s) const;
 
     void space(SkScalar shift, SkScalar space) {
         fSpacing += space;
@@ -167,6 +168,9 @@ public:
     inline SkScalar lastSpacing() const { return fSpacing; }
     inline SkScalar height() const { return fHeight; }
     inline SkSpan<const char> text() const { return fText; }
+    inline size_t size() const { return fEnd - fStart; }
+
+    SkScalar trimmedWidth(size_t pos) const;
 
     void shift(SkScalar offset) const { this->run()->shift(this, offset); }
 

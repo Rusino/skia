@@ -103,9 +103,6 @@ private:
 }
 
 class ParagraphView1 : public Sample {
-public:
-    ParagraphView1() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -227,9 +224,6 @@ private:
 };
 
 class ParagraphView2 : public Sample {
-public:
-    ParagraphView2() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -338,7 +332,7 @@ protected:
 
         paraStyle.setEllipsis(ellipsis);
         paraStyle.getTextStyle().setFontSize(20);
-        SkParagraphBuilder builder(paraStyle, sk_make_sp<SkFontCollection>());
+        SkParagraphBuilder builder(paraStyle, sk_make_sp<TestFontCollection>());
 
         SkPaint foreground;
         foreground.setColor(fg);
@@ -471,9 +465,6 @@ private:
 };
 
 class ParagraphView3 : public Sample {
-public:
-    ParagraphView3() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -601,9 +592,6 @@ private:
 };
 
 class ParagraphView4 : public Sample {
-public:
-    ParagraphView4() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -745,9 +733,6 @@ private:
 };
 
 class ParagraphView5 : public Sample {
-public:
-    ParagraphView5() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -873,9 +858,6 @@ private:
 };
 
 class ParagraphView6 : public Sample {
-public:
-    ParagraphView6() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -1053,9 +1035,6 @@ private:
 };
 
 class ParagraphView7 : public Sample {
-public:
-    ParagraphView7() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -1132,9 +1111,6 @@ private:
 };
 
 class ParagraphView8 : public Sample {
-public:
-    ParagraphView8() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -1211,25 +1187,6 @@ private:
 };
 
 class ParagraphView9 : public Sample {
-public:
-    ParagraphView9() {
-#if defined(SK_BUILD_FOR_WIN) && defined(SK_FONTHOST_WIN_GDI)
-        LOGFONT lf;
-        sk_bzero(&lf, sizeof(lf));
-        lf.lfHeight = 9;
-        SkTypeface* tf0 = SkCreateTypefaceFromLOGFONT(lf);
-        lf.lfHeight = 12;
-        SkTypeface* tf1 = SkCreateTypefaceFromLOGFONT(lf);
-        // we assert that different sizes should not affect which face we get
-        SkASSERT(tf0 == tf1);
-        tf0->unref();
-        tf1->unref();
-#endif
-
-        wordSpacing = 0;
-        letterSpacing = 0;
-    }
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -1264,43 +1221,7 @@ protected:
         SkAutoCanvasRestore acr(canvas, true);
         canvas->clipRect(SkRect::MakeWH(w, h));
         canvas->drawColor(background);
-        /*
-            // The chinese extra height should be absorbed by the strut.
-            const char* text = "World domination is such an ugly phrase - I prefer to call it world
-           optimisation"; std::vector<size_t> sizes = { 0, 5, 16, 19, 24, 27, 32, 39, 41, 43, 50,
-           53, 58, 61, 67, 80
-            };
 
-            std::vector<size_t> colors = {
-                SK_ColorBLUE, SK_ColorCYAN, SK_ColorLTGRAY, SK_ColorGREEN, SK_ColorRED,
-           SK_ColorWHITE, SK_ColorYELLOW, SK_ColorMAGENTA
-            };
-
-            SkParagraphStyle paragraphStyle;
-            paragraphStyle.setTextAlign(SkTextAlign::left);
-            paragraphStyle.turnHintingOff();
-            SkTextStyle textStyle;
-            textStyle.setFontFamily("Roboto");
-            textStyle.setFontSize(30);
-            textStyle.setColor(SK_ColorBLACK);
-            textStyle.setWordSpacing(wordSpacing);
-            textStyle.setLetterSpacing(letterSpacing);
-
-            SkParagraphBuilder builder(paragraphStyle, fontCollection);
-            builder.pushStyle(textStyle);
-            builder.addText(text);
-            builder.pop();
-
-            auto paragraph = builder.Build();
-            paragraph->layout(w - 20);
-            paragraph->paint(canvas, 0, 0);
-        */
-        sk_sp<SkFontCollection> fontCollection = sk_make_sp<SkFontCollection>();
-        fontCollection->disableFontFallback();
-        // fontCollection->setTestFontManager(
-        //          sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/NotoSansCJK-Regular.ttc")));
-        // fontCollection->setTestFontManager(
-        //        sk_make_sp<TestFontProvider>(MakeResourceAsTypeface("fonts/Roboto-Medium.ttf")));
         const char* text =
                 "(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)("
                 "　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)("
@@ -1318,7 +1239,7 @@ protected:
         textStyle.setFontStyle(SkFontStyle(SkFontStyle::kMedium_Weight, SkFontStyle::kNormal_Width,
                                            SkFontStyle::kUpright_Slant));
 
-        SkParagraphBuilder builder(paragraphStyle, fontCollection);
+        SkParagraphBuilder builder(paragraphStyle, sk_make_sp<TestFontCollection>());
         builder.pushStyle(textStyle);
         builder.addText(text);
         builder.pop();
@@ -1368,9 +1289,6 @@ private:
 };
 
 class ParagraphView10 : public Sample {
-public:
-    ParagraphView10() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -1383,11 +1301,10 @@ protected:
     void onDrawContent(SkCanvas* canvas) override {
         canvas->drawColor(SK_ColorWHITE);
 
-        sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
         const char* text = "English English 字典 字典 😀😃😄 😀😃😄";
         SkParagraphStyle paragraph_style;
         paragraph_style.turnHintingOff();
-        SkParagraphBuilder builder(paragraph_style, fontCollection);
+        SkParagraphBuilder builder(paragraph_style, sk_make_sp<TestFontCollection>());
 
         SkTextStyle text_style;
         text_style.setFontFamilies({"Roboto", "Noto Color Emoji", "Source Han Serif CN"});
@@ -1416,9 +1333,6 @@ private:
 };
 
 class ParagraphView11 : public Sample {
-public:
-    ParagraphView11() = default;
-
 protected:
     bool onQuery(Sample::Event* evt) override {
         if (Sample::TitleQ(*evt)) {
@@ -1430,8 +1344,6 @@ protected:
 
     void onDrawContent(SkCanvas* canvas) override {
         canvas->drawColor(SK_ColorWHITE);
-
-        sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
 
         const char* text =
                 "😀😃😄😁😆😅😂🤣☺😇🙂😍😡😟😢😻👽💩👍👎🙏👌👋👄👁👦👼👨‍🚀👨‍🚒🙋‍♂️👳👨‍👨‍👧‍"
@@ -1445,7 +1357,7 @@ protected:
 
         SkParagraphStyle paragraph_style;
         paragraph_style.turnHintingOff();
-        SkParagraphBuilder builder(paragraph_style, fontCollection);
+        SkParagraphBuilder builder(paragraph_style, sk_make_sp<TestFontCollection>());
 
         SkTextStyle text_style;
         text_style.setFontFamilies({"Noto Color Emoji"});

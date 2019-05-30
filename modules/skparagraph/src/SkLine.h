@@ -40,7 +40,7 @@ public:
     ~SkLine() = default;
 
     SkLine(SkVector offset, SkVector advance, SkSpan<const SkBlock> blocks, SkSpan<const char> text,
-           SkSpan<const SkCluster> clusters, SkLineMetrics sizes);
+           SkSpan<const SkCluster> clusters, size_t start, size_t end, SkLineMetrics sizes);
 
     inline SkSpan<const char> text() const { return fText; }
     inline SkSpan<const SkCluster> clusters() const { return fClusters; }
@@ -113,6 +113,8 @@ private:
     SkSpan<const SkBlock> fBlocks;
     SkSpan<const char> fText;
     SkSpan<const SkCluster> fClusters;
+    size_t fStartPos;
+    size_t fEndPos;
     SkTArray<SkRun*, true> fLogical;
     SkScalar fShift;                   // Shift to left - right - center
     SkVector fAdvance;                 // Text size

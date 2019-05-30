@@ -232,3 +232,14 @@ SkScalar SkCluster::sizeFromChar(const char* ch) const {
 
     return SkDoubleToScalar(fWidth * ratio);
 }
+
+size_t SkCluster::roundPos(SkScalar s) const {
+    TRACE_EVENT0("skia", TRACE_FUNC);
+    auto ratio = (s * 1.0) / fWidth;
+    return  sk_double_floor2int(ratio * size());
+}
+
+SkScalar SkCluster::trimmedWidth(size_t pos) const {
+    // Find the width until the pos and return the min between trimmedWidth and the width(pos)
+    return SkTMin(this->run()->positionX(pos) - this->run()->positionX(fStart), fWidth - fSpacing);
+}

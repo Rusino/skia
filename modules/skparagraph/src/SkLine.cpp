@@ -42,10 +42,13 @@ int32_t intersects(SkSpan<const char> a, SkSpan<const char> b) {
 SkTHashMap<SkFont, SkRun> SkLine::fEllipsisCache;
 
 SkLine::SkLine(SkVector offset, SkVector advance, SkSpan<const SkBlock> blocks,
-               SkSpan<const char> text, SkSpan<const SkCluster> clusters, SkLineMetrics sizes)
+               SkSpan<const char> text, SkSpan<const SkCluster> clusters, size_t startPos,
+               size_t endPos, SkLineMetrics sizes)
         : fBlocks(blocks)
         , fText(text)
         , fClusters(clusters)
+        , fStartPos(startPos)
+        , fEndPos(endPos)
         , fLogical()
         , fShift(0)
         , fAdvance(advance)
@@ -156,7 +159,7 @@ void SkLine::scanStyles(SkStyleType style, const StyleVisitor& visitor) {
 void SkLine::scanRuns(const RunVisitor& visitor) {
     this->iterateThroughRuns(
             fText, 0, false,
-            [visitor](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar sc , bool b) {
+            [visitor](SkRun* run, int32_t pos, size_t size, SkRect clip, SkScalar sc, bool b) {
                 visitor(run, pos, size, clip, sc, b);
                 return true;
             });

@@ -111,8 +111,7 @@ public:
                             blocks,
                     sk_sp<SkFontCollection>
                             fonts)
-            : SkParagraph(std::move(style), std::move(fonts))
-            , fPicture(nullptr) {
+            : SkParagraph(std::move(style), std::move(fonts)), fPicture(nullptr) {
         icu::UnicodeString unicode((UChar*)utf16text.data(), SkToS32(utf16text.size()));
         std::string str;
         unicode.toUTF8String(str);
@@ -142,10 +141,8 @@ public:
 
     size_t lineNumber() override { return fLines.size(); }
 
-    SkLine& addLine(SkVector offset,
-                    SkVector advance,
-                    SkSpan<const char> text,
-                    SkSpan<const SkCluster> clusters,
+    SkLine& addLine(SkVector offset, SkVector advance, SkSpan<const char> text,
+                    SkSpan<const SkCluster> clusters, size_t start, size_t end,
                     SkLineMetrics sizes);
 
     inline SkSpan<const char> text() const { return fUtf8; }
