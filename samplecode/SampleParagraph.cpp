@@ -568,22 +568,22 @@ protected:
         const std::string line =
                 "World domination is such an ugly phrase - I prefer to call it world optimisation";
 
-        drawLine(canvas, width, height, line, SkTextAlign::left, 1, false, SK_ColorLTGRAY);
+        drawLine(canvas, width, height, line, SkTextAlign::kLeft, 1, false, SK_ColorLTGRAY);
         canvas->translate(width, 0);
-        drawLine(canvas, width, height, line, SkTextAlign::right, 2, false, SK_ColorLTGRAY);
+        drawLine(canvas, width, height, line, SkTextAlign::kRight, 2, false, SK_ColorLTGRAY);
         canvas->translate(width, 0);
-        drawLine(canvas, width, height, line, SkTextAlign::center, 3, false, SK_ColorLTGRAY);
+        drawLine(canvas, width, height, line, SkTextAlign::kCenter, 3, false, SK_ColorLTGRAY);
         canvas->translate(width, 0);
-        drawLine(canvas, width, height, line, SkTextAlign::justify, 4, false, SK_ColorLTGRAY);
+        drawLine(canvas, width, height, line, SkTextAlign::kJustify, 4, false, SK_ColorLTGRAY);
         canvas->translate(-width * 3, height);
 
-        drawLine(canvas, width, height, line, SkTextAlign::left, 1, true, SK_ColorLTGRAY);
+        drawLine(canvas, width, height, line, SkTextAlign::kLeft, 1, true, SK_ColorLTGRAY);
         canvas->translate(width, 0);
-        drawLine(canvas, width, height, line, SkTextAlign::right, 2, true, SK_ColorLTGRAY);
+        drawLine(canvas, width, height, line, SkTextAlign::kRight, 2, true, SK_ColorLTGRAY);
         canvas->translate(width, 0);
-        drawLine(canvas, width, height, line, SkTextAlign::center, 3, true, SK_ColorLTGRAY);
+        drawLine(canvas, width, height, line, SkTextAlign::kCenter, 3, true, SK_ColorLTGRAY);
         canvas->translate(width, 0);
-        drawLine(canvas, width, height, line, SkTextAlign::justify, 4, true, SK_ColorLTGRAY);
+        drawLine(canvas, width, height, line, SkTextAlign::kJustify, 4, true, SK_ColorLTGRAY);
         canvas->translate(width, 0);
     }
 
@@ -1054,7 +1054,7 @@ protected:
                 "World domination is such an ugly phrase - I prefer to call it world optimisation";
 
         SkParagraphStyle paragraphStyle;
-        paragraphStyle.setTextAlign(SkTextAlign::left);
+        paragraphStyle.setTextAlign(SkTextAlign::kLeft);
         paragraphStyle.setMaxLines(10);
         paragraphStyle.turnHintingOff();
         SkTextStyle textStyle;
@@ -1130,7 +1130,7 @@ protected:
                 "World domination is such an ugly phrase - I prefer to call it world optimisation";
 
         SkParagraphStyle paragraphStyle;
-        paragraphStyle.setTextAlign(SkTextAlign::left);
+        paragraphStyle.setTextAlign(SkTextAlign::kLeft);
         paragraphStyle.setMaxLines(10);
         paragraphStyle.turnHintingOff();
         SkTextStyle textStyle;
@@ -1228,7 +1228,7 @@ protected:
                 "　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)";
 
         SkParagraphStyle paragraphStyle;
-        paragraphStyle.setTextAlign(SkTextAlign::left);
+        paragraphStyle.setTextAlign(SkTextAlign::kLeft);
         paragraphStyle.setMaxLines(10);
         paragraphStyle.turnHintingOff();
         SkTextStyle textStyle;

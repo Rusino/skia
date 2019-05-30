@@ -27,18 +27,18 @@ SkStrutStyle::SkStrutStyle() {
 }
 
 SkParagraphStyle::SkParagraphStyle() {
-    fTextAlign = SkTextAlign::start;
-    fTextDirection = SkTextDirection::ltr;
+    fTextAlign = SkTextAlign::kStart;
+    fTextDirection = SkTextDirection::kLtr;
     fLinesLimit = std::numeric_limits<size_t>::max();
     fHeight = 1;
     fHintingIsOn = true;
 }
 
 SkTextAlign SkParagraphStyle::effective_align() const {
-    if (fTextAlign == SkTextAlign::start) {
-        return (fTextDirection == SkTextDirection::ltr) ? SkTextAlign::left : SkTextAlign::right;
-    } else if (fTextAlign == SkTextAlign::end) {
-        return (fTextDirection == SkTextDirection::ltr) ? SkTextAlign::right : SkTextAlign::left;
+    if (fTextAlign == SkTextAlign::kStart) {
+        return (fTextDirection == SkTextDirection::kLtr) ? SkTextAlign::kLeft : SkTextAlign::kRight;
+    } else if (fTextAlign == SkTextAlign::kEnd) {
+        return (fTextDirection == SkTextDirection::kLtr) ? SkTextAlign::kRight : SkTextAlign::kLeft;
     } else {
         return fTextAlign;
     }

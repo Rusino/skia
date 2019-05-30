@@ -32,47 +32,7 @@ SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const cha
     auto end = SkTMin(a.end(), b.end());
     return SkSpan<const char>(begin, end > begin ? end - begin : 0);
 }
-void print(const SkCluster& cluster) {
-    /*
-    auto type = cluster.breakType() == SkCluster::BreakType::HardLineBreak
-                ? "!"
-                : (cluster.isSoftBreak() ? "?" : " ");
-    SkDebugf("Cluster %s%s", type, cluster.isWhitespaces() ? "*" : " ");
-    SkDebugf("[%d:%d) ", cluster.startPos(), cluster.endPos());
-    SkDebugf(" %f ", cluster.width());
 
-    SkDebugf("'");
-    for (auto ch = cluster.text().begin(); ch != cluster.text().end(); ++ch) {
-      SkDebugf("%c", *ch);
-    }
-    SkDebugf("'");
-
-    if (cluster.text().size() != 1) {
-      SkDebugf("(%d)\n", cluster.text().size());
-    } else {
-      if (cluster.endPos() - cluster.startPos() == 1) {
-        SkDebugf(" %f + %f", cluster.run()->positionX(cluster.startPos()),
-    cluster.run()->offset(cluster.startPos()));
-      }
-      SkDebugf("\n");
-    }
-
-    if (cluster.endPos() - cluster.startPos() > 1) {
-      SkDebugf("Offsets: ");
-      for (size_t i = cluster.startPos(); i < cluster.endPos(); ++i) {
-        SkDebugf("%f ", cluster.run()->offset(i));
-      }
-      SkDebugf("\n");
-    }
-     */
-}
-/*
-SkSpan<const char> operator*(const SkSpan<const char>& a, const SkSpan<const char>& b) {
-  auto begin = SkTMax(a.begin(), b.begin());
-  auto end = SkTMin(a.end(), b.end());
-  return SkSpan<const char>(begin, end > begin ? end - begin : 0);
-}
-*/
 inline SkUnichar utf8_next(const char** ptr, const char* end) {
     SkUnichar val = SkUTF::NextUTF8(ptr, end);
     return val < 0 ? 0xFFFD : val;
@@ -207,7 +167,7 @@ void SkParagraphImpl::buildClusterTable() {
 
             // Take spacing styles in account
             if (currentStyle->style().getWordSpacing() != 0 &&
-                fParagraphStyle.getTextAlign() != SkTextAlign::justify) {
+                fParagraphStyle.getTextAlign() != SkTextAlign::kJustify) {
                 if (cluster.isWhitespaces() && cluster.isSoftBreak()) {
                     shift += run.addSpacesAtTheEnd(currentStyle->style().getWordSpacing(), &cluster);
                 }
@@ -215,8 +175,6 @@ void SkParagraphImpl::buildClusterTable() {
             if (currentStyle->style().getLetterSpacing() != 0) {
                 shift += run.addSpacesEvenly(currentStyle->style().getLetterSpacing(), &cluster);
             }
-
-            print(cluster);
         });
 
         toUpdate.emplace_back(&run, runStart, fClusters.size() - runStart);
@@ -288,7 +246,7 @@ void SkParagraphImpl::shapeTextIntoEndlessLine() {
 
     auto bidi = SkShaper::MakeIcuBiDiRunIterator(
             fUtf8.begin(), fUtf8.size(),
-            fParagraphStyle.getTextDirection() == SkTextDirection::ltr ? (uint8_t)2 : (uint8_t)1);
+            fParagraphStyle.getTextDirection() == SkTextDirection::kLtr ? (uint8_t)2 : (uint8_t)1);
     auto script = SkShaper::MakeHbIcuScriptRunIterator(fUtf8.begin(), fUtf8.size());
     auto lang = SkShaper::MakeStdLanguageRunIterator(fUtf8.begin(), fUtf8.size());
 
@@ -430,8 +388,8 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(unsigned start,
                                                   SkScalar shift, bool clippingNeeded) {
                                     clip.offset(line.offset());
                                     results.emplace_back(clip, run->leftToRight()
-                                                                       ? SkTextDirection::ltr
-                                                                       : SkTextDirection::rtl);
+                                                                       ? SkTextDirection::kLtr
+                                                                       : SkTextDirection::kRtl);
                                     return true;
                                 });
 
@@ -484,7 +442,7 @@ std::vector<SkTextBox> SkParagraphImpl::getRectsForRange(unsigned start,
 }
 // TODO: Deal with RTL here
 SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx, SkScalar dy) {
-    SkPositionWithAffinity result(0, Affinity::DOWNSTREAM);
+    SkPositionWithAffinity result(0, Affinity::kDownstream);
     for (auto& line : fLines) {
         // This is so far the the line vertically closest to our coordinates
         // (or the first one, or the only one - all the same)
@@ -496,14 +454,14 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx
                     bool clippingNeeded) {
                     if (dx < clip.fLeft) {
                         // All the other runs are placed right of this one
-                        result = {SkToS32(run->fClusterIndexes[pos]), DOWNSTREAM};
+                        result = {SkToS32(run->fClusterIndexes[pos]), kDownstream};
                         return false;
                     }
 
                     if (dx >= clip.fRight) {
                         // We have to keep looking but just in case keep the last one as the closes
                         // so far
-                        result = {SkToS32(run->fClusterIndexes[pos + size]), UPSTREAM};
+                        result = {SkToS32(run->fClusterIndexes[pos + size]), kUpstream};
                         return true;
                     }
 
@@ -517,15 +475,15 @@ SkPositionWithAffinity SkParagraphImpl::getGlyphPositionAtCoordinate(SkScalar dx
                     }
 
                     if (found == pos) {
-                        result = {SkToS32(run->fClusterIndexes[found]), DOWNSTREAM};
+                        result = {SkToS32(run->fClusterIndexes[found]), kDownstream};
                     } else if (found == pos + size - 1) {
-                        result = {SkToS32(run->fClusterIndexes[found]), UPSTREAM};
+                        result = {SkToS32(run->fClusterIndexes[found]), kUpstream};
                     } else {
                         auto center = (run->positionX(found + 1) + run->positionX(found)) / 2;
                         if ((dx <= center + shift) == run->leftToRight()) {
-                            result = {SkToS32(run->fClusterIndexes[found]), DOWNSTREAM};
+                            result = {SkToS32(run->fClusterIndexes[found]), kDownstream};
                         } else {
-                            result = {SkToS32(run->fClusterIndexes[found + 1]), UPSTREAM};
+                            result = {SkToS32(run->fClusterIndexes[found + 1]), kUpstream};
                         }
                     }
                     // No need to continue

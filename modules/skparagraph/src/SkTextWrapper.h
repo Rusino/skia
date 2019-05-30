@@ -14,114 +14,114 @@
 class SkParagraphImpl;
 
 class SkTextWrapper {
+    class SkClusterPos {
+    public:
+        SkClusterPos() : fCluster(nullptr), fPos(0) {}
+        SkClusterPos(SkCluster* cluster, size_t pos) : fCluster(cluster), fPos(pos) {}
+        inline SkCluster* cluster() const { return fCluster; }
+        inline size_t position() const { return fPos; }
+        void move(bool up) {
+            fCluster += up ? 1 : -1;
+            fPos = up ? 0: fCluster->endPos();
+        }
+        void setPosition(size_t pos) { fPos = pos; }
+        void clean() {
+            fCluster = nullptr;
+            fPos = 0;
+        }
+
+    private:
+        SkCluster* fCluster;
+        size_t fPos;
+    };
     class SkTextStretch {
     public:
-        SkTextStretch()
-                : fStartCluster(nullptr), fEndCluster(nullptr), fStart(0), fEnd(0), fWidth(0) {}
+        SkTextStretch() : fStart(), fEnd(), fWidth(0) {}
         explicit SkTextStretch(SkCluster* s, SkCluster* e)
-                : fStartCluster(s)
-                , fEndCluster(e)
-                , fStart(0)
-                , fEnd(e->endPos())
-                , fMetrics()
-                , fWidth(0) {
+                : fStart(s, 0), fEnd(e, e->endPos()), fMetrics(), fWidth(0) {
             for (auto c = s; c <= e; ++c) {
                 if (c->run() != nullptr) fMetrics.add(c->run());
             }
         }
 
         inline SkScalar width() const { return fWidth; }
-        inline SkCluster* startCluster() const { return fStartCluster; }
-        inline SkCluster* endCluster() const { return fEndCluster; }
-        inline SkCluster* breakCluster() const { return fBreakCluster; }
+        inline SkCluster* startCluster() const { return fStart.cluster(); }
+        inline SkCluster* endCluster() const { return fEnd.cluster(); }
+        inline SkCluster* breakCluster() const { return fBreak.cluster(); }
         inline SkLineMetrics& metrics() { return fMetrics; }
-        inline size_t startPos() const { return fStart; }
-        inline size_t endPos() const { return fEnd; }
-        bool endOfCluster() { return fEnd == fEndCluster->endPos(); }
+        inline size_t startPos() const { return fStart.position(); }
+        inline size_t endPos() const { return fEnd.position(); }
+        bool endOfCluster() { return fEnd.position() == fEnd.cluster()->endPos(); }
         bool endOfWord() {
-            return endOfCluster() && (fEndCluster->isHardBreak() || fEndCluster->isSoftBreak());
+            return endOfCluster() && (fEnd.cluster()->isHardBreak() || fEnd.cluster()->isSoftBreak());
         }
 
         void extend(SkTextStretch& stretch) {
             fMetrics.add(stretch.fMetrics);
-            fEndCluster = stretch.endCluster();
-            fEnd = stretch.endPos();
+            fEnd = stretch.fEnd;
             fWidth += stretch.fWidth;
             stretch.clean();
         }
 
         void extend(SkCluster* cluster) {
-            fEndCluster = cluster;
+            fEnd = SkClusterPos(cluster, cluster->endPos());
             fMetrics.add(cluster->run());
-            fEnd = cluster->endPos();
             fWidth += cluster->width();
         }
 
         void extend(SkCluster* cluster, size_t pos) {
-            fEndCluster = cluster;
+            fEnd = SkClusterPos(cluster, pos);
             if (cluster->run() != nullptr) {
                 fMetrics.add(cluster->run());
             }
-            fEnd = pos;
         }
 
         void startFrom(SkCluster* cluster, size_t pos) {
-            fStartCluster = cluster;
-            fEndCluster = cluster;
+            fStart = SkClusterPos(cluster, pos);
+            fEnd = SkClusterPos(cluster, pos);
             if (cluster->run() != nullptr) {
                 fMetrics.add(cluster->run());
             }
-            fStart = pos;
-            fEnd = pos;
             fWidth = 0;
         }
 
         void nextPos() {
-            if (fEnd == fEndCluster->endPos()) {
-                ++fEndCluster;
-                fEnd = 0;
+            if (fEnd.position() == fEnd.cluster()->endPos()) {
+                fEnd.move(true);
             } else {
-                fEnd = fEndCluster->endPos();
+                fEnd.setPosition(fEnd.cluster()->endPos());
             }
         }
 
         void saveBreak() {
-            fBreakCluster = fEndCluster;
             fBreak = fEnd;
         }
 
         void restoreBreak() {
-            fEndCluster = fBreakCluster;
             fEnd = fBreak;
         }
 
         void trim() {
-            fWidth -= (fEndCluster->width() - fEndCluster->trimmedWidth(fEnd));
+            fWidth -= (fEnd.cluster()->width() - fEnd.cluster()->trimmedWidth(fEnd.position()));
         }
 
         void trim(SkCluster* cluster) {
-            SkASSERT(fEndCluster == cluster);
-            --fEndCluster;
+            SkASSERT(fEnd.cluster() == cluster);
+            fEnd.move(false);
             fWidth -= cluster->width();
-            fEnd = fEndCluster->endPos();
         }
 
         void clean() {
-            fStartCluster = nullptr;
-            fEndCluster = nullptr;
-            fStart = 0;
-            fEnd = 0;
+            fStart.clean();
+            fEnd.clean();
             fWidth = 0;
             fMetrics.clean();
         }
 
     private:
-        SkCluster* fStartCluster;
-        SkCluster* fEndCluster;
-        SkCluster* fBreakCluster;
-        size_t fStart;
-        size_t fEnd;
-        size_t fBreak;
+        SkClusterPos fStart;
+        SkClusterPos fEnd;
+        SkClusterPos fBreak;
         SkLineMetrics fMetrics;
         SkScalar fWidth;
     };
@@ -138,7 +138,8 @@ public:
                                                   SkLineMetrics metrics,
                                                   bool addEllipsis)>;
     void breakTextIntoLines(SkParagraphImpl* parent,
-                            SkSpan<SkCluster> span,
+                            SkSpan<SkCluster>
+                                    span,
                             SkScalar maxWidth,
                             size_t maxLines,
                             const std::string& ellipsisStr,

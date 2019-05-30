@@ -91,7 +91,7 @@ DEF_TEST(SkParagraph_SimpleParagraph, reporter) {
 
     size_t index = 0;
     for (auto& line : impl->lines()) {
-        line.scanStyles(SkStyleType::Decorations,
+        line.scanStyles(SkStyleType::kDecorations,
                         [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                             REPORTER_ASSERT(reporter, index == 0);
                             REPORTER_ASSERT(reporter, style.getColor() == SK_ColorBLACK);
@@ -129,7 +129,7 @@ DEF_TEST(SkParagraph_SimpleRedParagraph, reporter) {
 
     size_t index = 0;
     for (auto& line : impl->lines()) {
-        line.scanStyles(SkStyleType::Decorations,
+        line.scanStyles(SkStyleType::kDecorations,
                         [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                             REPORTER_ASSERT(reporter, index == 0);
                             REPORTER_ASSERT(reporter, style.getColor() == SK_ColorRED);
@@ -155,7 +155,7 @@ DEF_TEST(SkParagraph_RainbowParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.turnHintingOff();
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.setTextAlign(SkTextAlign::kLeft);
     paragraph_style.setMaxLines(1);
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -212,7 +212,7 @@ DEF_TEST(SkParagraph_RainbowParagraph, reporter) {
 
     size_t index = 0;
     impl->lines()[0].scanStyles(
-        SkStyleType::AllAttributes, [&](SkSpan<const char> text, SkTextStyle style, SkScalar) {
+        SkStyleType::kAllAttributes, [&](SkSpan<const char> text, SkTextStyle style, SkScalar) {
             switch (index) {
                 case 0:
                     REPORTER_ASSERT(reporter, style.equals(text_style1));
@@ -263,7 +263,7 @@ DEF_TEST(SkParagraph_DefaultStyleParagraph, reporter) {
 
     size_t index = 0;
     impl->lines()[0].scanStyles(
-        SkStyleType::AllAttributes, [&](SkSpan<const char> text1, SkTextStyle style, SkScalar) {
+        SkStyleType::kAllAttributes, [&](SkSpan<const char> text1, SkTextStyle style, SkScalar) {
             REPORTER_ASSERT(reporter, style.equals(paragraph_style.getTextStyle()));
             REPORTER_ASSERT(reporter, equal(text1, text));
             ++index;
@@ -303,7 +303,7 @@ DEF_TEST(SkParagraph_BoldParagraph, reporter) {
     impl->formatLines(VeryLongCanvasWidth);
 
     size_t index = 0;
-    impl->lines()[0].scanStyles(SkStyleType::AllAttributes,
+    impl->lines()[0].scanStyles(SkStyleType::kAllAttributes,
         [&](SkSpan<const char> text1, SkTextStyle style, SkScalar) {
             REPORTER_ASSERT(reporter, style.equals(text_style));
             REPORTER_ASSERT(reporter, equal(text1, text));
@@ -336,7 +336,7 @@ DEF_TEST(SkParagraph_LeftAlignParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.setTextAlign(SkTextAlign::kLeft);
     paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -420,7 +420,7 @@ DEF_TEST(SkParagraph_RightAlignParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::right);
+    paragraph_style.setTextAlign(SkTextAlign::kRight);
     paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -506,7 +506,7 @@ DEF_TEST(SkParagraph_CenterAlignParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::center);
+    paragraph_style.setTextAlign(SkTextAlign::kCenter);
     paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -591,7 +591,7 @@ DEF_TEST(SkParagraph_JustifyAlignParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::justify);
+    paragraph_style.setTextAlign(SkTextAlign::kJustify);
     paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -661,7 +661,7 @@ DEF_TEST(SkParagraph_JustifyRTL, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::justify);
+    paragraph_style.setTextAlign(SkTextAlign::kJustify);
     paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -705,7 +705,7 @@ DEF_TEST(SkParagraph_DecorationsParagraph, reporter) {
     sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.setTextAlign(SkTextAlign::kLeft);
     paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -760,7 +760,7 @@ DEF_TEST(SkParagraph_DecorationsParagraph, reporter) {
     size_t index = 0;
     for (auto& line : impl->lines()) {
         line.scanStyles(
-            SkStyleType::Decorations,
+            SkStyleType::kDecorations,
             [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                 auto decoration = (SkTextDecoration)(SkTextDecoration::kUnderline |
                                                      SkTextDecoration::kOverline |
@@ -847,7 +847,7 @@ DEF_TEST(SkParagraph_ItalicsParagraph, reporter) {
     auto& line = impl->lines()[0];
     size_t index = 0;
     line.scanStyles(
-        SkStyleType::Foreground,
+        SkStyleType::kForeground,
         [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
             switch (index) {
                 case 0:
@@ -885,7 +885,7 @@ DEF_TEST(SkParagraph_ChineseParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::justify);
+    paragraph_style.setTextAlign(SkTextAlign::kJustify);
     paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -927,7 +927,7 @@ DEF_TEST(SkParagraph_ArabicParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::justify);
+    paragraph_style.setTextAlign(SkTextAlign::kJustify);
     paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -966,7 +966,7 @@ DEF_TEST(SkParagraph_GetGlyphPositionAtCoordinateParagraph, reporter) {
             "67890 12345";
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setTextAlign(SkTextAlign::kLeft);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkTextStyle textStyle;
@@ -1028,7 +1028,7 @@ DEF_TEST(SkParagraph_GetRectsForRangeParagraph, reporter) {
             "67890 12345";
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setTextAlign(SkTextAlign::kLeft);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkTextStyle textStyle;
@@ -1114,7 +1114,7 @@ DEF_TEST(SkParagraph_GetRectsForRangeTight, reporter) {
             "　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)";
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setTextAlign(SkTextAlign::kLeft);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkTextStyle textStyle;
@@ -1174,7 +1174,7 @@ DEF_TEST(SkParagraph_GetRectsForRangeIncludeLineSpacingMiddle, reporter) {
             "　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)";
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setTextAlign(SkTextAlign::kLeft);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkTextStyle textStyle;
@@ -1262,7 +1262,7 @@ DEF_TEST(SkParagraph_GetRectsForRangeIncludeLineSpacingTop, reporter) {
             "　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)";
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setTextAlign(SkTextAlign::kLeft);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkTextStyle textStyle;
@@ -1353,7 +1353,7 @@ DEF_TEST(SkParagraph_GetRectsForRangeIncludeLineSpacingBottom, reporter) {
             "　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)(　´･‿･｀)";
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setTextAlign(SkTextAlign::kLeft);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkTextStyle textStyle;
@@ -1441,7 +1441,7 @@ DEF_TEST(SkParagraph_GetRectsForRangeIncludeCombiningCharacter, reporter) {
     sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     const char* text = "ดีสวัสดีชาวโลกที่น่ารัก";
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::center);
+    paragraphStyle.setTextAlign(SkTextAlign::kCenter);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkParagraphBuilder builder(paragraphStyle, fontCollection);
@@ -1517,7 +1517,7 @@ DEF_TEST(SkParagraph_GetRectsForRangeCenterParagraph, reporter) {
             "01234    ";  //"01234  　 ";   // includes ideographic space and english space.
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::center);
+    paragraphStyle.setTextAlign(SkTextAlign::kCenter);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkParagraphBuilder builder(paragraphStyle, fontCollection);
@@ -1605,7 +1605,7 @@ DEF_TEST(SkParagraph_GetRectsForRangeCenterParagraphNewlineCentered, reporter) {
     const char* text = "01234\n";
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::center);
+    paragraphStyle.setTextAlign(SkTextAlign::kCenter);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkParagraphBuilder builder(paragraphStyle, fontCollection);
@@ -1668,7 +1668,7 @@ DEF_TEST(SkParagraph_GetRectsForRangeCenterMultiLineParagraph, reporter) {
     // "01234  　 \n0123　        ";  // includes ideographic space and english space.
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::center);
+    paragraphStyle.setTextAlign(SkTextAlign::kCenter);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkParagraphBuilder builder(paragraphStyle, fontCollection);
@@ -1761,7 +1761,7 @@ DEF_TEST(SkParagraph_GetWordBoundaries, reporter) {
     sk_sp<SkFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
 
     SkParagraphStyle paragraphStyle;
-    paragraphStyle.setTextAlign(SkTextAlign::left);
+    paragraphStyle.setTextAlign(SkTextAlign::kLeft);
     paragraphStyle.setMaxLines(10);
     paragraphStyle.turnHintingOff();
     SkTextStyle textStyle;
@@ -1810,7 +1810,7 @@ DEF_TEST(SkParagraph_SpacingParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(10);
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.setTextAlign(SkTextAlign::kLeft);
     paragraph_style.turnHintingOff();
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -1865,12 +1865,12 @@ DEF_TEST(SkParagraph_SpacingParagraph, reporter) {
     REPORTER_ASSERT(reporter, impl->lines().size() == 1);
     size_t index = 0;
     impl->lines().begin()->scanStyles(
-            SkStyleType::LetterSpacing,
+            SkStyleType::kLetterSpacing,
             [&index](SkSpan<const char> text, SkTextStyle style, SkScalar) { ++index; return true; });
     REPORTER_ASSERT(reporter, index == 4);
     index = 0;
     impl->lines().begin()->scanStyles(
-            SkStyleType::WordSpacing,
+            SkStyleType::kWordSpacing,
             [&index](SkSpan<const char> text, SkTextStyle style, SkScalar) { ++index; return true; });
     REPORTER_ASSERT(reporter, index == 4);
 }
@@ -2137,7 +2137,7 @@ DEF_TEST(SkParagraph_UnderlineShiftParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.turnHintingOff();
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.setTextAlign(SkTextAlign::kLeft);
     paragraph_style.setMaxLines(2);
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -2174,7 +2174,7 @@ DEF_TEST(SkParagraph_UnderlineShiftParagraph, reporter) {
         auto& line = impl->lines()[0];
         size_t index = 0;
         line.scanStyles(
-                SkStyleType::Decorations,
+                SkStyleType::kDecorations,
                 [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                     switch (index) {
                         case 0:
@@ -2197,7 +2197,7 @@ DEF_TEST(SkParagraph_UnderlineShiftParagraph, reporter) {
     {
         auto& line = impl1->lines()[0];
         size_t index = 0;
-        line.scanStyles(SkStyleType::Decorations,
+        line.scanStyles(SkStyleType::kDecorations,
                         [&index, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                             if (index == 0) {
                                 REPORTER_ASSERT(reporter, style.getDecoration() ==
@@ -2260,7 +2260,7 @@ DEF_TEST(SkParagraph_SimpleShadow, reporter) {
     REPORTER_ASSERT(reporter, impl->styles().size() == 1);
     size_t index = 0;
     for (auto& line : impl->lines()) {
-        line.scanStyles(SkStyleType::Shadow,
+        line.scanStyles(SkStyleType::kShadow,
             [&index, text_style, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                 REPORTER_ASSERT(reporter, index == 0 && style.equals(text_style));
                 ++index;
@@ -2306,7 +2306,7 @@ DEF_TEST(SkParagraph_ComplexShadow, reporter) {
 
     size_t index = 0;
     for (auto& line : impl->lines()) {
-        line.scanStyles(SkStyleType::Shadow,
+        line.scanStyles(SkStyleType::kShadow,
             [&index, text_style, reporter](SkSpan<const char> text, SkTextStyle style, SkScalar) {
                 ++index;
                 switch (index) {
@@ -2344,7 +2344,7 @@ DEF_TEST(SkParagraph_BaselineParagraph, reporter) {
     SkParagraphStyle paragraph_style;
     paragraph_style.turnHintingOff();
     paragraph_style.setMaxLines(14);
-    paragraph_style.setTextAlign(SkTextAlign::justify);
+    paragraph_style.setTextAlign(SkTextAlign::kJustify);
     paragraph_style.setHeight(1.5);
     SkParagraphBuilder builder(paragraph_style, fontCollection);
 
@@ -2441,7 +2441,7 @@ DEF_TEST(SkParagraph_StrutParagraph1, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(10);
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.setTextAlign(SkTextAlign::kLeft);
     paragraph_style.turnHintingOff();
 
     SkStrutStyle strut_style;
@@ -2539,7 +2539,7 @@ DEF_TEST(SkParagraph_StrutParagraph2, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(10);
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.setTextAlign(SkTextAlign::kLeft);
     paragraph_style.turnHintingOff();
 
     SkStrutStyle strut_style;
@@ -2636,7 +2636,7 @@ DEF_TEST(SkParagraph_StrutParagraph3, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(10);
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.setTextAlign(SkTextAlign::kLeft);
     paragraph_style.turnHintingOff();
 
     SkStrutStyle strut_style;
@@ -2731,7 +2731,7 @@ DEF_TEST(SkParagraph_StrutForceParagraph, reporter) {
 
     SkParagraphStyle paragraph_style;
     paragraph_style.setMaxLines(10);
-    paragraph_style.setTextAlign(SkTextAlign::left);
+    paragraph_style.setTextAlign(SkTextAlign::kLeft);
     paragraph_style.turnHintingOff();
 
     SkStrutStyle strut_style;

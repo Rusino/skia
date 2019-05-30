@@ -9,7 +9,8 @@
 
 #include "include/core/SkRect.h"
 
-enum Affinity { UPSTREAM, DOWNSTREAM };
+// TODO: Add all these enums to some namespace
+enum Affinity { kUpstream, kDownstream };
 
 enum class RectHeightStyle {
     // Provide tight bounding boxes that fit heights per run.
@@ -44,17 +45,17 @@ enum class RectWidthStyle {
 };
 
 enum class SkTextAlign {
-    left,
-    right,
-    center,
-    justify,
-    start,
-    end,
+    kLeft,
+    kRight,
+    kCenter,
+    kJustify,
+    kStart,
+    kEnd,
 };
 
 enum class SkTextDirection {
-    rtl,
-    ltr,
+    kRtl,
+    kLtr,
 };
 
 struct SkPositionWithAffinity {

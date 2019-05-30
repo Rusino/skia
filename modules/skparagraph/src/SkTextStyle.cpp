@@ -95,17 +95,17 @@ bool SkTextStyle::equals(const SkTextStyle& other) const {
 
 bool SkTextStyle::matchOneAttribute(SkStyleType styleType, const SkTextStyle& other) const {
     switch (styleType) {
-        case Foreground:
+        case kForeground:
             if (fHasForeground) {
                 return other.fHasForeground && fForeground == other.fForeground;
             } else {
                 return !other.fHasForeground && fColor == other.fColor;
             }
 
-        case Background:
+        case kBackground:
             return (fHasBackground == other.fHasBackground && fBackground == other.fBackground);
 
-        case Shadow:
+        case kShadow:
             if (fTextShadows.size() != other.fTextShadows.size()) {
                 return false;
             }
@@ -117,21 +117,21 @@ bool SkTextStyle::matchOneAttribute(SkStyleType styleType, const SkTextStyle& ot
             }
             return true;
 
-        case Decorations:
+        case kDecorations:
             return fDecoration == other.fDecoration && fDecorationColor == other.fDecorationColor &&
                    fDecorationStyle == other.fDecorationStyle &&
                    fDecorationThicknessMultiplier == other.fDecorationThicknessMultiplier;
 
-        case LetterSpacing:
+        case kLetterSpacing:
             return fLetterSpacing == other.fLetterSpacing;
 
-        case WordSpacing:
+        case kWordSpacing:
             return fWordSpacing == other.fWordSpacing;
 
-        case AllAttributes:
+        case kAllAttributes:
             return this->equals(other);
 
-        case Font:
+        case kFont:
             return fFontStyle == other.fFontStyle && fFontFamilies == other.fFontFamilies &&
                    fFontSize == other.fFontSize && fHeight == other.fHeight;
 

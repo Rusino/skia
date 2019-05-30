@@ -63,7 +63,7 @@ void SkFontIterator::findAllFontsForAllStyledBlocks() {
                  combined.text().end() == block.text().begin());
 
         if (combined.text().begin() != nullptr &&
-            block.style().matchOneAttribute(SkStyleType::Font, combined.style())) {
+            block.style().matchOneAttribute(SkStyleType::kFont, combined.style())) {
             combined.add(block.text());
             continue;
         }

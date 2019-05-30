@@ -100,25 +100,25 @@ void SkLine::paint(SkCanvas* textCanvas) {
     textCanvas->translate(this->offset().fX, this->offset().fY);
 
     this->iterateThroughStylesInTextOrder(
-            SkStyleType::Background,
+            SkStyleType::kBackground,
             [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
                 return this->paintBackground(textCanvas, text, style, offsetX);
             });
 
     this->iterateThroughStylesInTextOrder(
-            SkStyleType::Shadow,
+            SkStyleType::kShadow,
             [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
                 return this->paintShadow(textCanvas, text, style, offsetX);
             });
 
     this->iterateThroughStylesInTextOrder(
-            SkStyleType::Foreground,
+            SkStyleType::kForeground,
             [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
                 return this->paintText(textCanvas, text, style, offsetX);
             });
 
     this->iterateThroughStylesInTextOrder(
-            SkStyleType::Decorations,
+            SkStyleType::kDecorations,
             [textCanvas, this](SkSpan<const char> text, SkTextStyle style, SkScalar offsetX) {
                 return this->paintDecorations(textCanvas, text, style, offsetX);
             });
@@ -133,11 +133,11 @@ void SkLine::format(SkTextAlign effectiveAlign, SkScalar maxWidth, bool notLastL
         return;
     }
 
-    if (effectiveAlign == SkTextAlign::justify && notLastLine) {
+    if (effectiveAlign == SkTextAlign::kJustify && notLastLine) {
         this->justify(maxWidth);
-    } else if (effectiveAlign == SkTextAlign::right) {
+    } else if (effectiveAlign == SkTextAlign::kRight) {
         this->shiftTo(delta);
-    } else if (effectiveAlign == SkTextAlign::center) {
+    } else if (effectiveAlign == SkTextAlign::kCenter) {
         this->shiftTo(delta / 2);
     }
 }
