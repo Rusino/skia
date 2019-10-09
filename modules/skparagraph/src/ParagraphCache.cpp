@@ -32,9 +32,8 @@ public:
 
     // Shaped results:
     InternalState fInternalState;
-    SkTArray<Run> fRuns;
+    SkTArray<Run, false> fRuns;
     SkTArray<Cluster, true> fClusters;
-    SkTArray<RunShifts, true> fRunShifts;
 };
 
 
@@ -136,7 +135,7 @@ struct ParagraphCache::Entry {
 ParagraphCache::ParagraphCache()
     : fChecker([](ParagraphImpl* impl, const char*, bool){ })
     , fLRUCacheMap(kMaxEntries)
-    , fCacheIsOn(true)
+    , fCacheIsOn(false)
 #ifdef PARAGRAPH_CACHE_STATS
     , fTotalRequests(0)
     , fCacheMisses(0)
@@ -149,7 +148,6 @@ ParagraphCache::~ParagraphCache() { }
 void ParagraphCache::updateFrom(const ParagraphImpl* paragraph, Entry* entry) {
 
     entry->fValue->fInternalState = paragraph->state();
-    entry->fValue->fRunShifts = paragraph->fRunShifts;
     for (size_t i = 0; i < paragraph->fRuns.size(); ++i) {
         auto& run = paragraph->fRuns[i];
         if (run.fSpaced) {
@@ -169,11 +167,6 @@ void ParagraphCache::updateTo(ParagraphImpl* paragraph, const Entry* entry) {
     paragraph->fClusters = entry->fValue->fClusters;
     for (auto& cluster : paragraph->fClusters) {
         cluster.setMaster(paragraph);
-    }
-
-    paragraph->fRunShifts.reset();
-    for (auto& runShift : entry->fValue->fRunShifts) {
-        paragraph->fRunShifts.push_back(runShift);
     }
 
     paragraph->fState = entry->fValue->fInternalState;

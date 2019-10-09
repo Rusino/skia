@@ -33,6 +33,9 @@ typedef SkRange<GraphemeIndex> GraphemeRange;
 typedef size_t CodepointIndex;
 typedef SkRange<CodepointIndex> CodepointRange;
 
+typedef size_t GlyphIndex;
+typedef SkRange<GlyphIndex> GlyphRange;
+
 struct RunShifts {
     RunShifts() { }
     RunShifts(size_t count) { fShifts.push_back_n(count, 0.0); }
@@ -169,7 +172,7 @@ private:
     SkVector fOffset;
     size_t fFirstChar;
     SkShaper::RunHandler::Range fUtf8Range;
-    SkSTArray<128, SkGlyphID, false> fGlyphs;
+    SkSTArray<128, SkGlyphID, true> fGlyphs;
     SkSTArray<128, SkPoint, true> fPositions;
     SkSTArray<128, uint32_t, true> fClusterIndexes;
     SkSTArray<128, SkScalar, true> fOffsets;  // For formatting (letter/word spacing, justification)

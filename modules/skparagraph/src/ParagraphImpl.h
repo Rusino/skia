@@ -190,6 +190,12 @@ public:
             std::function<SkScalar(SkSpan<const char>, SkSpan<Block>, SkScalar&, size_t)>;
     bool iterateThroughShapingRegions(ShapeVisitor shape);
 
+    using ShapeSingleFontVisitor = std::function<void(Block)>;
+    void iterateThroughSingleFontRegions(SkSpan<Block> styleSpan, ShapeSingleFontVisitor);
+
+    using TypefaceVisitor = std::function<bool(sk_sp<SkTypeface> typeface)>;
+    void iterateThroughTypefaces(const TextStyle& textStyle, SkUnichar unicode, TypefaceVisitor visitor);
+
     void resetContext();
     void resolveStrut();
     void resetRunShifts();
@@ -234,12 +240,12 @@ private:
 
     // Internal structures
     InternalState fState;
-    SkTArray<Run> fRuns;                // kShaped
+    SkTArray<Run, false> fRuns;                // kShaped
     SkTArray<Cluster, true> fClusters;  // kClusterized (cached: text, word spacing, letter spacing, resolved fonts)
     SkTArray<Grapheme, true> fGraphemes;
     SkTArray<Codepoint, true> fCodePoints;
 
-    SkTArray<RunShifts, true> fRunShifts;
+    SkTArray<RunShifts, false> fRunShifts;
     SkTArray<TextLine, true> fLines;    // kFormatted   (cached: width, max lines, ellipsis, text align)
     sk_sp<SkPicture> fPicture;          // kRecorded    (cached: text styles)
 

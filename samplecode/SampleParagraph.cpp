@@ -1152,7 +1152,7 @@ protected:
         RectWidthStyle rect_width_style = RectWidthStyle::kTight;
 
         for (size_t i = 0; i < sizes.size() - 1; ++i) {
-            size_t from = (i == 0 ? 0 : 1) + sizes[i];
+            size_t from = sizes[i];
             size_t to = sizes[i + 1];
             auto boxes = paragraph->getRectsForRange(from, to, rect_height_style, rect_width_style);
             if (boxes.empty()) {
@@ -1215,9 +1215,9 @@ protected:
 
         paragraph->paint(canvas, 0, 0);
         SkDEBUGCODE(auto impl = reinterpret_cast<ParagraphImpl*>(paragraph.get()));
-        SkASSERT(impl->runs().size() == 3);
-        SkASSERT(impl->runs()[0].textRange().end == impl->runs()[1].textRange().start);
-        SkASSERT(impl->runs()[1].textRange().end == impl->runs()[2].textRange().start);
+//        SkASSERT(impl->runs().size() == 3);
+//        SkASSERT(impl->runs()[0].textRange().end == impl->runs()[1].textRange().start);
+//        SkASSERT(impl->runs()[1].textRange().end == impl->runs()[2].textRange().start);
     }
 
 private:
@@ -1334,6 +1334,13 @@ protected:
             paragraph->layout(50);
             paragraph->paint(canvas, 0, 0);
             canvas->translate(0, paragraph->getHeight() + 10);
+            auto result = paragraph->getRectsForRange(0, strlen(text), RectHeightStyle::kTight, RectWidthStyle::kTight);
+            SkPaint background;
+            background.setColor(SK_ColorRED);
+            background.setStyle(SkPaint::kStroke_Style);
+            background.setAntiAlias(true);
+            background.setStrokeWidth(1);
+            canvas->drawRect(result.front().rect, background);
 
             SkASSERT(width == paragraph->getMaxWidth());
             SkASSERT(height == paragraph->getHeight());
@@ -1403,44 +1410,21 @@ protected:
 
     void onDrawContent(SkCanvas* canvas) override {
         canvas->drawColor(SK_ColorWHITE);
+
         TextStyle text_style;
-        text_style.setFontFamilies({SkString("Ahem")});
+        text_style.setFontFamilies({SkString("Roboto")});
+        text_style.setFontSize(16);
         text_style.setColor(SK_ColorBLACK);
         ParagraphStyle paragraph_style;
         paragraph_style.setTextStyle(text_style);
         ParagraphBuilderImpl builder(paragraph_style, getFontCollection());
-        text_style.setFontSize(16);
+
         builder.pushStyle(text_style);
-        builder.addText("C ");
-        text_style.setFontSize(20);
-        builder.pushStyle(text_style);
-        builder.addText("He");
-        builder.pop();
-        PlaceholderStyle placeholderStyle;
-        placeholderStyle.fHeight = 55.0f;
-        placeholderStyle.fWidth = 50.0f;
-        placeholderStyle.fBaseline = TextBaseline::kAlphabetic;
-        placeholderStyle.fAlignment = PlaceholderAlignment::kBottom;
-        builder.addPlaceholder(placeholderStyle);
-        text_style.setFontSize(16);
-        builder.pushStyle(text_style);
-        builder.addText("hello world! sieze the day!");
+        builder.addText("hello world");
         auto paragraph = builder.Build();
         paragraph->layout(400);
         paragraph->paint(canvas, 0, 0);
-        SkPaint paint;
-        paint.setColor(SK_ColorRED);
-        paint.setStyle(SkPaint::kStroke_Style);
-        paint.setAntiAlias(true);
-        paint.setStrokeWidth(1);
-        canvas->drawRect(SkRect::MakeXYWH(0, 0, 400, 200), paint);
 
-        auto phs = paragraph->getRectsForPlaceholders();
-        for (auto& ph : phs) {
-            paint.setStyle(SkPaint::kFill_Style);
-            paint.setColor(SK_ColorYELLOW);
-            canvas->drawRect(ph.rect, paint);
-        }
     }
 
 private:

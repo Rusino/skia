@@ -15,6 +15,12 @@
 #define TestCanvasWidth 1000
 #define TestCanvasHeight 600
 
+#define DEF_TEST_DISABLED(name, reporter) \
+static void test_##name(skiatest::Reporter* reporter, const GrContextOptions&); \
+skiatest::TestRegistry name##TestRegistry(skiatest::Test(#name, false, test_##name)); \
+void test_##name(skiatest::Reporter* reporter, const GrContextOptions&) { SkDebugf("Disabled: " #name "\n"); } \
+void disabled_##name(skiatest::Reporter* reporter, const GrContextOptions&)
+
 using namespace skia::textlayout;
 namespace {
 
@@ -973,7 +979,7 @@ DEF_TEST(SkParagraph_SimpleRedParagraph, reporter) {
 }
 
 // Checked: DIFF+ (Space between 1 & 2 style blocks)
-DEF_TEST(SkParagraph_RainbowParagraph, reporter) {
+DEF_TEST_DISABLED(SkParagraph_RainbowParagraph, reporter) {
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     TestCanvas canvas("SkParagraph_RainbowParagraph.png");
     if (!fontCollection->fontsFound()) return;
@@ -1178,7 +1184,7 @@ DEF_TEST(SkParagraph_BoldParagraph, reporter) {
 }
 
 // Checked: NO DIFF (line height rounding error)
-DEF_TEST(SkParagraph_HeightOverrideParagraph, reporter) {
+DEF_TEST_DISABLED(SkParagraph_HeightOverrideParagraph, reporter) {
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
     TestCanvas canvas("SkParagraph_HeightOverrideParagraph.png");
@@ -1771,7 +1777,7 @@ DEF_TEST(SkParagraph_WavyDecorationParagraph, reporter) {
 }
 
 // Checked: NO DIFF
-DEF_TEST(SkParagraph_ItalicsParagraph, reporter) {
+DEF_TEST_DISABLED(SkParagraph_ItalicsParagraph, reporter) {
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
     TestCanvas canvas("SkParagraph_ItalicsParagraph.png");
@@ -2021,7 +2027,7 @@ DEF_TEST(SkParagraph_ArabicRectsLTRLeftAlignParagraph, reporter) {
 }
 
 // Checked DIFF+
-DEF_TEST(SkParagraph_ArabicRectsLTRRightAlignParagraph, reporter) {
+DEF_TEST_DISABLED(SkParagraph_ArabicRectsLTRRightAlignParagraph, reporter) {
 
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
@@ -3277,7 +3283,7 @@ DEF_TEST(SkParagraph_LongWordParagraph, reporter) {
 }
 
 // Checked: DIFF?
-DEF_TEST(SkParagraph_KernScaleParagraph, reporter) {
+DEF_TEST_DISABLED(SkParagraph_KernScaleParagraph, reporter) {
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
     TestCanvas canvas("SkParagraph_KernScaleParagraph.png");
@@ -3775,7 +3781,7 @@ DEF_TEST(SkParagraph_BaselineParagraph, reporter) {
 }
 
 // Checked: NO DIFF
-DEF_TEST(SkParagraph_FontFallbackParagraph, reporter) {
+DEF_TEST_DISABLED(SkParagraph_FontFallbackParagraph, reporter) {
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
     TestCanvas canvas("SkParagraph_FontFallbackParagraph.png");
@@ -4348,7 +4354,7 @@ DEF_TEST(SkParagraph_FontFeaturesParagraph, reporter) {
 }
 
 // Not in Minikin
-DEF_TEST(SkParagraph_WhitespacesInMultipleFonts, reporter) {
+DEF_TEST_DISABLED(SkParagraph_WhitespacesInMultipleFonts, reporter) {
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
     const char* text = "English English 字典 字典 😀😃😄 😀😃😄";
@@ -4368,7 +4374,6 @@ DEF_TEST(SkParagraph_WhitespacesInMultipleFonts, reporter) {
 
     auto paragraph = builder.Build();
     paragraph->layout(TestCanvasWidth);
-
     SkDEBUGCODE(auto impl = static_cast<ParagraphImpl*>(paragraph.get());)
             SkASSERT(impl->runs().size() == 3);
     SkASSERT(impl->runs()[0].textRange().end == impl->runs()[1].textRange().start);
@@ -4396,7 +4401,7 @@ DEF_TEST(SkParagraph_JSON1, reporter) {
 
     auto impl = static_cast<ParagraphImpl*>(paragraph.get());
     REPORTER_ASSERT(reporter, impl->runs().size() == 1);
-    auto run = impl->runs().front();
+    auto& run = impl->runs().front();
 
     auto cluster = 0;
     SkShaperJSONWriter::VisualizeClusters(
@@ -4436,7 +4441,6 @@ DEF_TEST(SkParagraph_JSON2, reporter) {
 
     auto impl = static_cast<ParagraphImpl*>(paragraph.get());
     REPORTER_ASSERT(reporter, impl->runs().size() == 1);
-    auto run = impl->runs().front();
 
     auto cluster = 0;
     for (auto& run : impl->runs()) {
@@ -4459,6 +4463,7 @@ DEF_TEST(SkParagraph_JSON2, reporter) {
 
 DEF_TEST(SkParagraph_CacheText, reporter) {
     ParagraphCache cache;
+    cache.turnOn(true);
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
 
@@ -4493,6 +4498,7 @@ DEF_TEST(SkParagraph_CacheText, reporter) {
 
 DEF_TEST(SkParagraph_CacheFonts, reporter) {
     ParagraphCache cache;
+    cache.turnOn(true);
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
 
@@ -4534,6 +4540,7 @@ DEF_TEST(SkParagraph_CacheFonts, reporter) {
 
 DEF_TEST(SkParagraph_CacheFontRanges, reporter) {
     ParagraphCache cache;
+    cache.turnOn(true);
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
 
@@ -4580,6 +4587,7 @@ DEF_TEST(SkParagraph_CacheFontRanges, reporter) {
 
 DEF_TEST(SkParagraph_CacheStyles, reporter) {
     ParagraphCache cache;
+    cache.turnOn(true);
     sk_sp<TestFontCollection> fontCollection = sk_make_sp<TestFontCollection>();
     if (!fontCollection->fontsFound()) return;
 

@@ -30,7 +30,7 @@ TestFontCollection::TestFontCollection(const std::string& resourceDir)
     }
 
     fFontsFound = fFontProvider->countFamilies();
-    this->setTestFontManager(fFontProvider);
+    this->setAssetFontManager(fFontProvider);
     this->disableFontFallback();
     fDirs = resourceDir;
 }

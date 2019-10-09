@@ -44,6 +44,7 @@ Run::Run(ParagraphImpl* master,
     fPositions[info.glyphCount] = fOffset + fAdvance;
     fClusterIndexes[info.glyphCount] = info.utf8Range.end();
     fEllipsis = false;
+    fPlaceholder = nullptr;
 }
 
 SkShaper::RunHandler::Buffer Run::newRunBuffer() {
