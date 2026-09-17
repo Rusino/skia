@@ -710,6 +710,45 @@ DEF_TEST(TextEditor_Defect_VerticalCaretNavigationUpDown, reporter) {
     REPORTER_ASSERT(reporter, upPos.text_index < TextIndex(11));
 }
 
+// =============================================================================
+// DEFECT TRAP 13 (Defect D6): Font Fallback & Arabic Glyph Shaping
+// =============================================================================
+DEF_TEST(TextEditor_Defect_FontFallbackAndArabicGlyphShaping, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+
+    sk_sp<SkFontMgr> fm = SkFontMgr::RefDefault();
+    REPORTER_ASSERT(reporter, fm != nullptr);
+    if (fm) {
+        sk_sp<SkTypeface> arFace = fm->matchFamilyStyleCharacter(nullptr, SkFontStyle(), nullptr, 0, 0x0645);
+        REPORTER_ASSERT(reporter, arFace != nullptr);
+    }
+
+    // "مرحبا" (Arabic for "Hello")
+    auto editor = TextEditorController::Make("مرحبا", font);
+    REPORTER_ASSERT(reporter, editor != nullptr);
+
+    const auto& spatial = editor->spatial_index();
+    const auto& shaped = spatial.formatted().shaped();
+    REPORTER_ASSERT(reporter, !shaped.shaped_runs().empty());
+
+    // Hostile Invariant:
+    // Arabic characters must NOT map to glyph ID 0 (.notdef tofu).
+    // The engine must automatically find a font fallback that provides valid glyphs.
+    bool hasTofu = false;
+    int glyphCount = 0;
+    for (const auto& sr : shaped.shaped_runs()) {
+        for (const auto& g : sr.glyphs) {
+            ++glyphCount;
+            if (g.glyph_id == 0 && !g.is_zero_width_control) {
+                hasTofu = true;
+            }
+        }
+    }
+    REPORTER_ASSERT(reporter, glyphCount > 0);
+    REPORTER_ASSERT(reporter, !hasTofu);
+}
+
+
 
 
 

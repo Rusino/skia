@@ -6,6 +6,8 @@
  */
 
 #include "tools/text_editor/include/UnicodeParagraph.h"
+#include "include/core/SkFontMgr.h"
+#include "include/core/SkTypeface.h"
 #include "modules/skunicode/include/SkUnicode.h"
 #include "src/base/SkUTF.h"
 #include <algorithm>
@@ -105,24 +107,83 @@ private:
             bidiRegions.emplace_back(0, fText.size(), 0);
         }
 
+        sk_sp<SkFontMgr> fm = SkFontMgr::RefDefault();
+
         for (const auto& bidi : bidiRegions) {
-            ItemizedRun run;
-            run.text_range = TextRange(TextIndex(bidi.start), TextIndex(bidi.end));
-            run.bidi_level = bidi.level;
-            run.direction = (bidi.level % 2 == 0) ? Direction::kLTR : Direction::kRTL;
-            // Match font from styles span
+            SkFont baseFont;
             for (const auto& style : styles) {
                 if (style.range.contains(TextIndex(bidi.start))) {
-                    run.font = style.font;
+                    baseFont = style.font;
                     break;
                 }
             }
-            if (styles.empty()) {
-                run.font = SkFont();
-            } else if (!run.font.getTypeface()) {
-                run.font = styles[0].font;
+            if (!baseFont.getTypeface() && !styles.empty()) {
+                baseFont = styles[0].font;
             }
-            fRuns.push_back(run);
+
+            if (!baseFont.getTypeface()) {
+                ItemizedRun run;
+                run.text_range = TextRange(TextIndex(bidi.start), TextIndex(bidi.end));
+                run.bidi_level = bidi.level;
+                run.direction = (bidi.level % 2 == 0) ? Direction::kLTR : Direction::kRTL;
+                run.font = baseFont;
+                fRuns.push_back(run);
+                continue;
+            }
+
+            auto resolveFontFor = [&](SkUnichar u, const SkFont& activeFont) -> SkFont {
+                if (u <= 32 || (u >= 0x200B && u <= 0x200F)) {
+                    return activeFont; // spaces and controls stay with surrounding active font
+                }
+                if (activeFont.getTypeface() && activeFont.unicharToGlyph(u) != 0) {
+                    return activeFont;
+                }
+                if (baseFont.getTypeface() && baseFont.unicharToGlyph(u) != 0) {
+                    return baseFont;
+                }
+                if (fm) {
+                    SkFontStyle style = baseFont.getTypeface() ? baseFont.getTypeface()->fontStyle() : SkFontStyle();
+                    sk_sp<SkTypeface> fallbackFace = fm->matchFamilyStyleCharacter(nullptr, style, nullptr, 0, u);
+                    if (fallbackFace && fallbackFace->unicharToGlyph(u) != 0) {
+                        return SkFont(std::move(fallbackFace), baseFont.getSize());
+                    }
+                }
+                return baseFont;
+            };
+
+            const char* p = fText.data() + bidi.start;
+            const char* end = fText.data() + bidi.end;
+            size_t segStart = bidi.start;
+            SkFont curFont = baseFont;
+
+            while (p < end) {
+                size_t charStart = p - fText.data();
+                SkUnichar u = SkUTF::NextUTF8(&p, end);
+
+                SkFont neededFont = resolveFontFor(u, curFont);
+                if (charStart == bidi.start) {
+                    curFont = neededFont;
+                } else if (neededFont.getTypeface() != curFont.getTypeface()) {
+                    ItemizedRun run;
+                    run.text_range = TextRange(TextIndex(segStart), TextIndex(charStart));
+                    run.bidi_level = bidi.level;
+                    run.direction = (bidi.level % 2 == 0) ? Direction::kLTR : Direction::kRTL;
+                    run.font = curFont;
+                    fRuns.push_back(run);
+
+                    segStart = charStart;
+                    curFont = neededFont;
+                }
+            }
+
+            if (segStart < bidi.end) {
+                ItemizedRun run;
+                run.text_range = TextRange(TextIndex(segStart), TextIndex(bidi.end));
+                run.bidi_level = bidi.level;
+                run.direction = (bidi.level % 2 == 0) ? Direction::kLTR : Direction::kRTL;
+                run.font = curFont;
+                fRuns.push_back(run);
+            }
         }
 
         // 2. Compute Grapheme breaks
