@@ -3796,6 +3796,20 @@ if (skia_build_fuzzers) {
       }
       testonly = true
     }
+
+    test_app("text_editor_app") {
+      sources = [ "tools/text_editor/app/TextEditorApp.cpp" ]
+      libs = []
+
+      deps = [
+        ":flags",
+        ":gpu_tool_utils",
+        ":sk_app",
+        ":skia",
+        ":tool_utils",
+        "tools/text_editor",
+      ]
+    }
   }
 
   libfuzzer_app("region_deserialize") {
