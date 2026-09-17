@@ -748,6 +748,36 @@ DEF_TEST(TextEditor_Defect_FontFallbackAndArabicGlyphShaping, reporter) {
     REPORTER_ASSERT(reporter, !hasTofu);
 }
 
+// =============================================================================
+// DEFECT TRAP 14 (Defect D7): Zalgo Grapheme Single-Step Navigation
+// =============================================================================
+DEF_TEST(TextEditor_Defect_ZalgoGraphemeSingleStepNavigation, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+
+    // Zalgo 'e' with 6 combining diacritics, followed by " X"
+    const std::string zalgo = "e\xcc\x81\xcc\x80\xcc\x83\xcc\x82\xcc\x88\xcc\x8a";
+    const std::string text = zalgo + " X";
+    auto editor = TextEditorController::Make(text, font);
+    REPORTER_ASSERT(reporter, editor != nullptr);
+
+    // Caret starts at index 0 (left of 'e')
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(0));
+    SkScalar startX = editor->selection().focus.caret_rect.fLeft;
+
+    // Hostile Invariant:
+    // A single Right Arrow keystroke MUST step across the ENTIRE extended grapheme cluster!
+    // It must NOT stop at intermediate zero-width diacritical marks without visual motion.
+    bool handled = editor->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, handled);
+
+    CaretPosition pos = editor->selection().focus;
+    // 1. Must advance past the entire Zalgo sequence in a single keypress:
+    REPORTER_ASSERT(reporter, pos.text_index == TextIndex(zalgo.size()));
+    // 2. The cursor MUST visually move horizontally (not stay stuck at startX):
+    REPORTER_ASSERT(reporter, pos.caret_rect.fLeft > startX);
+}
+
+
 
 
 

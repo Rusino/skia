@@ -148,6 +148,11 @@ public:
                         next.affinity = Affinity::kDownstream;
                         next.caret_rect = fFlatClusters.back().bounds;
                         next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                    } else if (currentIdx < fFlatClusters.size() && current.text_index > fFlatClusters[currentIdx].text_range.start) {
+                        next.text_index = fFlatClusters[currentIdx].text_range.start;
+                        next.affinity = Affinity::kDownstream;
+                        next.caret_rect = fFlatClusters[currentIdx].bounds;
+                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
                     } else if (currentIdx > 0 && currentIdx < fFlatClusters.size()) {
                         next.text_index = fFlatClusters[currentIdx - 1].text_range.start;
                         next.affinity = Affinity::kDownstream;
@@ -268,18 +273,62 @@ private:
         ClusterIndex clusterCounter(0);
         GlyphIndex glyphCounter(0);
 
+        auto graphemeBreaks = fFormatted->shaped().unicode().grapheme_breaks();
+        std::string_view fullText = fFormatted->shaped().unicode().text();
+
         for (size_t lIdx = 0; lIdx < lines.size(); ++lIdx) {
             const auto& line = lines[lIdx];
             for (const auto& vr : line.visual_runs) {
                 SkScalar curX = vr.x_offset;
                 for (const auto& g : vr.glyphs) {
-                    std::string_view fullText = fFormatted->shaped().unicode().text();
                     TextIndex endIdx = g.cluster_text_index + 1;
                     if (g.cluster_text_index.value < fullText.size()) {
                         const char* ptr = fullText.data() + g.cluster_text_index.value;
                         const char* end = fullText.data() + fullText.size();
                         SkUTF::NextUTF8(&ptr, end);
                         endIdx = TextIndex(ptr - fullText.data());
+                    }
+
+                    if (!graphemeBreaks.empty()) {
+                        auto it = std::upper_bound(graphemeBreaks.begin(), graphemeBreaks.end(), g.cluster_text_index);
+                        if (it != graphemeBreaks.end() && *it > endIdx) {
+                            endIdx = *it;
+                        }
+                    }
+
+                    SkScalar cbWidth = g.advance.fX;
+                    SkScalar cbHeight = std::abs(vr.ascent) + std::abs(vr.descent);
+                    if (cbHeight <= 0) {
+                        cbHeight = 16.0f;
+                    }
+
+                    // Check if this glyph should be merged into the previous cluster on this line
+                    if (!fLineClusters[lIdx].empty()) {
+                        ClusterBox& lastCb = fLineClusters[lIdx].back();
+                        if (g.is_mark || lastCb.text_range.contains(g.cluster_text_index) || g.cluster_text_index == lastCb.text_range.start) {
+                            GlyphIndex curGlyph = glyphCounter;
+                            glyphCounter = glyphCounter + 1;
+
+                            lastCb.text_range.end = std::max(lastCb.text_range.end, endIdx);
+                            fFlatClusters.back().text_range.end = lastCb.text_range.end;
+
+                            lastCb.glyph_range.end = GlyphIndex(curGlyph.value + 1);
+                            fFlatClusters.back().glyph_range.end = lastCb.glyph_range.end;
+
+                            SkScalar markTop = line.baseline + vr.ascent + g.offset.fY;
+                            SkScalar markBottom = markTop + cbHeight;
+                            if (markTop < lastCb.bounds.fTop) {
+                                lastCb.bounds.fTop = markTop;
+                            }
+                            if (markBottom > lastCb.bounds.fBottom) {
+                                lastCb.bounds.fBottom = markBottom;
+                            }
+                            lastCb.bounds.fRight += g.advance.fX;
+                            fFlatClusters.back().bounds = lastCb.bounds;
+
+                            curX += g.advance.fX;
+                            continue;
+                        }
                     }
 
                     ClusterIndex curCluster = clusterCounter;
@@ -291,12 +340,6 @@ private:
                     cb.cluster_index = curCluster;
                     cb.text_range = TextRange(g.cluster_text_index, endIdx);
                     cb.glyph_range = GlyphRange(curGlyph, curGlyph + 1);
-
-                    SkScalar cbWidth = g.advance.fX;
-                    SkScalar cbHeight = std::abs(vr.ascent) + std::abs(vr.descent);
-                    if (cbHeight <= 0) {
-                        cbHeight = 16.0f;
-                    }
 
                     cb.bounds = SkRect::MakeXYWH(curX + g.offset.fX,
                                                  line.baseline + vr.ascent,
