@@ -749,12 +749,13 @@ DEF_TEST(TextEditor_Defect_FontFallbackAndArabicGlyphShaping, reporter) {
 }
 
 // =============================================================================
-// DEFECT TRAP 14 (Defect D7): Zalgo Grapheme Single-Step Navigation
+// DEFECT TRAP 14 (Defect D7): Anti-Monoculture Extended Grapheme Cluster Matrix
 // =============================================================================
 DEF_TEST(TextEditor_Defect_ZalgoGraphemeSingleStepNavigation, reporter) {
     SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
 
-    // Zalgo 'e' with 6 combining diacritics, followed by " X"
+    // --- Partition 1: Latin Stacked Diacritics (Zalgo Text) ---
+    // 'e' with 6 combining diacritics, followed by " X"
     const std::string zalgo = "e\xcc\x81\xcc\x80\xcc\x83\xcc\x82\xcc\x88\xcc\x8a";
     const std::string text = zalgo + " X";
     auto editor = TextEditorController::Make(text, font);
@@ -764,17 +765,44 @@ DEF_TEST(TextEditor_Defect_ZalgoGraphemeSingleStepNavigation, reporter) {
     REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(0));
     SkScalar startX = editor->selection().focus.caret_rect.fLeft;
 
-    // Hostile Invariant:
-    // A single Right Arrow keystroke MUST step across the ENTIRE extended grapheme cluster!
-    // It must NOT stop at intermediate zero-width diacritical marks without visual motion.
-    bool handled = editor->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
-    REPORTER_ASSERT(reporter, handled);
+    // 1. Single Right Arrow MUST step across the entire extended grapheme cluster in one hit:
+    bool handledRight = editor->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, handledRight);
+    CaretPosition posAfterRight = editor->selection().focus;
+    REPORTER_ASSERT(reporter, posAfterRight.text_index == TextIndex(zalgo.size()));
+    REPORTER_ASSERT(reporter, posAfterRight.caret_rect.fLeft > startX);
 
-    CaretPosition pos = editor->selection().focus;
-    // 1. Must advance past the entire Zalgo sequence in a single keypress:
-    REPORTER_ASSERT(reporter, pos.text_index == TextIndex(zalgo.size()));
-    // 2. The cursor MUST visually move horizontally (not stay stuck at startX):
-    REPORTER_ASSERT(reporter, pos.caret_rect.fLeft > startX);
+    // 2. Single Left Arrow MUST step backward across the entire cluster back to 0:
+    bool handledLeft = editor->handleKey(skui::Key::kLeft, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, handledLeft);
+    CaretPosition posAfterLeft = editor->selection().focus;
+    REPORTER_ASSERT(reporter, posAfterLeft.text_index == TextIndex(0));
+    REPORTER_ASSERT(reporter, posAfterLeft.caret_rect.fLeft == startX);
+
+    // --- Partition 2: Hit-Test Boundary Snapping ---
+    // Hit-testing the right half of the Zalgo cluster must resolve past all combining marks:
+    CaretPosition hitRight = editor->spatial_index().hitTest(startX + (posAfterRight.caret_rect.fLeft - startX) * 0.75f, 5.0f);
+    REPORTER_ASSERT(reporter, hitRight.text_index == TextIndex(zalgo.size()));
+
+    // Hit-testing the left half must resolve to the start of the cluster:
+    CaretPosition hitLeft = editor->spatial_index().hitTest(startX + 1.0f, 5.0f);
+    REPORTER_ASSERT(reporter, hitLeft.text_index == TextIndex(0));
+
+    // --- Partition 3: Arabic Combining Diacritics (Harakat / Tashkeel) ---
+    // Arabic letter Beh ('ب') with Shadda (U+0651) and Fatha (U+064E): 2 + 2 + 2 = 6 UTF-8 bytes
+    const std::string arabicWithMarks = "\xd8\xa8\xd9\x91\xd9\x8e";
+    const std::string arabicText = arabicWithMarks + " \xd8\xb9\xd8\xb1\xd8\xa8\xd9\x8a";
+    auto arabicEditor = TextEditorController::Make(arabicText, font);
+    REPORTER_ASSERT(reporter, arabicEditor != nullptr);
+
+    // Single step forward along reading order (kTextLogical):
+    CaretPosition arabicCaret = arabicEditor->spatial_index().moveCaret(
+        arabicEditor->selection().focus,
+        CursorDirection::kRight,
+        MovementGranularity::kGrapheme,
+        NavigationMode::kTextLogical);
+    // Must step across the Arabic letter and both vowel marks in one step (to byte 6):
+    REPORTER_ASSERT(reporter, arabicCaret.text_index == TextIndex(arabicWithMarks.size()));
 }
 
 

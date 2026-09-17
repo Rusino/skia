@@ -47,8 +47,8 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 
 1. **Preservation of 1-to-1 Codepoint-to-Glyph Mapping**:
    In Layer 2 (`ShapedParagraph`), HarfBuzz must execute in single-pass mode with standard ligatures and composition explicitly disabled (`liga=0`, `ccmp=0`, `dlig=0`, `calt=0`).
-2. **Grapheme Stepping Invariant**:
-   For editable text, every character codepoint must retain a distinct `cluster_text_index`. 'ffi' must produce 3 distinct glyph entries rather than 1 fused ligature glyph, and base + combining mark ('e' + `́`) must retain separate glyph entries.
+2. **Glyph Independence Invariant**:
+   For editable text, shaping retains distinct glyph entries for base and combining marks ('e' + `́`) to ensure accurate per-glyph metrics. Downstream navigational unification is governed by Domain Invariant 7.
 
 ---
 
@@ -61,8 +61,7 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 2. **Vertical Caret Navigation (Arrow Up / Down)**:
    Navigating Up or Down must query the line box immediately above or below the current line, evaluating `hitTest(currentX, targetLine.bounds.centerY())`.
 3. **Newline Cursor Exclusion**:
-   `ParagraphSpatialIndex::hitTest` must place the caret *before* a trailing newline codepoint (`
-`), never after it on the same line. The end of a line terminated by a hard break belongs to the last visible glyph boundary.
+   `ParagraphSpatialIndex::hitTest` must place the caret *before* a trailing newline codepoint (`\n`), never after it on the same line. The end of a line terminated by a hard break belongs to the last visible glyph boundary.
 
 ---
 
@@ -72,3 +71,15 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
    All keyboard and character handling logic (`handleKey`, `handleChar`) must live inside `TextEditorController`, decoupled from OS window glue (`sk_app::Window`).
 2. **Modifier Shielding (Ctrl/Cmd Shortcut Isolation)**:
    When a shortcut key is dispatched (e.g. `Ctrl+A` / `Cmd+A`), the controller must consume the event and shield the text buffer from subsequent character inputs (`onChar('a')`), preventing accidental buffer overwrites.
+
+---
+
+## Domain Invariant 7: Extended Grapheme Cluster Atomic Navigation & Spatial Indexing
+
+1. **Atomic Grapheme Cluster Unification**:
+   Zero-width combining marks (e.g. Zalgo stacked diacritics, Arabic harakat/tashkeel, Hebrew niqqud, combining accents) and sub-grapheme glyphs must NEVER produce standalone, zero-width `ClusterBox`es in Layer 4 (`ParagraphSpatialIndex`). All combining marks must merge into the preceding base `ClusterBox`, extending its `text_range.end`, expanding its vertical `bounds` for stacked marks, and joining `glyph_range`.
+2. **Single-Keystroke Navigation**:
+   Directional navigation (Left/Right arrow keys) must step across the entire extended grapheme cluster in a single keypress. Caret movement must never require multiple keystrokes that leave the caret visually frozen at intermediate zero-width diacritics.
+3. **Hit-Testing Affinity & Internal Snapping**:
+   - Hit-testing on a base character with attached combining marks must resolve to either the start of the cluster (left half) or past the entire cluster (right half), never landing at an internal zero-width mark boundary.
+   - If the caret index is positioned inside a multi-codepoint grapheme cluster (e.g. via programmatic positioning or mutation), backward navigation (`kLeft`) must snap to the start of that cluster.
