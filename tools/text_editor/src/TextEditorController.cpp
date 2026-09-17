@@ -171,6 +171,61 @@ public:
         updateCursorPosition(fSelection.focus.text_index.value);
     }
 
+    bool handleKey(skui::Key key, skui::InputState state, skui::ModifierKey modifiers) override {
+        if (state != skui::InputState::kDown) {
+            return false;
+        }
+
+        bool shift = (modifiers & skui::ModifierKey::kShift) != skui::ModifierKey::kNone;
+        bool ctrlOrCmd = ((modifiers & skui::ModifierKey::kControl) != skui::ModifierKey::kNone) ||
+                         ((modifiers & skui::ModifierKey::kCommand) != skui::ModifierKey::kNone);
+
+        switch (key) {
+            case skui::Key::kLeft:
+                moveCaret(CursorDirection::kLeft, MovementGranularity::kGrapheme,
+                          NavigationMode::kScreenPhysical, shift);
+                return true;
+            case skui::Key::kRight:
+                moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme,
+                          NavigationMode::kScreenPhysical, shift);
+                return true;
+            case skui::Key::kBack:
+                deleteBackward();
+                return true;
+            case skui::Key::kDelete:
+                deleteForward();
+                return true;
+            case skui::Key::kA:
+                if (ctrlOrCmd) {
+                    selectAll();
+                    return true;
+                }
+                break;
+            default:
+                break;
+        }
+        return false;
+    }
+
+    bool handleChar(SkUnichar c, skui::ModifierKey modifiers) override {
+        // Reject character input if Ctrl or Command modifier is active (e.g. Ctrl+A)
+        if ((modifiers & (skui::ModifierKey::kControl | skui::ModifierKey::kCommand)) != skui::ModifierKey::kNone) {
+            return false;
+        }
+        if (c < 32 && c != '\n' && c != '\t') {
+            return false;
+        }
+
+        char utf8Buffer[4];
+        size_t len = SkUTF::ToUTF8(c, utf8Buffer);
+        if (len > 0) {
+            std::string_view utf8Str(utf8Buffer, len);
+            insertText(utf8Str);
+            return true;
+        }
+        return false;
+    }
+
 private:
     void rebuildPipeline() {
         std::vector<StyleSpan> styles = {

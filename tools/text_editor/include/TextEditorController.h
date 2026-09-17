@@ -10,6 +10,9 @@
 
 #include "include/core/SkColor.h"
 #include "include/core/SkFont.h"
+#include "tools/skui/InputState.h"
+#include "tools/skui/Key.h"
+#include "tools/skui/ModifierKey.h"
 #include "tools/text_editor/include/EditorTypes.h"
 #include "tools/text_editor/include/FormattedParagraph.h"
 #include "tools/text_editor/include/ParagraphSpatialIndex.h"
@@ -78,6 +81,10 @@ public:
 
     // Layout configuration
     virtual void setConstraints(LayoutConstraints constraints) = 0;
+
+    // Input Event Handling (Decoupled from native windowing)
+    virtual bool handleKey(skui::Key key, skui::InputState state, skui::ModifierKey modifiers) = 0;
+    virtual bool handleChar(SkUnichar c, skui::ModifierKey modifiers) = 0;
 };
 
 } // namespace skia::text_editor

@@ -111,18 +111,7 @@ public:
         if (!fEditor) {
             return false;
         }
-        if ((modifiers & (skui::ModifierKey::kControl | skui::ModifierKey::kCommand)) != skui::ModifierKey::kNone) {
-            return false;
-        }
-        if (c < 32 && c != '\n' && c != '\t') {
-            return false;
-        }
-
-        char utf8Buffer[4];
-        size_t len = SkUTF::ToUTF8(c, utf8Buffer);
-        if (len > 0) {
-            std::string_view text(utf8Buffer, len);
-            fEditor->insertText(text);
+        if (fEditor->handleChar(c, modifiers)) {
             fWindow->inval();
             return true;
         }
@@ -130,44 +119,13 @@ public:
     }
 
     bool onKey(skui::Key key, skui::InputState state, skui::ModifierKey modifiers) override {
-        if (!fEditor || state != skui::InputState::kDown) {
+        if (!fEditor) {
             return false;
         }
-
-        bool shift = (modifiers & skui::ModifierKey::kShift) != skui::ModifierKey::kNone;
-        bool ctrlOrCmd = ((modifiers & skui::ModifierKey::kControl) != skui::ModifierKey::kNone) ||
-                         ((modifiers & skui::ModifierKey::kCommand) != skui::ModifierKey::kNone);
-
-        switch (key) {
-            case skui::Key::kLeft:
-                fEditor->moveCaret(CursorDirection::kLeft, MovementGranularity::kGrapheme,
-                                  NavigationMode::kScreenPhysical, shift);
-                fWindow->inval();
-                return true;
-            case skui::Key::kRight:
-                fEditor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme,
-                                  NavigationMode::kScreenPhysical, shift);
-                fWindow->inval();
-                return true;
-            case skui::Key::kBack:
-                fEditor->deleteBackward();
-                fWindow->inval();
-                return true;
-            case skui::Key::kDelete:
-                fEditor->deleteForward();
-                fWindow->inval();
-                return true;
-            case skui::Key::kA:
-                if (ctrlOrCmd) {
-                    fEditor->selectAll();
-                    fWindow->inval();
-                    return true;
-                }
-                break;
-            default:
-                break;
+        if (fEditor->handleKey(key, state, modifiers)) {
+            fWindow->inval();
+            return true;
         }
-
         return false;
     }
 

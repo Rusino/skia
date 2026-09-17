@@ -585,5 +585,43 @@ DEF_TEST(TextEditor_Invariant7_HeadlessInteractionSession, reporter) {
     REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft > 0.0f);
 }
 
+// =============================================================================
+// TRAP 10 (Invariant 7): Headless Event Dispatch & Modifier Guard Simulation
+// =============================================================================
+DEF_TEST(TextEditor_Invariant7_HeadlessEventDispatch, reporter) {
+    SkFont font;
+    const std::string initialText = "Hello World";
+    auto editor = TextEditorController::Make(initialText, font);
+    REPORTER_ASSERT(reporter, editor != nullptr);
+
+    // 1. Simulate Normal Typing via handleChar: insert '!' at beginning
+    bool charHandled = editor->handleChar('!', skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, charHandled);
+    REPORTER_ASSERT(reporter, editor->text() == "!Hello World");
+
+    // 2. Simulate Ctrl+A via handleKey: must select all
+    bool keyHandled = editor->handleKey(skui::Key::kA, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, keyHandled);
+    REPORTER_ASSERT(reporter, !editor->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, editor->selection().text_range().length() == editor->text().size());
+
+    // 3. Simulate OS dispatching onChar('a', kControl) after Ctrl+A:
+    // Hostile Invariant: handleChar MUST reject 'a' when Ctrl/Cmd is active!
+    bool ctrlCharHandled = editor->handleChar('a', skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, !ctrlCharHandled);
+
+    // CRITICAL DEFECT TRAP (Bug 3):
+    // Buffer MUST NOT be replaced with "a"! It must preserve "!Hello World" and remain selected!
+    REPORTER_ASSERT(reporter, editor->text() == "!Hello World");
+    REPORTER_ASSERT(reporter, !editor->selection().is_collapsed());
+
+    // 4. Simulate Backspace key replacing selection
+    bool backHandled = editor->handleKey(skui::Key::kBack, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, backHandled);
+    REPORTER_ASSERT(reporter, editor->text().empty());
+    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.height() > 0.0f);
+}
+
+
 
 
