@@ -6,6 +6,7 @@
  */
 
 #include "tools/text_editor/include/TextEditorController.h"
+#include "include/core/SkFontMetrics.h"
 #include "src/base/SkUTF.h"
 #include <algorithm>
 
@@ -26,15 +27,7 @@ public:
         , fConstraints(constraints)
     {
         rebuildPipeline();
-        // Initially place cursor at beginning
-        CaretPosition startPos;
-        startPos.text_index = TextIndex(0);
-        startPos.affinity = Affinity::kDownstream;
-        if (fSpatialIndex && !fSpatialIndex->formatted().lines().empty()) {
-            startPos = fSpatialIndex->hitTest(0.0f, 0.0f);
-        }
-        fSelection.anchor = startPos;
-        fSelection.focus = startPos;
+        updateCursorPosition(0);
     }
 
     std::string_view text() const override { return fText; }
@@ -211,6 +204,15 @@ private:
                                                       1.0f, std::abs(firstLine.ascent) + std::abs(firstLine.descent));
                 }
             }
+        }
+        if (pos.caret_rect.isEmpty()) {
+            SkFontMetrics metrics;
+            fDefaultFont.getMetrics(&metrics);
+            float h = std::abs(metrics.fAscent) + std::abs(metrics.fDescent);
+            if (h <= 0) {
+                h = fDefaultFont.getSize() > 0 ? fDefaultFont.getSize() * 1.2f : 16.0f;
+            }
+            pos.caret_rect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, h);
         }
         fSelection.anchor = pos;
         fSelection.focus = pos;

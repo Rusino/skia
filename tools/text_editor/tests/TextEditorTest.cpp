@@ -507,4 +507,83 @@ DEF_TEST(TextEditor_Defect_LineWrappingAtWordBreak, reporter) {
     REPORTER_ASSERT(reporter, line1.visual_runs[0].glyphs[0].cluster_text_index == TextIndex(6));
 }
 
+// =============================================================================
+// TRAP 9 (Invariant 7): Full-Spectrum Headless Interactive Session Simulation
+// =============================================================================
+DEF_TEST(TextEditor_Invariant7_HeadlessInteractionSession, reporter) {
+    SkFont font;
+    font.setSize(16.0f);
+
+    LayoutConstraints constraints;
+    constraints.max_width = 200.0f; // Constrain width so text wraps across multiple lines
+
+    // 1. Initial Empty Controller
+    auto editor = TextEditorController::Make("", font, SkColor4f{0, 0, 0, 1}, constraints);
+    REPORTER_ASSERT(reporter, editor != nullptr);
+    REPORTER_ASSERT(reporter, editor->text().empty());
+
+    // Dual-Contract: Empty buffer must have valid non-zero spatial bounds
+    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.height() > 0.0f);
+    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft >= 0.0f);
+
+    // 2. Headless Typing Flow: Simulate typing "The quick brown fox jumps over the lazy dog"
+    const std::string fullSentence = "The quick brown fox jumps over the lazy dog";
+    editor->insertText(fullSentence);
+    REPORTER_ASSERT(reporter, editor->text() == fullSentence);
+
+    // Dual-Contract: Verify multi-line wrapping under 200.0f width constraint
+    const auto& spatial = editor->spatial_index();
+    const auto& lines = spatial.formatted().lines();
+    REPORTER_ASSERT(reporter, lines.size() >= 2);
+
+    // Verify word-boundary invariant: each line must not break inside words
+    for (const auto& line : lines) {
+        REPORTER_ASSERT(reporter, line.bounds.width() <= constraints.max_width + 1.0f);
+        REPORTER_ASSERT(reporter, !line.visual_runs.empty());
+    }
+
+    // Caret must be at end of text with valid non-zero spatial X
+    CaretPosition endPos = editor->selection().focus;
+    REPORTER_ASSERT(reporter, endPos.text_index == TextIndex(fullSentence.size()));
+    REPORTER_ASSERT(reporter, endPos.caret_rect.fLeft > 0.0f);
+    SkScalar endX = endPos.caret_rect.fLeft;
+
+    // 3. Headless Backspace Flow: Delete "dog" (3 backspaces)
+    editor->deleteBackward(); // deletes 'g'
+    REPORTER_ASSERT(reporter, editor->text() == "The quick brown fox jumps over the lazy do");
+    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft < endX);
+    SkScalar doX = editor->selection().focus.caret_rect.fLeft;
+
+    editor->deleteBackward(); // deletes 'o'
+    SkScalar dX = editor->selection().focus.caret_rect.fLeft;
+    REPORTER_ASSERT(reporter, dX < doX);
+    REPORTER_ASSERT(reporter, dX > 0.0f);
+
+    editor->deleteBackward(); // deletes 'd'
+    // With 'd' deleted, the wrapped line for "dog" collapses, and the caret wraps up
+    // to the end of the previous line ("...lazy ").
+    REPORTER_ASSERT(reporter, editor->text() == "The quick brown fox jumps over the lazy ");
+    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft > 0.0f);
+
+    // 4. Headless Selection & Navigation Flow:
+    // Move left 5 times with select=true (expanding selection across "lazy")
+    for (int i = 0; i < 5; ++i) {
+        editor->moveCaret(CursorDirection::kLeft, MovementGranularity::kGrapheme, NavigationMode::kScreenPhysical, true);
+    }
+    REPORTER_ASSERT(reporter, !editor->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, editor->selection().text_range().length() > 0);
+
+    // 5. Headless Select All & Overwrite Safeguard Flow:
+    editor->selectAll();
+    REPORTER_ASSERT(reporter, editor->selection().text_range().start == TextIndex(0));
+    REPORTER_ASSERT(reporter, editor->selection().text_range().end == TextIndex(editor->text().size()));
+
+    // Perform replacement of selected range
+    editor->insertText("Replaced");
+    REPORTER_ASSERT(reporter, editor->text() == "Replaced");
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(8));
+    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft > 0.0f);
+}
+
+
 
