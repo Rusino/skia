@@ -1,0 +1,42 @@
+# Copyright 2026 Google LLC.
+
+import("../../gn/skia.gni")
+
+config("public_config") {
+  include_dirs = [ "include" ]
+}
+
+skia_source_set("text_editor") {
+  public_configs = [ ":public_config" ]
+  public = [
+    "include/EditorTypes.h",
+    "include/FormattedParagraph.h",
+    "include/ParagraphSpatialIndex.h",
+    "include/ShapedParagraph.h",
+    "include/UnicodeParagraph.h",
+  ]
+  sources = [
+    "src/FormattedParagraph.cpp",
+    "src/ParagraphSpatialIndex.cpp",
+    "src/ShapedParagraph.cpp",
+    "src/UnicodeParagraph.cpp",
+  ]
+  deps = [
+    "../..:skia",
+    "../../modules/skunicode",
+    "//third_party/harfbuzz",
+  ]
+}
+
+skia_source_set("tests") {
+  testonly = true
+  sources = [
+    "tests/TextEditorTest.cpp",
+  ]
+  deps = [
+    ":text_editor",
+    "../..:skia",
+    "../..:test",
+    "../../modules/skunicode",
+  ]
+}
