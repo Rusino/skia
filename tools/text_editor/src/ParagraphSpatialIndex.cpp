@@ -110,19 +110,38 @@ public:
 
         const auto& lines = fFormatted->lines();
 
-        // 1. Locate cluster for current text index
-        size_t currentIdx = fFlatClusters.size();
-        for (size_t i = 0; i < fFlatClusters.size(); ++i) {
-            if (fFlatClusters[i].text_range.contains(current.text_index)) {
-                currentIdx = i;
-                break;
-            }
-        }
-        bool atEndOfText = (current.text_index >= fFlatClusters.back().text_range.end);
-
         switch (dir) {
             case CursorDirection::kRight:
-                if (mode == NavigationMode::kScreenPhysical || mode == NavigationMode::kTextLogical) {
+                if (mode == NavigationMode::kTextLogical) {
+                    size_t logicalIdx = fLogicalClusters.size();
+                    for (size_t i = 0; i < fLogicalClusters.size(); ++i) {
+                        if (fLogicalClusters[i].text_range.contains(current.text_index)) {
+                            logicalIdx = i;
+                            break;
+                        }
+                    }
+                    if (logicalIdx < fLogicalClusters.size()) {
+                        if (logicalIdx + 1 < fLogicalClusters.size()) {
+                            next.text_index = fLogicalClusters[logicalIdx + 1].text_range.start;
+                            next.affinity = Affinity::kDownstream;
+                            next.caret_rect = fLogicalClusters[logicalIdx + 1].bounds;
+                            next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                        } else {
+                            next.text_index = fLogicalClusters.back().text_range.end;
+                            next.affinity = Affinity::kUpstream;
+                            next.caret_rect = fLogicalClusters.back().bounds;
+                            next.caret_rect.fLeft = next.caret_rect.fRight;
+                            next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                        }
+                    }
+                } else {
+                    size_t currentIdx = fFlatClusters.size();
+                    for (size_t i = 0; i < fFlatClusters.size(); ++i) {
+                        if (fFlatClusters[i].text_range.contains(current.text_index)) {
+                            currentIdx = i;
+                            break;
+                        }
+                    }
                     if (currentIdx < fFlatClusters.size()) {
                         if (currentIdx + 1 < fFlatClusters.size()) {
                             next.text_index = fFlatClusters[currentIdx + 1].text_range.start;
@@ -130,7 +149,6 @@ public:
                             next.caret_rect = fFlatClusters[currentIdx + 1].bounds;
                             next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
                         } else {
-                            // Advance past the last cluster to end of text
                             next.text_index = fFlatClusters.back().text_range.end;
                             next.affinity = Affinity::kUpstream;
                             next.caret_rect = fFlatClusters.back().bounds;
@@ -141,9 +159,41 @@ public:
                 }
                 break;
             case CursorDirection::kLeft:
-                if (mode == NavigationMode::kScreenPhysical || mode == NavigationMode::kTextLogical) {
+                if (mode == NavigationMode::kTextLogical) {
+                    size_t logicalIdx = fLogicalClusters.size();
+                    for (size_t i = 0; i < fLogicalClusters.size(); ++i) {
+                        if (fLogicalClusters[i].text_range.contains(current.text_index)) {
+                            logicalIdx = i;
+                            break;
+                        }
+                    }
+                    bool atEndOfLogical = (current.text_index >= fLogicalClusters.back().text_range.end);
+                    if (atEndOfLogical) {
+                        next.text_index = fLogicalClusters.back().text_range.start;
+                        next.affinity = Affinity::kDownstream;
+                        next.caret_rect = fLogicalClusters.back().bounds;
+                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                    } else if (logicalIdx < fLogicalClusters.size() && current.text_index > fLogicalClusters[logicalIdx].text_range.start) {
+                        next.text_index = fLogicalClusters[logicalIdx].text_range.start;
+                        next.affinity = Affinity::kDownstream;
+                        next.caret_rect = fLogicalClusters[logicalIdx].bounds;
+                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                    } else if (logicalIdx > 0 && logicalIdx < fLogicalClusters.size()) {
+                        next.text_index = fLogicalClusters[logicalIdx - 1].text_range.start;
+                        next.affinity = Affinity::kDownstream;
+                        next.caret_rect = fLogicalClusters[logicalIdx - 1].bounds;
+                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                    }
+                } else {
+                    size_t currentIdx = fFlatClusters.size();
+                    for (size_t i = 0; i < fFlatClusters.size(); ++i) {
+                        if (fFlatClusters[i].text_range.contains(current.text_index)) {
+                            currentIdx = i;
+                            break;
+                        }
+                    }
+                    bool atEndOfText = (current.text_index >= fFlatClusters.back().text_range.end);
                     if (atEndOfText) {
-                        // Move from end of text to start of last cluster
                         next.text_index = fFlatClusters.back().text_range.start;
                         next.affinity = Affinity::kDownstream;
                         next.caret_rect = fFlatClusters.back().bounds;
@@ -352,11 +402,18 @@ private:
                 }
             }
         }
+
+        fLogicalClusters = fFlatClusters;
+        std::sort(fLogicalClusters.begin(), fLogicalClusters.end(),
+                  [](const ClusterBox& a, const ClusterBox& b) {
+                      return a.text_range.start < b.text_range.start;
+                  });
     }
 
     std::shared_ptr<const FormattedParagraph> fFormatted;
     std::vector<std::vector<ClusterBox>> fLineClusters;
     std::vector<ClusterBox> fFlatClusters;
+    std::vector<ClusterBox> fLogicalClusters;
 };
 
 } // namespace

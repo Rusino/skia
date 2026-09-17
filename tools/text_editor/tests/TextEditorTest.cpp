@@ -20,6 +20,7 @@
 #include "tools/text_editor/include/TextEditorController.h"
 #include "tools/text_editor/include/TextEditorPainter.h"
 #include "tools/text_editor/include/UnicodeParagraph.h"
+#include "tools/text_editor/tests/StressCorpus.h"
 
 using namespace skia::text_editor;
 
@@ -803,6 +804,56 @@ DEF_TEST(TextEditor_Defect_ZalgoGraphemeSingleStepNavigation, reporter) {
         NavigationMode::kTextLogical);
     // Must step across the Arabic letter and both vowel marks in one step (to byte 6):
     REPORTER_ASSERT(reporter, arabicCaret.text_index == TextIndex(arabicWithMarks.size()));
+}
+
+// =============================================================================
+// INVARIANT TRAP 15: Cross-Layer Stress Propagation & Zero-Delta Phantom Navigation Law
+// =============================================================================
+DEF_TEST(TextEditor_Invariant_CrossLayerStressPropagation, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+
+    for (const auto& tc : GetCrossLayerStressCorpus()) {
+        auto editor = TextEditorController::Make(tc.text, font);
+        REPORTER_ASSERT(reporter, editor != nullptr);
+
+        // 1. Dual-Contract Formatting Check:
+        // Must never produce zero-height bounds even on empty buffer
+        CaretPosition startCaret = editor->selection().focus;
+        REPORTER_ASSERT(reporter, startCaret.caret_rect.height() > 0);
+
+        if (tc.text.empty()) {
+            continue;
+        }
+
+        // 2. Zero-Delta Phantom Navigation Law Check:
+        // Walking forward must NEVER produce a zero-advance step where logical index
+        // advances while spatial position (X, Y) remains frozen.
+        int steps = 0;
+        const int kMaxSteps = 200;
+        TextIndex prevIndex = startCaret.text_index;
+        SkPoint prevCaretPos = SkPoint::Make(startCaret.caret_rect.fLeft, startCaret.caret_rect.fTop);
+
+        while (editor->selection().focus.text_index.value < tc.text.size() && ++steps < kMaxSteps) {
+            bool moved = editor->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
+            if (!moved) {
+                break;
+            }
+            CaretPosition cur = editor->selection().focus;
+            if (cur.text_index == prevIndex) {
+                // Reached end of line or document
+                break;
+            }
+
+            // The Zero-Delta Phantom Navigation Law:
+            // If logical text index advanced, the caret MUST visually move (either X or Y changed):
+            SkPoint curCaretPos = SkPoint::Make(cur.caret_rect.fLeft, cur.caret_rect.fTop);
+            REPORTER_ASSERT(reporter, curCaretPos != prevCaretPos);
+
+            prevIndex = cur.text_index;
+            prevCaretPos = curCaretPos;
+        }
+        REPORTER_ASSERT(reporter, steps < kMaxSteps);
+    }
 }
 
 

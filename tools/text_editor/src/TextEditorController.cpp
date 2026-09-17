@@ -183,11 +183,11 @@ public:
         switch (key) {
             case skui::Key::kLeft:
                 moveCaret(CursorDirection::kLeft, MovementGranularity::kGrapheme,
-                          NavigationMode::kScreenPhysical, shift);
+                          NavigationMode::kTextLogical, shift);
                 return true;
             case skui::Key::kRight:
                 moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme,
-                          NavigationMode::kScreenPhysical, shift);
+                          NavigationMode::kTextLogical, shift);
                 return true;
             case skui::Key::kUp:
                 moveCaret(CursorDirection::kUp, MovementGranularity::kLine,

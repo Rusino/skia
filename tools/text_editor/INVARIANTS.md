@@ -83,3 +83,12 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 3. **Hit-Testing Affinity & Internal Snapping**:
    - Hit-testing on a base character with attached combining marks must resolve to either the start of the cluster (left half) or past the entire cluster (right half), never landing at an internal zero-width mark boundary.
    - If the caret index is positioned inside a multi-codepoint grapheme cluster (e.g. via programmatic positioning or mutation), backward navigation (`kLeft`) must snap to the start of that cluster.
+
+---
+
+## Domain Invariant 8: Cross-Layer Stress Corpus & Zero-Delta Phantom Navigation Law
+
+1. **Centralized Stress Corpus Requirement**:
+   Stress test inputs (Zalgo stacked marks, Arabic vowels/tashkeel, Hebrew niqqud, multi-line mixed linebreaks, empty buffers) must reside in a centralized header (`StressCorpus.h`). All functional layers (Formatting, Spatial Navigation, Mutation) must systematically execute against this shared corpus to prevent partial-dimension testing blindspots.
+2. **Zero-Delta Phantom Navigation Prohibition**:
+   Walking the caret across any non-empty text buffer must NEVER produce a zero-advance step where logical index advances while spatial position ($X, Y$) remains frozen. Every directional navigation step must produce non-zero visual motion or reach an authentic line/document boundary.

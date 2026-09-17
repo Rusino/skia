@@ -153,8 +153,12 @@ private:
                     sg.glyph_id = gid;
                     sg.cluster_text_index = codepointOffset;
                     sg.offset = SkPoint::Make(0, 0);
-                    sg.is_mark = (u >= 0x0300 && u <= 0x036F) || (u >= 0x1AB0 && u <= 0x1AFF) ||
-                                 (u >= 0x1DC0 && u <= 0x1DFF) || (u >= 0xFE20 && u <= 0xFE2F);
+                    hb_unicode_funcs_t* ufuncs = hb_unicode_funcs_get_default();
+                    hb_unicode_general_category_t cat = hb_unicode_general_category(ufuncs, u);
+                    sg.is_mark = (cat == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK ||
+                                  cat == HB_UNICODE_GENERAL_CATEGORY_SPACING_MARK ||
+                                  cat == HB_UNICODE_GENERAL_CATEGORY_ENCLOSING_MARK ||
+                                  hb_unicode_combining_class(ufuncs, u) > 0);
                     sg.is_zero_width_control = fUnicode->isControl(codepointOffset);
 
                     if (width <= 0 && !sg.is_mark && !sg.is_zero_width_control) {
@@ -176,8 +180,12 @@ private:
                         const char* p = fullText.data() + sg.cluster_text_index.value;
                         u = SkUTF::NextUTF8(&p, fullText.data() + fullText.size());
                     }
-                    sg.is_mark = (u >= 0x0300 && u <= 0x036F) || (u >= 0x1AB0 && u <= 0x1AFF) ||
-                                 (u >= 0x1DC0 && u <= 0x1DFF) || (u >= 0xFE20 && u <= 0xFE2F);
+                    hb_unicode_funcs_t* ufuncs = hb_unicode_funcs_get_default();
+                    hb_unicode_general_category_t cat = hb_unicode_general_category(ufuncs, u);
+                    sg.is_mark = (cat == HB_UNICODE_GENERAL_CATEGORY_NON_SPACING_MARK ||
+                                  cat == HB_UNICODE_GENERAL_CATEGORY_SPACING_MARK ||
+                                  cat == HB_UNICODE_GENERAL_CATEGORY_ENCLOSING_MARK ||
+                                  hb_unicode_combining_class(ufuncs, u) > 0);
                     sg.is_zero_width_control = fUnicode->isControl(sg.cluster_text_index);
 
                     SkScalar w = glyphPositions[i].x_advance / 64.0f;
