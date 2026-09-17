@@ -13,12 +13,16 @@ skia_source_set("text_editor") {
     "include/FormattedParagraph.h",
     "include/ParagraphSpatialIndex.h",
     "include/ShapedParagraph.h",
+    "include/TextEditorController.h",
+    "include/TextEditorPainter.h",
     "include/UnicodeParagraph.h",
   ]
   sources = [
     "src/FormattedParagraph.cpp",
     "src/ParagraphSpatialIndex.cpp",
     "src/ShapedParagraph.cpp",
+    "src/TextEditorController.cpp",
+    "src/TextEditorPainter.cpp",
     "src/UnicodeParagraph.cpp",
   ]
   deps = [

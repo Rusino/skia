@@ -89,31 +89,50 @@ public:
             return next;
         }
 
-        // Find current cluster index
-        size_t currentIdx = 0;
+        // 1. Locate cluster for current text index
+        size_t currentIdx = fFlatClusters.size();
         for (size_t i = 0; i < fFlatClusters.size(); ++i) {
-            if (fFlatClusters[i].text_range.contains(current.text_index) ||
-                fFlatClusters[i].text_range.end == current.text_index) {
+            if (fFlatClusters[i].text_range.contains(current.text_index)) {
                 currentIdx = i;
                 break;
             }
         }
+        bool atEndOfText = (current.text_index >= fFlatClusters.back().text_range.end);
 
         switch (dir) {
             case CursorDirection::kRight:
                 if (mode == NavigationMode::kScreenPhysical || mode == NavigationMode::kTextLogical) {
-                    if (currentIdx + 1 < fFlatClusters.size()) {
-                        next.text_index = fFlatClusters[currentIdx + 1].text_range.start;
-                        next.caret_rect = fFlatClusters[currentIdx + 1].bounds;
-                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                    if (currentIdx < fFlatClusters.size()) {
+                        if (currentIdx + 1 < fFlatClusters.size()) {
+                            next.text_index = fFlatClusters[currentIdx + 1].text_range.start;
+                            next.affinity = Affinity::kDownstream;
+                            next.caret_rect = fFlatClusters[currentIdx + 1].bounds;
+                            next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                        } else {
+                            // Advance past the last cluster to end of text
+                            next.text_index = fFlatClusters.back().text_range.end;
+                            next.affinity = Affinity::kUpstream;
+                            next.caret_rect = fFlatClusters.back().bounds;
+                            next.caret_rect.fLeft = next.caret_rect.fRight;
+                            next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                        }
                     }
                 }
                 break;
             case CursorDirection::kLeft:
-                if (currentIdx > 0) {
-                    next.text_index = fFlatClusters[currentIdx - 1].text_range.start;
-                    next.caret_rect = fFlatClusters[currentIdx - 1].bounds;
-                    next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                if (mode == NavigationMode::kScreenPhysical || mode == NavigationMode::kTextLogical) {
+                    if (atEndOfText) {
+                        // Move from end of text to start of last cluster
+                        next.text_index = fFlatClusters.back().text_range.start;
+                        next.affinity = Affinity::kDownstream;
+                        next.caret_rect = fFlatClusters.back().bounds;
+                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                    } else if (currentIdx > 0 && currentIdx < fFlatClusters.size()) {
+                        next.text_index = fFlatClusters[currentIdx - 1].text_range.start;
+                        next.affinity = Affinity::kDownstream;
+                        next.caret_rect = fFlatClusters[currentIdx - 1].bounds;
+                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                    }
                 }
                 break;
             default:

@@ -5,6 +5,8 @@
  * found in the LICENSE file.
  */
 
+#include "include/core/SkBitmap.h"
+#include "include/core/SkCanvas.h"
 #include "include/core/SkFont.h"
 #include "include/core/SkFontMetrics.h"
 #include "include/core/SkFontMgr.h"
@@ -14,6 +16,8 @@
 #include "tools/text_editor/include/FormattedParagraph.h"
 #include "tools/text_editor/include/ParagraphSpatialIndex.h"
 #include "tools/text_editor/include/ShapedParagraph.h"
+#include "tools/text_editor/include/TextEditorController.h"
+#include "tools/text_editor/include/TextEditorPainter.h"
 #include "tools/text_editor/include/UnicodeParagraph.h"
 
 using namespace skia::text_editor;
@@ -284,3 +288,139 @@ DEF_TEST(TextEditor_ParagraphSpatialIndex_NavigationAndHitTest, reporter) {
     REPORTER_ASSERT(reporter, selectionRects[0].width() > 0);
     REPORTER_ASSERT(reporter, selectionRects[0].height() > 0);
 }
+
+// =============================================================================
+// TRAP 6: Layer 5 Controller Text Mutation & Selection Invariants
+// =============================================================================
+DEF_TEST(TextEditor_Controller_InsertionAndDeletion, reporter) {
+    SkFont font;
+    auto editor = TextEditorController::Make("Hello World", font);
+    REPORTER_ASSERT(reporter, editor != nullptr);
+    REPORTER_ASSERT(reporter, editor->text() == "Hello World");
+
+    // Initially collapsed at 0
+    REPORTER_ASSERT(reporter, editor->selection().is_collapsed());
+
+    // Move to end and type "!"
+    editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, false);
+    int safetySteps = 0;
+    while (editor->selection().focus.text_index < TextIndex(editor->text().size()) && ++safetySteps < 1000) {
+        editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, false);
+    }
+    REPORTER_ASSERT(reporter, safetySteps < 1000);
+    editor->insertText("!");
+    REPORTER_ASSERT(reporter, editor->text() == "Hello World!");
+
+    // Backspace: removes "!"
+    editor->deleteBackward();
+    REPORTER_ASSERT(reporter, editor->text() == "Hello World");
+
+    // Select "World" [6, 11) and replace with "Skia"
+    CaretPosition anchor;
+    anchor.text_index = TextIndex(6);
+    anchor.affinity = Affinity::kDownstream;
+
+    CaretPosition focus;
+    focus.text_index = TextIndex(11);
+    focus.affinity = Affinity::kDownstream;
+
+    editor->setSelection(anchor, focus);
+    REPORTER_ASSERT(reporter, !editor->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, editor->selection().text_range() == TextRange(TextIndex(6), TextIndex(11)));
+
+    editor->insertText("Skia");
+    REPORTER_ASSERT(reporter, editor->text() == "Hello Skia");
+    REPORTER_ASSERT(reporter, editor->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(10));
+
+    // Collapse to beginning and deleteForward
+    CaretPosition startPos;
+    startPos.text_index = TextIndex(0);
+    startPos.affinity = Affinity::kDownstream;
+    editor->collapseTo(startPos);
+    editor->deleteForward();
+    REPORTER_ASSERT(reporter, editor->text() == "ello Skia");
+
+    // Select all and deleteBackward
+    editor->selectAll();
+    REPORTER_ASSERT(reporter, !editor->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, editor->selection().text_range().length() == editor->text().size());
+    editor->deleteBackward();
+    REPORTER_ASSERT(reporter, editor->text().empty());
+    REPORTER_ASSERT(reporter, editor->selection().is_collapsed());
+}
+
+// =============================================================================
+// TRAP 7: Layer 5 Controller Navigation & Word Selection
+// =============================================================================
+DEF_TEST(TextEditor_Controller_NavigationAndWordSelection, reporter) {
+    SkFont font;
+    auto editor = TextEditorController::Make("The quick brown fox", font);
+    REPORTER_ASSERT(reporter, editor != nullptr);
+
+    // 1. Move caret with selection expansion (select = true)
+    CaretPosition startPos;
+    startPos.text_index = TextIndex(0);
+    startPos.affinity = Affinity::kDownstream;
+    editor->collapseTo(startPos);
+
+    editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, true);
+    REPORTER_ASSERT(reporter, !editor->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, editor->selection().anchor.text_index == TextIndex(0));
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(1));
+
+    // 2. Collapse navigation (select = false)
+    editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, false);
+    REPORTER_ASSERT(reporter, editor->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(2));
+
+    // 3. Word selection at point
+    // Inside "quick" (x offset of 'q' is after "The ")
+    // Hit-testing near the word should select [4, 9)
+    editor->selectWordAtPoint(35.0f, 5.0f);
+    REPORTER_ASSERT(reporter, !editor->selection().is_collapsed());
+    // The selection must be a valid non-empty range covering words
+    TextRange selRange = editor->selection().text_range();
+    REPORTER_ASSERT(reporter, selRange.length() > 0);
+}
+
+// =============================================================================
+// TRAP 8: Layer 6 Painter Stateless Canvas Drawing
+// =============================================================================
+DEF_TEST(TextEditor_Painter_RenderWithoutCrashing, reporter) {
+    SkFont font;
+    auto editor = TextEditorController::Make("Visual Rendering Test\nLine 2", font);
+    REPORTER_ASSERT(reporter, editor != nullptr);
+
+    // Create a 200x200 software bitmap and canvas
+    SkBitmap bitmap;
+    bitmap.allocN32Pixels(200, 200);
+    SkCanvas canvas(bitmap);
+    canvas.clear(SK_ColorWHITE);
+
+    PaintOptions options;
+    options.show_caret = true;
+    options.caret_width = 2.0f;
+    options.origin = SkPoint::Make(10.0f, 10.0f);
+
+    // 1. Paint with collapsed caret
+    TextEditorPainter::Paint(&canvas, *editor, options);
+
+    // 2. Paint with active selection
+    editor->selectAll();
+    TextEditorPainter::Paint(&canvas, *editor, options);
+
+    // Verify canvas is not blank (some pixels were drawn)
+    bool hasDrawnPixel = false;
+    for (int y = 0; y < 200; ++y) {
+        for (int x = 0; x < 200; ++x) {
+            if (bitmap.getColor(x, y) != SK_ColorWHITE) {
+                hasDrawnPixel = true;
+                break;
+            }
+        }
+        if (hasDrawnPixel) break;
+    }
+    REPORTER_ASSERT(reporter, hasDrawnPixel);
+}
+
