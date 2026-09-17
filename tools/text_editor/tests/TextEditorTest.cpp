@@ -12,6 +12,7 @@
 #include "include/core/SkFontMgr.h"
 #include "include/core/SkTypeface.h"
 #include "tests/Test.h"
+#include "tools/fonts/FontToolUtils.h"
 #include "tools/text_editor/include/EditorTypes.h"
 #include "tools/text_editor/include/FormattedParagraph.h"
 #include "tools/text_editor/include/ParagraphSpatialIndex.h"
@@ -621,6 +622,94 @@ DEF_TEST(TextEditor_Invariant7_HeadlessEventDispatch, reporter) {
     REPORTER_ASSERT(reporter, editor->text().empty());
     REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.height() > 0.0f);
 }
+
+// =============================================================================
+// DEFECT TRAP 11 (Defect D4): Newline '\n' Must NOT Render as Tofu Box
+// =============================================================================
+DEF_TEST(TextEditor_Defect_NewlineNotRenderedAsTofu, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+
+    auto editorA = TextEditorController::Make("A", font);
+    auto editorANewline = TextEditorController::Make("A\n", font);
+    REPORTER_ASSERT(reporter, editorA != nullptr);
+    REPORTER_ASSERT(reporter, editorANewline != nullptr);
+
+    SkBitmap bitmapA, bitmapANewline;
+    bitmapA.allocN32Pixels(100, 100);
+    bitmapANewline.allocN32Pixels(100, 100);
+    SkCanvas canvasA(bitmapA);
+    SkCanvas canvasANewline(bitmapANewline);
+    canvasA.clear(SK_ColorWHITE);
+    canvasANewline.clear(SK_ColorWHITE);
+
+    PaintOptions options;
+    options.show_caret = false;
+    options.origin = SkPoint::Make(10.0f, 10.0f);
+
+    TextEditorPainter::Paint(&canvasA, *editorA, options);
+    TextEditorPainter::Paint(&canvasANewline, *editorANewline, options);
+
+    int pixelsA = 0;
+    int pixelsANewline = 0;
+    for (int y = 0; y < 100; ++y) {
+        for (int x = 0; x < 100; ++x) {
+            if (bitmapA.getColor(x, y) != SK_ColorWHITE) {
+                ++pixelsA;
+            }
+            if (bitmapANewline.getColor(x, y) != SK_ColorWHITE) {
+                ++pixelsANewline;
+            }
+        }
+    }
+
+    // Hostile Invariant:
+    // "A\n" must NOT render any tofu / box / .notdef glyph for '\n'.
+    // The number of painted pixels for "A\n" MUST be identical to "A"!
+    REPORTER_ASSERT(reporter, pixelsA > 0);
+    REPORTER_ASSERT(reporter, pixelsANewline == pixelsA);
+}
+
+// =============================================================================
+// DEFECT TRAP 12 (Defect D5): Vertical Caret Navigation (Arrow Up and Down)
+// =============================================================================
+DEF_TEST(TextEditor_Defect_VerticalCaretNavigationUpDown, reporter) {
+    SkFont font;
+    font.setSize(16.0f);
+
+    // Two lines: "First Line\nSecond Line"
+    auto editor = TextEditorController::Make("First Line\nSecond Line", font);
+    REPORTER_ASSERT(reporter, editor != nullptr);
+
+    // Caret starts at index 0 (Line 0, "First Line")
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(0));
+    SkScalar startY = editor->selection().focus.caret_rect.fTop;
+
+    // Move right 5 characters: "First|"
+    for (int i = 0; i < 5; ++i) {
+        editor->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
+    }
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(5));
+
+    // Hostile Invariant 1: Arrow Down must move caret to Line 1 ("Second Line")
+    bool downHandled = editor->handleKey(skui::Key::kDown, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, downHandled);
+
+    CaretPosition downPos = editor->selection().focus;
+    // Must move to line 1: Y coordinate must increase!
+    REPORTER_ASSERT(reporter, downPos.caret_rect.fTop > startY);
+    // Must be in "Second Line" (index >= 11, which is after "First Line\n")
+    REPORTER_ASSERT(reporter, downPos.text_index >= TextIndex(11));
+
+    // Hostile Invariant 2: Arrow Up must move caret back to Line 0
+    bool upHandled = editor->handleKey(skui::Key::kUp, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, upHandled);
+
+    CaretPosition upPos = editor->selection().focus;
+    // Must return to line 0: Y coordinate must match startY!
+    REPORTER_ASSERT(reporter, upPos.caret_rect.fTop == startY);
+    REPORTER_ASSERT(reporter, upPos.text_index < TextIndex(11));
+}
+
 
 
 

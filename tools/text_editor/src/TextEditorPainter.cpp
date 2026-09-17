@@ -59,6 +59,9 @@ void TextEditorPainter::Paint(
 
             SkScalar curX = vr.x_offset;
             for (const auto& g : vr.glyphs) {
+                if (g.is_zero_width_control) {
+                    continue;
+                }
                 glyphIds.push_back(static_cast<SkGlyphID>(g.glyph_id));
                 positions.push_back(SkPoint::Make(curX + g.offset.fX, line.baseline + g.offset.fY));
                 curX += g.advance.fX;

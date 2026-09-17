@@ -52,7 +52,17 @@ public:
         // 2. Locate closest cluster on line by X coordinate
         if (targetLineIdx < fLineClusters.size() && !fLineClusters[targetLineIdx].empty()) {
             const auto& clusters = fLineClusters[targetLineIdx];
+            std::string_view fullText = fFormatted->shaped().unicode().text();
             for (const auto& cb : clusters) {
+                bool isNewline = (cb.text_range.start.value < fullText.size() &&
+                                  fullText[cb.text_range.start.value] == '\n');
+                if (isNewline) {
+                    pos.text_index = cb.text_range.start;
+                    pos.affinity = Affinity::kDownstream;
+                    pos.caret_rect.fLeft = cb.bounds.fLeft;
+                    pos.caret_rect.fRight = cb.bounds.fLeft + 1.0f;
+                    return pos;
+                }
                 if (x <= cb.bounds.fLeft || x < cb.bounds.centerX()) {
                     pos.text_index = cb.text_range.start;
                     pos.affinity = Affinity::kDownstream;
@@ -69,10 +79,19 @@ public:
             }
             // Past right edge of line
             const auto& lastCb = clusters.back();
-            pos.text_index = lastCb.text_range.end;
-            pos.affinity = Affinity::kUpstream;
-            pos.caret_rect.fLeft = lastCb.bounds.fRight;
-            pos.caret_rect.fRight = lastCb.bounds.fRight + 1.0f;
+            bool isNewline = (lastCb.text_range.start.value < fullText.size() &&
+                              fullText[lastCb.text_range.start.value] == '\n');
+            if (isNewline) {
+                pos.text_index = lastCb.text_range.start;
+                pos.affinity = Affinity::kDownstream;
+                pos.caret_rect.fLeft = lastCb.bounds.fLeft;
+                pos.caret_rect.fRight = lastCb.bounds.fLeft + 1.0f;
+            } else {
+                pos.text_index = lastCb.text_range.end;
+                pos.affinity = Affinity::kUpstream;
+                pos.caret_rect.fLeft = lastCb.bounds.fRight;
+                pos.caret_rect.fRight = lastCb.bounds.fRight + 1.0f;
+            }
         }
 
         return pos;
@@ -85,9 +104,11 @@ public:
         NavigationMode mode) const override
     {
         CaretPosition next = current;
-        if (fFlatClusters.empty()) {
+        if (!fFormatted || fFormatted->lines().empty() || fFlatClusters.empty()) {
             return next;
         }
+
+        const auto& lines = fFormatted->lines();
 
         // 1. Locate cluster for current text index
         size_t currentIdx = fFlatClusters.size();
@@ -135,6 +156,66 @@ public:
                     }
                 }
                 break;
+            case CursorDirection::kDown: {
+                size_t currentLineIdx = lines.size();
+                SkScalar curY = current.caret_rect.centerY();
+                if (current.caret_rect.height() <= 0) {
+                    curY = current.caret_rect.fTop;
+                }
+                for (size_t i = 0; i < lines.size(); ++i) {
+                    if (curY >= lines[i].bounds.fTop && curY <= lines[i].bounds.fBottom) {
+                        currentLineIdx = i;
+                        break;
+                    }
+                }
+                if (currentLineIdx >= lines.size()) {
+                    for (size_t i = 0; i < fLineClusters.size(); ++i) {
+                        if (fLineClusters[i].empty()) continue;
+                        if (current.text_index >= fLineClusters[i].front().text_range.start &&
+                            current.text_index <= fLineClusters[i].back().text_range.end) {
+                            currentLineIdx = i;
+                            break;
+                        }
+                    }
+                }
+                if (currentLineIdx < lines.size() && currentLineIdx + 1 < lines.size()) {
+                    size_t targetLineIdx = currentLineIdx + 1;
+                    SkScalar targetY = lines[targetLineIdx].bounds.centerY();
+                    SkScalar targetX = current.caret_rect.fLeft;
+                    next = hitTest(targetX, targetY);
+                }
+                break;
+            }
+            case CursorDirection::kUp: {
+                size_t currentLineIdx = lines.size();
+                SkScalar curY = current.caret_rect.centerY();
+                if (current.caret_rect.height() <= 0) {
+                    curY = current.caret_rect.fTop;
+                }
+                for (size_t i = 0; i < lines.size(); ++i) {
+                    if (curY >= lines[i].bounds.fTop && curY <= lines[i].bounds.fBottom) {
+                        currentLineIdx = i;
+                        break;
+                    }
+                }
+                if (currentLineIdx >= lines.size()) {
+                    for (size_t i = 0; i < fLineClusters.size(); ++i) {
+                        if (fLineClusters[i].empty()) continue;
+                        if (current.text_index >= fLineClusters[i].front().text_range.start &&
+                            current.text_index <= fLineClusters[i].back().text_range.end) {
+                            currentLineIdx = i;
+                            break;
+                        }
+                    }
+                }
+                if (currentLineIdx > 0 && currentLineIdx < lines.size()) {
+                    size_t targetLineIdx = currentLineIdx - 1;
+                    SkScalar targetY = lines[targetLineIdx].bounds.centerY();
+                    SkScalar targetX = current.caret_rect.fLeft;
+                    next = hitTest(targetX, targetY);
+                }
+                break;
+            }
             default:
                 break;
         }

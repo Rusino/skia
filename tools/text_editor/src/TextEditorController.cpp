@@ -189,6 +189,14 @@ public:
                 moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme,
                           NavigationMode::kScreenPhysical, shift);
                 return true;
+            case skui::Key::kUp:
+                moveCaret(CursorDirection::kUp, MovementGranularity::kLine,
+                          NavigationMode::kScreenPhysical, shift);
+                return true;
+            case skui::Key::kDown:
+                moveCaret(CursorDirection::kDown, MovementGranularity::kLine,
+                          NavigationMode::kScreenPhysical, shift);
+                return true;
             case skui::Key::kBack:
                 deleteBackward();
                 return true;
