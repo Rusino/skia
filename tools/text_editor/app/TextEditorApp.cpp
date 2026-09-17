@@ -111,6 +111,9 @@ public:
         if (!fEditor) {
             return false;
         }
+        if ((modifiers & (skui::ModifierKey::kControl | skui::ModifierKey::kCommand)) != skui::ModifierKey::kNone) {
+            return false;
+        }
         if (c < 32 && c != '\n' && c != '\t') {
             return false;
         }

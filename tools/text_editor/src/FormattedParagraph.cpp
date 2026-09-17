@@ -42,9 +42,15 @@ private:
             return;
         }
 
+        SkScalar defaultAscent = shapedRuns[0].ascent;
+        SkScalar defaultDescent = shapedRuns[0].descent;
+        if (defaultAscent == 0 && defaultDescent == 0) {
+            defaultAscent = -14.0f * 0.8f;
+            defaultDescent = 14.0f * 0.2f;
+        }
+
         SkScalar yCursor = 0;
 
-        // Simple line breaking greedy accumulator across shaped runs
         LineBox currentLine;
         currentLine.line_index = fLines.size();
         currentLine.baseline = 0;
@@ -54,6 +60,24 @@ private:
 
         auto flushLine = [&](bool isLastLine) {
             if (currentLine.visual_runs.empty()) {
+                if (fLines.empty() && isLastLine) {
+                    return;
+                }
+                // Handle empty lines gracefully
+                currentLine.baseline = yCursor + std::abs(defaultAscent);
+                SkScalar lineHeight = std::abs(defaultAscent) + std::abs(defaultDescent);
+                currentLine.bounds = SkRect::MakeXYWH(0, yCursor, 0, lineHeight);
+                currentLine.ascent = defaultAscent;
+                currentLine.descent = defaultDescent;
+                currentLine.total_width = 0;
+                yCursor += lineHeight;
+                fLines.push_back(std::move(currentLine));
+
+                currentLine = LineBox();
+                currentLine.line_index = fLines.size();
+                lineWidth = 0;
+                lineAscent = 0;
+                lineDescent = 0;
                 return;
             }
 
@@ -95,6 +119,11 @@ private:
                 currentX += vr.width;
             }
 
+            if (lineAscent == 0 && lineDescent == 0) {
+                lineAscent = defaultAscent;
+                lineDescent = defaultDescent;
+            }
+
             currentLine.baseline = yCursor + std::abs(lineAscent) + maxZalgoTop;
             SkScalar lineHeight = (std::abs(lineAscent) + maxZalgoTop) + (std::abs(lineDescent) + maxZalgoBottom);
             currentLine.bounds = SkRect::MakeXYWH(xShift, yCursor, currentLine.content_width, lineHeight);
@@ -112,83 +141,213 @@ private:
             lineDescent = 0;
         };
 
+        // Precompute line break offsets from UnicodeParagraph and whitespace
+        std::vector<size_t> breakOffsets;
+        for (const auto& lb : fShaped->unicode().line_breaks()) {
+            if (lb.offset.value > 0) {
+                breakOffsets.push_back(lb.offset.value);
+            }
+        }
+        std::string_view fullText = fShaped->unicode().text();
+        for (size_t i = 0; i < fullText.size(); ++i) {
+            if (fShaped->unicode().isSpace(TextIndex(i)) || fullText[i] == ' ') {
+                breakOffsets.push_back(i + 1);
+            }
+        }
+        std::sort(breakOffsets.begin(), breakOffsets.end());
+        breakOffsets.erase(std::unique(breakOffsets.begin(), breakOffsets.end()), breakOffsets.end());
+
+        VisualRun vr;
+        bool vrInitialized = false;
+
+        auto startNewVR = [&](const ShapedRun& sr) {
+            if (vrInitialized && !vr.glyphs.empty()) {
+                currentLine.visual_runs.push_back(std::move(vr));
+            }
+            vr = VisualRun();
+            vr.font = sr.item->font;
+            vr.bidi_level = sr.item->bidi_level;
+            vr.ascent = sr.ascent;
+            vr.descent = sr.descent;
+            vr.text_range = sr.item->text_range;
+            vrInitialized = true;
+        };
+
+        auto appendEllipsis = [&](const ShapedRun& sr) {
+            if (!constraints.ellipsis.empty()) {
+                ShapedGlyph eg;
+                SkUnichar uEllipsis = 0x2026;
+                sr.item->font.textToGlyphs(&uEllipsis, sizeof(SkUnichar), SkTextEncoding::kUTF32,
+                                           reinterpret_cast<SkGlyphID*>(&eg.glyph_id), 1);
+                SkScalar eWidth = 0;
+                sr.item->font.getWidths(reinterpret_cast<SkGlyphID*>(&eg.glyph_id), 1, &eWidth);
+                if (eWidth <= 0) {
+                    eWidth = sr.item->font.getSize() > 0 ? sr.item->font.getSize() * 0.6f : 8.0f;
+                }
+                eg.advance = SkPoint::Make(eWidth, 0);
+                eg.offset = SkPoint::Make(0, 0);
+                eg.cluster_text_index = vr.glyphs.empty() ? TextIndex(0) : vr.glyphs.back().cluster_text_index;
+                eg.is_mark = false;
+                eg.is_zero_width_control = false;
+                vr.glyphs.push_back(eg);
+                vr.width += eWidth;
+                lineWidth += eWidth;
+                currentLine.content_width += eWidth;
+                vr.is_ellipsis_terminated = true;
+                currentLine.has_ellipsis = true;
+            }
+        };
+
+        struct Chunk {
+            size_t start_gidx;
+            size_t end_gidx;
+            SkScalar width;
+            bool ends_with_hard_break;
+        };
+
         for (size_t runIdx = 0; runIdx < shapedRuns.size(); ++runIdx) {
             const auto& sr = shapedRuns[runIdx];
             if (sr.glyphs.empty()) {
                 continue;
             }
 
+            if (!vrInitialized || vr.font.getTypeface() != sr.item->font.getTypeface() || vr.bidi_level != sr.item->bidi_level) {
+                startNewVR(sr);
+            }
+
             lineAscent = std::min(lineAscent, sr.ascent);
             lineDescent = std::max(lineDescent, sr.descent);
 
-            VisualRun vr;
-            vr.font = sr.item->font;
-            vr.bidi_level = sr.item->bidi_level;
-            vr.ascent = sr.ascent;
-            vr.descent = sr.descent;
-            vr.text_range = sr.item->text_range;
+            // Break shaped run into chunks (words/tokens) based on break opportunities
+            std::vector<Chunk> chunks;
+            size_t curStart = 0;
+            SkScalar curW = 0;
 
             for (size_t gIdx = 0; gIdx < sr.glyphs.size(); ++gIdx) {
                 const auto& g = sr.glyphs[gIdx];
-                SkScalar gWidth = g.advance.fX;
+                bool isHard = fShaped->unicode().isHardLineBreak(g.cluster_text_index) ||
+                              (g.cluster_text_index.value < fullText.size() && fullText[g.cluster_text_index.value] == '\n');
+                bool isSoftBreak = (gIdx > curStart) &&
+                                   std::binary_search(breakOffsets.begin(), breakOffsets.end(), g.cluster_text_index.value);
 
-                // Check line truncation constraints
-                if (std::isfinite(constraints.max_width) && (lineWidth + gWidth > constraints.max_width) && lineWidth > 0) {
+                if (isSoftBreak) {
+                    chunks.push_back({curStart, gIdx, curW, false});
+                    curStart = gIdx;
+                    curW = 0;
+                }
+
+                curW += g.advance.fX;
+
+                if (isHard) {
+                    chunks.push_back({curStart, gIdx + 1, curW, true});
+                    curStart = gIdx + 1;
+                    curW = 0;
+                }
+            }
+
+            if (curStart < sr.glyphs.size()) {
+                chunks.push_back({curStart, sr.glyphs.size(), curW, false});
+            }
+
+            // Place chunks onto lines
+            for (const auto& chunk : chunks) {
+                bool chunkFits = !std::isfinite(constraints.max_width) || (lineWidth + chunk.width <= constraints.max_width);
+
+                if (!chunkFits && lineWidth > 0) {
+                    // Current line cannot fit this chunk; try wrapping to next line
                     if (constraints.max_lines > 0 && fLines.size() + 1 >= constraints.max_lines) {
-                        // Append terminal ellipsis
-                        if (!constraints.ellipsis.empty()) {
-                            ShapedGlyph eg;
-                            SkUnichar uEllipsis = 0x2026;
-                            sr.item->font.textToGlyphs(&uEllipsis, sizeof(SkUnichar), SkTextEncoding::kUTF32,
-                                                       reinterpret_cast<SkGlyphID*>(&eg.glyph_id), 1);
-                            SkScalar eWidth = 0;
-                            sr.item->font.getWidths(reinterpret_cast<SkGlyphID*>(&eg.glyph_id), 1, &eWidth);
-                            if (eWidth <= 0) {
-                                eWidth = sr.item->font.getSize() > 0 ? sr.item->font.getSize() * 0.6f : 8.0f;
-                            }
-                            eg.advance = SkPoint::Make(eWidth, 0);
-                            eg.offset = SkPoint::Make(0, 0);
-                            eg.cluster_text_index = g.cluster_text_index;
-                            eg.is_mark = false;
-                            eg.is_zero_width_control = false;
-                            vr.glyphs.push_back(eg);
-                            vr.width += eWidth;
-                            lineWidth += eWidth;
-                            currentLine.content_width += eWidth;
-                            vr.is_ellipsis_terminated = true;
-                            currentLine.has_ellipsis = true;
-                        }
-                        currentLine.visual_runs.push_back(std::move(vr));
-                        flushLine(true);
-                        goto layout_finished;
-                    } else {
-                        // Soft wrap to next line
+                        appendEllipsis(sr);
                         if (!vr.glyphs.empty()) {
                             currentLine.visual_runs.push_back(std::move(vr));
-                            vr = VisualRun();
-                            vr.font = sr.item->font;
-                            vr.bidi_level = sr.item->bidi_level;
-                            vr.ascent = sr.ascent;
-                            vr.descent = sr.descent;
-                            vr.text_range = sr.item->text_range;
+                            vrInitialized = false;
+                        }
+                        flushLine(true);
+                        goto layout_finished;
+                    }
+
+                    // Soft wrap to next line
+                    if (!vr.glyphs.empty()) {
+                        currentLine.visual_runs.push_back(std::move(vr));
+                        vrInitialized = false;
+                    }
+                    flushLine(false);
+                    startNewVR(sr);
+                    lineAscent = sr.ascent;
+                    lineDescent = sr.descent;
+                }
+
+                // Check if chunk fits on the current line (which could be freshly started)
+                if (!std::isfinite(constraints.max_width) || (lineWidth + chunk.width <= constraints.max_width)) {
+                    for (size_t gi = chunk.start_gidx; gi < chunk.end_gidx; ++gi) {
+                        vr.glyphs.push_back(sr.glyphs[gi]);
+                    }
+                    vr.width += chunk.width;
+                    lineWidth += chunk.width;
+                    currentLine.content_width += chunk.width;
+
+                    if (chunk.ends_with_hard_break) {
+                        currentLine.has_hard_break = true;
+                        if (!vr.glyphs.empty()) {
+                            currentLine.visual_runs.push_back(std::move(vr));
+                            vrInitialized = false;
                         }
                         flushLine(false);
+                        startNewVR(sr);
                         lineAscent = sr.ascent;
                         lineDescent = sr.descent;
                     }
+                } else {
+                    // Oversized chunk on empty/near-empty line: break inside chunk glyph-by-glyph
+                    for (size_t gi = chunk.start_gidx; gi < chunk.end_gidx; ++gi) {
+                        const auto& g = sr.glyphs[gi];
+                        SkScalar gWidth = g.advance.fX;
+
+                        if (std::isfinite(constraints.max_width) && (lineWidth + gWidth > constraints.max_width) && lineWidth > 0) {
+                            if (constraints.max_lines > 0 && fLines.size() + 1 >= constraints.max_lines) {
+                                appendEllipsis(sr);
+                                if (!vr.glyphs.empty()) {
+                                    currentLine.visual_runs.push_back(std::move(vr));
+                                    vrInitialized = false;
+                                }
+                                flushLine(true);
+                                goto layout_finished;
+                            }
+                            if (!vr.glyphs.empty()) {
+                                currentLine.visual_runs.push_back(std::move(vr));
+                                vrInitialized = false;
+                            }
+                            flushLine(false);
+                            startNewVR(sr);
+                            lineAscent = sr.ascent;
+                            lineDescent = sr.descent;
+                        }
+
+                        vr.glyphs.push_back(g);
+                        vr.width += gWidth;
+                        lineWidth += gWidth;
+                        currentLine.content_width += gWidth;
+
+                        bool isHard = fShaped->unicode().isHardLineBreak(g.cluster_text_index) ||
+                                      (g.cluster_text_index.value < fullText.size() && fullText[g.cluster_text_index.value] == '\n');
+                        if (isHard) {
+                            currentLine.has_hard_break = true;
+                            if (!vr.glyphs.empty()) {
+                                currentLine.visual_runs.push_back(std::move(vr));
+                                vrInitialized = false;
+                            }
+                            flushLine(false);
+                            startNewVR(sr);
+                            lineAscent = sr.ascent;
+                            lineDescent = sr.descent;
+                        }
+                    }
                 }
-
-                vr.glyphs.push_back(g);
-                vr.width += gWidth;
-                lineWidth += gWidth;
-                currentLine.content_width += gWidth;
-            }
-
-            if (!vr.glyphs.empty()) {
-                currentLine.visual_runs.push_back(std::move(vr));
             }
         }
 
+        if (vrInitialized && !vr.glyphs.empty()) {
+            currentLine.visual_runs.push_back(std::move(vr));
+        }
         flushLine(true);
 
     layout_finished:

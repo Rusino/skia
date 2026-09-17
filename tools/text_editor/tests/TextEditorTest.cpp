@@ -424,3 +424,87 @@ DEF_TEST(TextEditor_Painter_RenderWithoutCrashing, reporter) {
     REPORTER_ASSERT(reporter, hasDrawnPixel);
 }
 
+// =============================================================================
+// DEFECT TRAP 1: Backspace & Delete Must Maintain Exact Spatial Caret Position
+// =============================================================================
+DEF_TEST(TextEditor_Defect_BackspaceMaintainsCaretRectPosition, reporter) {
+    SkFont font;
+    auto editor = TextEditorController::Make("Hello World", font);
+    REPORTER_ASSERT(reporter, editor != nullptr);
+
+    // Move to end of "Hello World" (offset 11)
+    int stepLimit = 0;
+    while (editor->selection().focus.text_index < TextIndex(editor->text().size()) && ++stepLimit < 1000) {
+        editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, false);
+    }
+    REPORTER_ASSERT(reporter, stepLimit < 1000);
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(11));
+
+    SkScalar beforeX = editor->selection().focus.caret_rect.fLeft;
+    REPORTER_ASSERT(reporter, beforeX > 0.0f);
+
+    // Backspace deletes 'd'. New text is "Hello Worl" (length 10)
+    editor->deleteBackward();
+    REPORTER_ASSERT(reporter, editor->text() == "Hello Worl");
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(10));
+
+    // Hostile Invariant: Caret X position must NOT reset to 0.0f! It must sit at the end of "Worl"!
+    SkScalar afterX = editor->selection().focus.caret_rect.fLeft;
+    REPORTER_ASSERT(reporter, afterX > 0.0f);
+    REPORTER_ASSERT(reporter, afterX < beforeX);
+
+    // Move to index 5 ("Hello| Worl") and test deleteForward
+    CaretPosition midPos;
+    midPos.text_index = TextIndex(5);
+    midPos.affinity = Affinity::kDownstream;
+    editor->collapseTo(midPos);
+
+    // Delete space at index 5 -> "HelloWorl"
+    editor->deleteForward();
+    REPORTER_ASSERT(reporter, editor->text() == "HelloWorl");
+    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(5));
+    // Caret X position after deleteForward must sit at the boundary, NOT at 0.0f!
+    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft > 0.0f);
+}
+
+// =============================================================================
+// DEFECT TRAP 2: Line Wrapping Must Break at Word Boundaries, Not Mid-Cluster
+// =============================================================================
+DEF_TEST(TextEditor_Defect_LineWrappingAtWordBreak, reporter) {
+    SkFont font;
+    const std::string text = "Hello World";
+    std::vector<StyleSpan> styles = {
+        { TextRange(TextIndex(0), TextIndex(text.size())), font, SkColor4f{0, 0, 0, 1} }
+    };
+
+    auto uni = UnicodeParagraph::Make(text, styles);
+    auto shaped = ShapedParagraph::Make(std::move(uni));
+
+    // Measure the exact advance width of "Hello" vs "Hello World"
+    SkScalar totalWidth = shaped->advance_width();
+    SkScalar halfWidth = totalWidth * 0.65f; // Wide enough for "Hello ", too narrow for "Hello World"
+
+    LayoutConstraints constraints;
+    constraints.max_width = halfWidth;
+
+    auto formatted = FormattedParagraph::Make(std::move(shaped), constraints);
+    REPORTER_ASSERT(reporter, formatted != nullptr);
+    REPORTER_ASSERT(reporter, formatted->lines().size() == 2);
+
+    const auto& line0 = formatted->lines()[0];
+    const auto& line1 = formatted->lines()[1];
+
+    // Hostile Invariant:
+    // Line 0 MUST NOT break inside "World"! It must end after "Hello" (index <= 6).
+    // Line 1 MUST start with "World" (index 6).
+    for (const auto& vr : line0.visual_runs) {
+        for (const auto& g : vr.glyphs) {
+            // Index 6 is 'W'. Line 0 must never contain 'W', 'o', 'r', 'l', 'd'!
+            REPORTER_ASSERT(reporter, g.cluster_text_index < TextIndex(6));
+        }
+    }
+    REPORTER_ASSERT(reporter, !line1.visual_runs.empty());
+    REPORTER_ASSERT(reporter, line1.visual_runs[0].glyphs[0].cluster_text_index == TextIndex(6));
+}
+
+

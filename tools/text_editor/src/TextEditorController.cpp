@@ -195,12 +195,21 @@ private:
         pos.text_index = TextIndex(index);
         pos.affinity = (index == fText.size()) ? Affinity::kUpstream : Affinity::kDownstream;
 
-        // Position rect lookup
-        if (fSpatialIndex) {
-            const auto& lines = fSpatialIndex->formatted().lines();
-            if (!lines.empty()) {
-                pos.caret_rect = SkRect::MakeXYWH(lines[0].bounds.fLeft, lines[0].baseline + lines[0].ascent,
-                                                  1.0f, std::abs(lines[0].ascent) + std::abs(lines[0].descent));
+        if (fSpatialIndex && !fSpatialIndex->formatted().lines().empty()) {
+            if (index == fText.size()) {
+                const auto& lastLine = fSpatialIndex->formatted().lines().back();
+                pos.caret_rect = SkRect::MakeXYWH(lastLine.bounds.fRight, lastLine.baseline + lastLine.ascent,
+                                                  1.0f, std::abs(lastLine.ascent) + std::abs(lastLine.descent));
+            } else {
+                std::vector<SkRect> rects;
+                fSpatialIndex->getSelectionRects(TextRange(TextIndex(index), TextIndex(index + 1)), rects);
+                if (!rects.empty()) {
+                    pos.caret_rect = SkRect::MakeXYWH(rects[0].fLeft, rects[0].fTop, 1.0f, rects[0].height());
+                } else {
+                    const auto& firstLine = fSpatialIndex->formatted().lines()[0];
+                    pos.caret_rect = SkRect::MakeXYWH(firstLine.bounds.fLeft, firstLine.baseline + firstLine.ascent,
+                                                      1.0f, std::abs(firstLine.ascent) + std::abs(firstLine.descent));
+                }
             }
         }
         fSelection.anchor = pos;
