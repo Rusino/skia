@@ -332,6 +332,78 @@ public:
         }
     }
 
+    void getSelectionForVisualDrag(
+        SkScalar x1, SkScalar y1, SkScalar x2, SkScalar y2,
+        std::vector<SkRect>& out_rects,
+        std::vector<TextRange>& out_ranges) const override {
+        out_rects.clear();
+        out_ranges.clear();
+
+        if (!fFormatted || fFlatClusters.empty()) {
+            return;
+        }
+
+        const auto& lines = fFormatted->lines();
+        if (lines.empty()) {
+            return;
+        }
+
+        // 1. Determine target line index for the drag
+        SkScalar minY = std::min(y1, y2);
+        SkScalar maxY = std::max(y1, y2);
+        SkScalar minX = std::min(x1, x2);
+        SkScalar maxX = std::max(x1, x2);
+
+        size_t lineIdx = lines.size() - 1;
+        for (size_t i = 0; i < lines.size(); ++i) {
+            if (maxY <= lines[i].bounds.fBottom || i == lines.size() - 1) {
+                lineIdx = i;
+                break;
+            }
+        }
+
+        if (lineIdx >= fLineClusters.size() || fLineClusters[lineIdx].empty()) {
+            return;
+        }
+
+        const auto& clustersOnLine = fLineClusters[lineIdx];
+
+        // 2. Collect all clusters whose horizontal bounds overlap [minX, maxX]
+        std::vector<TextRange> rawRanges;
+        for (const auto& cb : clustersOnLine) {
+            SkScalar cbLeft = cb.bounds.fLeft;
+            SkScalar cbRight = cb.bounds.fRight;
+            if (cbLeft > cbRight) {
+                std::swap(cbLeft, cbRight);
+            }
+
+            // Check horizontal overlap: cluster intersects [minX, maxX]
+            bool overlaps = !(cbRight <= minX || cbLeft >= maxX);
+            if (overlaps) {
+                out_rects.push_back(cb.bounds);
+                rawRanges.push_back(cb.text_range);
+            }
+        }
+
+        if (rawRanges.empty()) {
+            return;
+        }
+
+        // 3. Sort ranges logically and merge adjacent/overlapping spans
+        std::sort(rawRanges.begin(), rawRanges.end(), [](const TextRange& a, const TextRange& b) {
+            return a.start < b.start;
+        });
+
+        out_ranges.push_back(rawRanges[0]);
+        for (size_t i = 1; i < rawRanges.size(); ++i) {
+            if (rawRanges[i].start <= out_ranges.back().end) {
+                out_ranges.back().end = std::max(out_ranges.back().end, rawRanges[i].end);
+            } else {
+                out_ranges.push_back(rawRanges[i]);
+            }
+        }
+    }
+
 private:
     void buildIndex() {
         if (!fFormatted) {

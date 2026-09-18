@@ -55,6 +55,12 @@ public:
     // Geometry queries
     virtual void getSelectionRects(TextRange range, std::vector<SkRect>& out_rects) const = 0;
 
+    // Visual drag selection queries: returns physical rects and discontinuous logical ranges
+    virtual void getSelectionForVisualDrag(
+        SkScalar x1, SkScalar y1, SkScalar x2, SkScalar y2,
+        std::vector<SkRect>& out_rects,
+        std::vector<TextRange>& out_ranges) const = 0;
+
     // Factory method
     static std::unique_ptr<const ParagraphSpatialIndex> Make(
         std::shared_ptr<const FormattedParagraph> formatted_para);

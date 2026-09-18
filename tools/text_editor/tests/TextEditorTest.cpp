@@ -1023,6 +1023,74 @@ DEF_TEST(TextEditor_Invariant11_BiDiClusterHitTestingAndDrag, reporter) {
     REPORTER_ASSERT(reporter, maxRight >= x2 - 2.0f);
 }
 
+// =============================================================================
+// TRAP 20: Domain Invariant 12 - Continuous Physical Selection & Deletion Across BiDi
+// =============================================================================
+DEF_TEST(TextEditor_Invariant12_CrossDirectionalBiDiDragSelection, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+
+    // Mixed text: "Hello " (LTR) + Arabic "مرحبا" (RTL)
+    // Byte layout:
+    // [0..5): "Hello"
+    // [5..6): " " (space)
+    // [6..16): "مرحبا" (Arabic)
+    const std::string text = "Hello \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7";
+    auto vm = std::make_unique<TextEditorViewModel>(text, font);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, !lines.empty());
+    const auto& line = lines[0];
+
+    // Find the X position of the space:
+    // "Hello " starts at 0, space is right before Arabic text.
+    // Let's find cluster of the space:
+    std::vector<SkRect> spaceRects;
+    vm->document().spatial_index().getSelectionRects(TextRange(TextIndex(5), TextIndex(6)), spaceRects);
+    REPORTER_ASSERT(reporter, !spaceRects.empty());
+    SkScalar spaceX = spaceRects[0].centerX();
+
+    // Start drag on the space:
+    vm->moveCaretToPoint(spaceX, line.bounds.centerY(), false); // anchor
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+
+    // Drag slightly to the right (e.g. 15px right of spaceX, entering the left edge of Arabic text):
+    SkScalar dragX = spaceRects[0].fRight + 15.0f;
+    vm->moveCaretToPoint(dragX, line.bounds.centerY(), true); // focus
+
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+    std::vector<SkRect> selRects = vm->screenSelectionRects();
+    REPORTER_ASSERT(reporter, !selRects.empty());
+
+    // Calculate bounding box of selection
+    SkScalar minLeft = selRects[0].fLeft;
+    SkScalar maxRight = selRects[0].fRight;
+    for (const auto& r : selRects) {
+        minLeft = std::min(minLeft, r.fLeft);
+        maxRight = std::max(maxRight, r.fRight);
+    }
+
+    // HOSTILE INVARIANT:
+    // The selection MUST NOT jump to cover the entire line width or the entire Arabic word!
+    // The right edge of the selection MUST be close to dragX (+/- 1 cluster tolerance),
+    // and MUST NOT expand to line.content_width (which is > 50px further right)!
+    REPORTER_ASSERT(reporter, maxRight <= dragX + 20.0f);
+    REPORTER_ASSERT(reporter, maxRight < line.content_width - 15.0f);
+
+    // Verify Discontinuous Deletion:
+    // Deleting the selection must remove the space and the end-letter of the Arabic word,
+    // but the beginning of the Arabic word MUST remain intact!
+    std::string textBefore = std::string(vm->document().text());
+    vm->deleteBackward();
+    std::string textAfter = std::string(vm->document().text());
+
+    REPORTER_ASSERT(reporter, textAfter != textBefore);
+    // Prefix "Hello" must be intact
+    REPORTER_ASSERT(reporter, textAfter.rfind("Hello", 0) == 0);
+    // Arabic first letter 'م' (0xd9 0x85) must still exist in textAfter!
+    REPORTER_ASSERT(reporter, textAfter.find("\xd9\x85") != std::string::npos);
+}
+
 
 
 

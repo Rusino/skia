@@ -145,19 +145,27 @@ struct CaretPosition {
 struct EditorSelection {
     CaretPosition anchor;
     CaretPosition focus;
+    // For cross-directional BiDi selections, contains the exact discontinuous logical ranges
+    std::vector<TextRange> ranges;
 
     bool is_collapsed() const {
+        if (!ranges.empty()) {
+            return false;
+        }
         return anchor.text_index == focus.text_index && anchor.affinity == focus.affinity;
     }
 
     TextRange text_range() const {
+        if (!ranges.empty()) {
+            return TextRange(ranges.front().start, ranges.back().end);
+        }
         TextIndex s = std::min(anchor.text_index, focus.text_index);
         TextIndex e = std::max(anchor.text_index, focus.text_index);
         return TextRange(s, e);
     }
 
     bool operator==(const EditorSelection& other) const {
-        return anchor == other.anchor && focus == other.focus;
+        return anchor == other.anchor && focus == other.focus && ranges == other.ranges;
     }
     bool operator!=(const EditorSelection& other) const {
         return !(*this == other);

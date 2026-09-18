@@ -136,3 +136,17 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
      - The visually right half of an RTL cluster corresponds to `cb.text_range.start` (logical start / downstream boundary).
 2. **Physical Drag Monotonicity**:
    - When a mouse drag gesture moves monotonically along the X-axis across text runs (whether LTR or RTL), the visual selection bounds must monotonically track the physical pointer position. Hit-testing must not collapse or mirror selection spans when entering RTL runs.
+
+---
+
+## Domain Invariant 12: Continuous Physical Selection & Discontinuous Logical Deletion Across BiDi Boundaries
+
+1. **Physical Selection Bounds Dominance**:
+   - During interactive mouse drag across mixed LTR/RTL text runs, visual selection must strictly illuminate the physical horizontal interval $[X_{anchor}, X_{focus}]$ on the active line.
+   - Crossing a directionality boundary (e.g. from an LTR space into the visually adjacent end of an RTL run) must NEVER cause the selection to prematurely expand across the unselected portions of the RTL run or invert unselected characters.
+2. **Discontinuous Logical Mapping**:
+   - The selected text region spanning cross-directional runs must be represented as a canonical set of non-overlapping, sorted logical ranges ($\{R_1, R_2, \dots, R_k\}$).
+   - Only the glyph clusters physically intersecting $[X_{anchor}, X_{focus}]$ contribute their logical byte spans to the selection.
+3. **Inverted Topological Deletion Order**:
+   - Deletion of a discontinuous selection (via Backspace, Delete, or character replacement) must execute against the underlying document in reverse logical order (from highest byte offset down to lowest byte offset).
+   - Deletion must remove strictly and exclusively the bytes corresponding to the physically highlighted glyphs, leaving unselected logical segments of adjacent runs structurally intact.

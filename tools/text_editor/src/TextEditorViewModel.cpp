@@ -40,10 +40,21 @@ TextEditorViewModel::TextEditorViewModel(
 
 void TextEditorViewModel::insertText(std::string_view utf8_text) {
     if (!fSelection.is_collapsed()) {
-        TextRange range = fSelection.text_range();
-        size_t start = range.start.value;
-        fDocument->replace(range, utf8_text);
-        updateCursorPosition(start + utf8_text.size());
+        if (!fSelection.ranges.empty()) {
+            // Delete ranges in reverse order
+            for (auto it = fSelection.ranges.rbegin(); it != fSelection.ranges.rend(); ++it) {
+                fDocument->erase(*it);
+            }
+            size_t insertPos = fSelection.ranges.front().start.value;
+            fSelection.ranges.clear();
+            fDocument->insert(TextIndex(insertPos), utf8_text);
+            updateCursorPosition(insertPos + utf8_text.size());
+        } else {
+            TextRange range = fSelection.text_range();
+            size_t start = range.start.value;
+            fDocument->replace(range, utf8_text);
+            updateCursorPosition(start + utf8_text.size());
+        }
     } else {
         size_t pos = std::min(fSelection.focus.text_index.value, fDocument->text().size());
         fDocument->insert(TextIndex(pos), utf8_text);
@@ -54,10 +65,19 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
 
 void TextEditorViewModel::deleteBackward(MovementGranularity gran) {
     if (!fSelection.is_collapsed()) {
-        TextRange range = fSelection.text_range();
-        size_t start = range.start.value;
-        fDocument->erase(range);
-        updateCursorPosition(start);
+        if (!fSelection.ranges.empty()) {
+            size_t targetCaret = fSelection.ranges.front().start.value;
+            for (auto it = fSelection.ranges.rbegin(); it != fSelection.ranges.rend(); ++it) {
+                fDocument->erase(*it);
+            }
+            fSelection.ranges.clear();
+            updateCursorPosition(targetCaret);
+        } else {
+            TextRange range = fSelection.text_range();
+            size_t start = range.start.value;
+            fDocument->erase(range);
+            updateCursorPosition(start);
+        }
     } else {
         size_t cursor = fSelection.focus.text_index.value;
         std::string_view text = fDocument->text();
@@ -79,10 +99,19 @@ void TextEditorViewModel::deleteBackward(MovementGranularity gran) {
 
 void TextEditorViewModel::deleteForward(MovementGranularity gran) {
     if (!fSelection.is_collapsed()) {
-        TextRange range = fSelection.text_range();
-        size_t start = range.start.value;
-        fDocument->erase(range);
-        updateCursorPosition(start);
+        if (!fSelection.ranges.empty()) {
+            size_t targetCaret = fSelection.ranges.front().start.value;
+            for (auto it = fSelection.ranges.rbegin(); it != fSelection.ranges.rend(); ++it) {
+                fDocument->erase(*it);
+            }
+            fSelection.ranges.clear();
+            updateCursorPosition(targetCaret);
+        } else {
+            TextRange range = fSelection.text_range();
+            size_t start = range.start.value;
+            fDocument->erase(range);
+            updateCursorPosition(start);
+        }
     } else {
         size_t cursor = fSelection.focus.text_index.value;
         std::string_view text = fDocument->text();
@@ -116,6 +145,21 @@ void TextEditorViewModel::moveCaretToPoint(SkScalar screenX, SkScalar screenY, b
     fSelection.focus = hit;
     if (!select) {
         fSelection.anchor = hit;
+        fSelection.ranges.clear();
+        fDragAnchorDocPoint = SkPoint::Make(docX, docY);
+        fHasDragPoint = true;
+    } else {
+        if (!fHasDragPoint) {
+            fDragAnchorDocPoint = SkPoint::Make(docX, docY);
+            fHasDragPoint = true;
+        }
+        std::vector<SkRect> visualRects;
+        std::vector<TextRange> visualRanges;
+        fDocument->spatial_index().getSelectionForVisualDrag(
+            fDragAnchorDocPoint.fX, fDragAnchorDocPoint.fY,
+            docX, docY,
+            visualRects, visualRanges);
+        fSelection.ranges = std::move(visualRanges);
     }
     notifyRedraw();
 }
@@ -260,7 +304,15 @@ SkRect TextEditorViewModel::screenCaretRect() const {
 std::vector<SkRect> TextEditorViewModel::screenSelectionRects() const {
     std::vector<SkRect> rects;
     if (!fSelection.is_collapsed()) {
-        fDocument->spatial_index().getSelectionRects(fSelection.text_range(), rects);
+        if (!fSelection.ranges.empty()) {
+            for (const auto& r : fSelection.ranges) {
+                std::vector<SkRect> subRects;
+                fDocument->spatial_index().getSelectionRects(r, subRects);
+                rects.insert(rects.end(), subRects.begin(), subRects.end());
+            }
+        } else {
+            fDocument->spatial_index().getSelectionRects(fSelection.text_range(), rects);
+        }
         for (auto& r : rects) {
             r.offset(-fScrollOffset.fX, -fScrollOffset.fY);
         }

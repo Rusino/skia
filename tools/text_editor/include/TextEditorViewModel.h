@@ -111,6 +111,8 @@ private:
     std::unique_ptr<TextDocument> fDocument;
     EditorSelection fSelection;
     SkPoint fScrollOffset{0, 0};
+    SkPoint fDragAnchorDocPoint{0, 0};
+    bool fHasDragPoint{false};
     bool fCaretVisible{true};
     NavigationMode fNavMode{NavigationMode::kTextLogical};
     RedrawCallback fOnRedraw;
