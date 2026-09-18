@@ -114,3 +114,25 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
      `TextDocument::visitDocumentRuns(docClip, visitor)` $\to$
      `TextEditorViewModel::visitScreenRuns(screenClip, visitor)`.
    - The visitor delivers pre-baked `SkSpan<const SkGlyphID>` and `SkSpan<const SkPoint>` directly to `SkCanvas::drawGlyphs`. Frame rendering must perform zero heap allocations in the draw loop.
+
+---
+
+## Domain Invariant 10: Typographic Caret Bounds vs. Ink Bounds Separation
+
+1. **Typographic Height Invariant**:
+   - The vertical height and position of the caret must be strictly computed from the active typographic font metrics ($Ascent + Descent$) and paragraph line spacing:
+     $$\text{CaretTop} = \text{line.baseline} + \text{line.ascent}, \quad \text{CaretHeight} = |\text{line.ascent}| + |\text{line.descent}|$$
+   - The caret bounds MUST NEVER expand to encompass stacked diacritics, combining marks, or Zalgo text.
+2. **Ink Bounds Isolation**:
+   - Dynamic diacritic expansion (`maxZalgoTop`, `maxZalgoBottom`) belongs strictly to `line.bounds` for redraw invalidation and visual clipping. It must never leak into caret geometry. For any single-style line, $\text{caret.height}() \le \text{font.getSize}() \times 1.35$.
+
+---
+
+## Domain Invariant 11: BiDi Cluster Hit-Testing & Selection Geometry
+
+1. **BiDi Affinity Invariant**:
+   - In Layer 4 (`ParagraphSpatialIndex`), hit-testing inside an RTL cluster (`ClusterBox::is_rtl == true`) must invert logical boundary assignment:
+     - The visually left half of an RTL cluster corresponds to `cb.text_range.end` (logical end / upstream boundary);
+     - The visually right half of an RTL cluster corresponds to `cb.text_range.start` (logical start / downstream boundary).
+2. **Physical Drag Monotonicity**:
+   - When a mouse drag gesture moves monotonically along the X-axis across text runs (whether LTR or RTL), the visual selection bounds must monotonically track the physical pointer position. Hit-testing must not collapse or mirror selection spans when entering RTL runs.

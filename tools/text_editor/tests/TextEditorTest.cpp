@@ -962,6 +962,67 @@ DEF_TEST(TextEditor_MVVM_ViewModel_PresentationAndVisitor, reporter) {
     REPORTER_ASSERT(reporter, hasTextPixels);
 }
 
+// =============================================================================
+// TRAP 18: Domain Invariant 10 - Typographic Caret Bounds Separation on Zalgo
+// =============================================================================
+DEF_TEST(TextEditor_Invariant10_TypographicCaretOnZalgo, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 18.0f);
+
+    // Zalgo string: 'e' with 6 stacked combining marks
+    const std::string zalgo = "e\xcc\x81\xcc\x80\xcc\x83\xcc\x82\xcc\x88\xcc\x8a";
+    auto vm = std::make_unique<TextEditorViewModel>(zalgo, font);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+
+    SkRect caretRect = vm->screenCaretRect();
+    SkFontMetrics metrics;
+    font.getMetrics(&metrics);
+    SkScalar typographicHeight = std::abs(metrics.fAscent) + std::abs(metrics.fDescent);
+
+    // Hostile Invariant:
+    // Even though line ink bounds are huge (>60px), the caret height MUST strictly adhere
+    // to typographic metrics and must NEVER expand to the ink bounds of stacked marks!
+    REPORTER_ASSERT(reporter, caretRect.height() > 0.0f);
+    REPORTER_ASSERT(reporter, std::abs(caretRect.height() - typographicHeight) < 0.01f);
+    REPORTER_ASSERT(reporter, caretRect.height() < 30.0f);
+}
+
+// =============================================================================
+// TRAP 19: Domain Invariant 11 - BiDi Cluster Hit-Testing & Selection Geometry
+// =============================================================================
+DEF_TEST(TextEditor_Invariant11_BiDiClusterHitTestingAndDrag, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+
+    // Mixed BiDi line: Latin prefix followed by Arabic text (as in TextEditorApp):
+    // "- Arabic: مرحبا"
+    const std::string mixedText = "Prefix: \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7";
+    auto vm = std::make_unique<TextEditorViewModel>(mixedText, font);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, !lines.empty());
+    const auto& line = lines[0];
+
+    // Dragging from X1 to X2 in Arabic text:
+    SkScalar x1 = line.content_width - 40.0f;
+    SkScalar x2 = line.content_width - 10.0f;
+    vm->moveCaretToPoint(x1, line.bounds.centerY(), false); // anchor
+    vm->moveCaretToPoint(x2, line.bounds.centerY(), true);  // focus (dragged right)
+
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+    std::vector<SkRect> selRects = vm->screenSelectionRects();
+    REPORTER_ASSERT(reporter, !selRects.empty());
+
+    // The selection must span across the dragged region [x1, x2]:
+    SkScalar minLeft = selRects[0].fLeft;
+    SkScalar maxRight = selRects[0].fRight;
+    for (const auto& r : selRects) {
+        minLeft = std::min(minLeft, r.fLeft);
+        maxRight = std::max(maxRight, r.fRight);
+    }
+    REPORTER_ASSERT(reporter, minLeft <= x1 + 2.0f);
+    REPORTER_ASSERT(reporter, maxRight >= x2 - 2.0f);
+}
+
 
 
 

@@ -92,6 +92,8 @@ private:
                 currentLine.bounds = SkRect::MakeXYWH(0, yCursor, 0, lineHeight);
                 currentLine.ascent = defaultAscent;
                 currentLine.descent = defaultDescent;
+                currentLine.typographic_ascent = defaultAscent;
+                currentLine.typographic_descent = defaultDescent;
                 currentLine.total_width = 0;
                 yCursor += lineHeight;
                 fLines.push_back(std::move(currentLine));
@@ -152,6 +154,8 @@ private:
             currentLine.bounds = SkRect::MakeXYWH(xShift, yCursor, currentLine.content_width, lineHeight);
             currentLine.ascent = lineAscent - maxZalgoTop;
             currentLine.descent = lineDescent + maxZalgoBottom;
+            currentLine.typographic_ascent = lineAscent;
+            currentLine.typographic_descent = lineDescent;
             currentLine.total_width = lineWidth;
 
             // Precompute flat glyph arrays for zero-allocation rendering

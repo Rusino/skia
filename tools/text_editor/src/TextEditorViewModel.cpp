@@ -283,19 +283,26 @@ void TextEditorViewModel::updateCursorPosition(size_t index) {
 
     const auto& lines = fDocument->formatted().lines();
     if (!lines.empty()) {
+        const auto& firstLine = lines[0];
+        SkScalar caretTop = firstLine.baseline + firstLine.typographic_ascent;
+        SkScalar caretHeight = std::abs(firstLine.typographic_ascent) + std::abs(firstLine.typographic_descent);
+        if (caretHeight <= 0.0f) {
+            caretHeight = 16.0f;
+        }
+
         if (index == text.size()) {
             const auto& lastLine = lines.back();
-            pos.caret_rect = SkRect::MakeXYWH(lastLine.bounds.fRight, lastLine.baseline + lastLine.ascent,
-                                              1.0f, std::abs(lastLine.ascent) + std::abs(lastLine.descent));
+            pos.caret_rect = SkRect::MakeXYWH(lastLine.bounds.fRight,
+                                              lastLine.baseline + lastLine.typographic_ascent,
+                                              1.0f,
+                                              std::abs(lastLine.typographic_ascent) + std::abs(lastLine.typographic_descent));
         } else {
             std::vector<SkRect> rects;
             fDocument->spatial_index().getSelectionRects(TextRange(TextIndex(index), TextIndex(index + 1)), rects);
             if (!rects.empty()) {
-                pos.caret_rect = SkRect::MakeXYWH(rects[0].fLeft, rects[0].fTop, 1.0f, rects[0].height());
+                pos.caret_rect = SkRect::MakeXYWH(rects[0].fLeft, caretTop, 1.0f, caretHeight);
             } else {
-                const auto& firstLine = lines[0];
-                pos.caret_rect = SkRect::MakeXYWH(firstLine.bounds.fLeft, firstLine.baseline + firstLine.ascent,
-                                                  1.0f, std::abs(firstLine.ascent) + std::abs(firstLine.descent));
+                pos.caret_rect = SkRect::MakeXYWH(firstLine.bounds.fLeft, caretTop, 1.0f, caretHeight);
             }
         }
     }

@@ -44,8 +44,10 @@ struct LineBox {
     TextRange trimmed_text_range; // Excludes trailing hanging whitespace and hard breaks
     SkRect bounds{SkRect::MakeEmpty()}; // Dynamic visual bounds in paragraph coordinates (expands for Zalgo)
     SkScalar baseline{0};         // Absolute Y baseline within paragraph
-    SkScalar ascent{0};
-    SkScalar descent{0};
+    SkScalar ascent{0};           // Expanded ascent including Zalgo marks (negative)
+    SkScalar descent{0};          // Expanded descent including Zalgo marks (positive)
+    SkScalar typographic_ascent{0};  // Typographic font ascent (negative)
+    SkScalar typographic_descent{0}; // Typographic font descent (positive)
     SkScalar content_width{0};    // Visual width excluding trailing hanging spaces
     SkScalar total_width{0};      // Total width including hanging spaces
     bool has_hard_break{false};   // True if terminated by \n, \r, CRLF, etc.

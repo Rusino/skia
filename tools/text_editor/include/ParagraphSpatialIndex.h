@@ -24,6 +24,7 @@ struct ClusterBox {
     TextRange text_range;
     GlyphRange glyph_range;
     SkRect bounds{SkRect::MakeEmpty()}; // Bounding box in paragraph coordinates
+    bool is_rtl{false};
 };
 
 /**

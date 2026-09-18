@@ -46,8 +46,8 @@ public:
         }
 
         const auto& line = lines[targetLineIdx];
-        pos.caret_rect = SkRect::MakeXYWH(line.bounds.fLeft, line.baseline + line.ascent, 1.0f,
-                                          std::abs(line.ascent) + std::abs(line.descent));
+        pos.caret_rect = SkRect::MakeXYWH(line.bounds.fLeft, line.baseline + line.typographic_ascent, 1.0f,
+                                          std::abs(line.typographic_ascent) + std::abs(line.typographic_descent));
 
         // 2. Locate closest cluster on line by X coordinate
         if (targetLineIdx < fLineClusters.size() && !fLineClusters[targetLineIdx].empty()) {
@@ -64,14 +64,30 @@ public:
                     return pos;
                 }
                 if (x <= cb.bounds.fLeft || x < cb.bounds.centerX()) {
-                    pos.text_index = cb.text_range.start;
-                    pos.affinity = Affinity::kDownstream;
+                    // Left half of cluster box:
+                    // For LTR: corresponds to start of cluster.
+                    // For RTL: corresponds to end of cluster (characters read right-to-left).
+                    if (cb.is_rtl) {
+                        pos.text_index = cb.text_range.end;
+                        pos.affinity = Affinity::kUpstream;
+                    } else {
+                        pos.text_index = cb.text_range.start;
+                        pos.affinity = Affinity::kDownstream;
+                    }
                     pos.caret_rect.fLeft = cb.bounds.fLeft;
                     pos.caret_rect.fRight = cb.bounds.fLeft + 1.0f;
                     return pos;
                 } else if (x <= cb.bounds.fRight) {
-                    pos.text_index = cb.text_range.end;
-                    pos.affinity = Affinity::kUpstream;
+                    // Right half of cluster box:
+                    // For LTR: corresponds to end of cluster.
+                    // For RTL: corresponds to start of cluster.
+                    if (cb.is_rtl) {
+                        pos.text_index = cb.text_range.start;
+                        pos.affinity = Affinity::kDownstream;
+                    } else {
+                        pos.text_index = cb.text_range.end;
+                        pos.affinity = Affinity::kUpstream;
+                    }
                     pos.caret_rect.fLeft = cb.bounds.fRight;
                     pos.caret_rect.fRight = cb.bounds.fRight + 1.0f;
                     return pos;
@@ -87,8 +103,13 @@ public:
                 pos.caret_rect.fLeft = lastCb.bounds.fLeft;
                 pos.caret_rect.fRight = lastCb.bounds.fLeft + 1.0f;
             } else {
-                pos.text_index = lastCb.text_range.end;
-                pos.affinity = Affinity::kUpstream;
+                if (lastCb.is_rtl) {
+                    pos.text_index = lastCb.text_range.start;
+                    pos.affinity = Affinity::kDownstream;
+                } else {
+                    pos.text_index = lastCb.text_range.end;
+                    pos.affinity = Affinity::kUpstream;
+                }
                 pos.caret_rect.fLeft = lastCb.bounds.fRight;
                 pos.caret_rect.fRight = lastCb.bounds.fRight + 1.0f;
             }
@@ -365,14 +386,8 @@ private:
                             lastCb.glyph_range.end = GlyphIndex(curGlyph.value + 1);
                             fFlatClusters.back().glyph_range.end = lastCb.glyph_range.end;
 
-                            SkScalar markTop = line.baseline + vr.ascent + g.offset.fY;
-                            SkScalar markBottom = markTop + cbHeight;
-                            if (markTop < lastCb.bounds.fTop) {
-                                lastCb.bounds.fTop = markTop;
-                            }
-                            if (markBottom > lastCb.bounds.fBottom) {
-                                lastCb.bounds.fBottom = markBottom;
-                            }
+                            // Keep cluster vertical bounds strictly typographic (line.typographic_ascent / descent)
+                            // Diacritic ink bounds are tracked by LineBox::bounds for invalidation.
                             lastCb.bounds.fRight += g.advance.fX;
                             fFlatClusters.back().bounds = lastCb.bounds;
 
@@ -390,6 +405,7 @@ private:
                     cb.cluster_index = curCluster;
                     cb.text_range = TextRange(g.cluster_text_index, endIdx);
                     cb.glyph_range = GlyphRange(curGlyph, curGlyph + 1);
+                    cb.is_rtl = vr.isRTL();
 
                     cb.bounds = SkRect::MakeXYWH(curX + g.offset.fX,
                                                  line.baseline + vr.ascent,
