@@ -17,7 +17,6 @@
 #include "tools/text_editor/include/FormattedParagraph.h"
 #include "tools/text_editor/include/ParagraphSpatialIndex.h"
 #include "tools/text_editor/include/TextDocument.h"
-#include "tools/text_editor/include/TextEditorController.h"
 #include "tools/text_editor/include/TextEditorPainter.h"
 #include "tools/text_editor/include/TextEditorViewModel.h"
 #include "tools/text_editor/include/UnicodeParagraph.h"
@@ -297,7 +296,7 @@ DEF_TEST(TextEditor_ParagraphSpatialIndex_NavigationAndHitTest, reporter) {
 // =============================================================================
 DEF_TEST(TextEditor_Controller_InsertionAndDeletion, reporter) {
     SkFont font;
-    auto editor = TextEditorController::Make("Hello World", font);
+    auto editor = std::make_unique<TextEditorViewModel>("Hello World", font);
     REPORTER_ASSERT(reporter, editor != nullptr);
     REPORTER_ASSERT(reporter, editor->text() == "Hello World");
 
@@ -358,7 +357,7 @@ DEF_TEST(TextEditor_Controller_InsertionAndDeletion, reporter) {
 // =============================================================================
 DEF_TEST(TextEditor_Controller_NavigationAndWordSelection, reporter) {
     SkFont font;
-    auto editor = TextEditorController::Make("The quick brown fox", font);
+    auto editor = std::make_unique<TextEditorViewModel>("The quick brown fox", font);
     REPORTER_ASSERT(reporter, editor != nullptr);
 
     // 1. Move caret with selection expansion (select = true)
@@ -392,7 +391,7 @@ DEF_TEST(TextEditor_Controller_NavigationAndWordSelection, reporter) {
 // =============================================================================
 DEF_TEST(TextEditor_Painter_RenderWithoutCrashing, reporter) {
     SkFont font;
-    auto editor = TextEditorController::Make("Visual Rendering Test\nLine 2", font);
+    auto editor = std::make_unique<TextEditorViewModel>("Visual Rendering Test\nLine 2", font);
     REPORTER_ASSERT(reporter, editor != nullptr);
 
     // Create a 200x200 software bitmap and canvas
@@ -432,7 +431,7 @@ DEF_TEST(TextEditor_Painter_RenderWithoutCrashing, reporter) {
 // =============================================================================
 DEF_TEST(TextEditor_Defect_BackspaceMaintainsCaretRectPosition, reporter) {
     SkFont font;
-    auto editor = TextEditorController::Make("Hello World", font);
+    auto editor = std::make_unique<TextEditorViewModel>("Hello World", font);
     REPORTER_ASSERT(reporter, editor != nullptr);
 
     // Move to end of "Hello World" (offset 11)
@@ -521,7 +520,7 @@ DEF_TEST(TextEditor_Invariant7_HeadlessInteractionSession, reporter) {
     constraints.max_width = 200.0f; // Constrain width so text wraps across multiple lines
 
     // 1. Initial Empty Controller
-    auto editor = TextEditorController::Make("", font, SkColor4f{0, 0, 0, 1}, constraints);
+    auto editor = std::make_unique<TextEditorViewModel>("", font, SkColor4f{0, 0, 0, 1}, constraints);
     REPORTER_ASSERT(reporter, editor != nullptr);
     REPORTER_ASSERT(reporter, editor->text().empty());
 
@@ -594,7 +593,7 @@ DEF_TEST(TextEditor_Invariant7_HeadlessInteractionSession, reporter) {
 DEF_TEST(TextEditor_Invariant7_HeadlessEventDispatch, reporter) {
     SkFont font;
     const std::string initialText = "Hello World";
-    auto editor = TextEditorController::Make(initialText, font);
+    auto editor = std::make_unique<TextEditorViewModel>(initialText, font);
     REPORTER_ASSERT(reporter, editor != nullptr);
 
     // 1. Simulate Normal Typing via handleChar: insert '!' at beginning
@@ -631,8 +630,8 @@ DEF_TEST(TextEditor_Invariant7_HeadlessEventDispatch, reporter) {
 DEF_TEST(TextEditor_Defect_NewlineNotRenderedAsTofu, reporter) {
     SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
 
-    auto editorA = TextEditorController::Make("A", font);
-    auto editorANewline = TextEditorController::Make("A\n", font);
+    auto editorA = std::make_unique<TextEditorViewModel>("A", font);
+    auto editorANewline = std::make_unique<TextEditorViewModel>("A\n", font);
     REPORTER_ASSERT(reporter, editorA != nullptr);
     REPORTER_ASSERT(reporter, editorANewline != nullptr);
 
@@ -679,7 +678,7 @@ DEF_TEST(TextEditor_Defect_VerticalCaretNavigationUpDown, reporter) {
     font.setSize(16.0f);
 
     // Two lines: "First Line\nSecond Line"
-    auto editor = TextEditorController::Make("First Line\nSecond Line", font);
+    auto editor = std::make_unique<TextEditorViewModel>("First Line\nSecond Line", font);
     REPORTER_ASSERT(reporter, editor != nullptr);
 
     // Caret starts at index 0 (Line 0, "First Line")
@@ -726,7 +725,7 @@ DEF_TEST(TextEditor_Defect_FontFallbackAndArabicGlyphShaping, reporter) {
     }
 
     // "مرحبا" (Arabic for "Hello")
-    auto editor = TextEditorController::Make("مرحبا", font);
+    auto editor = std::make_unique<TextEditorViewModel>("مرحبا", font);
     REPORTER_ASSERT(reporter, editor != nullptr);
 
     const auto& spatial = editor->spatial_index();
@@ -760,7 +759,7 @@ DEF_TEST(TextEditor_Defect_ZalgoGraphemeSingleStepNavigation, reporter) {
     // 'e' with 6 combining diacritics, followed by " X"
     const std::string zalgo = "e\xcc\x81\xcc\x80\xcc\x83\xcc\x82\xcc\x88\xcc\x8a";
     const std::string text = zalgo + " X";
-    auto editor = TextEditorController::Make(text, font);
+    auto editor = std::make_unique<TextEditorViewModel>(text, font);
     REPORTER_ASSERT(reporter, editor != nullptr);
 
     // Caret starts at index 0 (left of 'e')
@@ -794,7 +793,7 @@ DEF_TEST(TextEditor_Defect_ZalgoGraphemeSingleStepNavigation, reporter) {
     // Arabic letter Beh ('ب') with Shadda (U+0651) and Fatha (U+064E): 2 + 2 + 2 = 6 UTF-8 bytes
     const std::string arabicWithMarks = "\xd8\xa8\xd9\x91\xd9\x8e";
     const std::string arabicText = arabicWithMarks + " \xd8\xb9\xd8\xb1\xd8\xa8\xd9\x8a";
-    auto arabicEditor = TextEditorController::Make(arabicText, font);
+    auto arabicEditor = std::make_unique<TextEditorViewModel>(arabicText, font);
     REPORTER_ASSERT(reporter, arabicEditor != nullptr);
 
     // Single step forward along reading order (kTextLogical):
@@ -814,7 +813,7 @@ DEF_TEST(TextEditor_Invariant_CrossLayerStressPropagation, reporter) {
     SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
 
     for (const auto& tc : GetCrossLayerStressCorpus()) {
-        auto editor = TextEditorController::Make(tc.text, font);
+        auto editor = std::make_unique<TextEditorViewModel>(tc.text, font);
         REPORTER_ASSERT(reporter, editor != nullptr);
 
         // 1. Dual-Contract Formatting Check:

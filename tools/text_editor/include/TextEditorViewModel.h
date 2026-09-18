@@ -60,6 +60,8 @@ public:
     // Model Access (Fully Inlined)
     const TextDocument& document() const { return *fDocument; }
     TextDocument& document() { return *fDocument; }
+    std::string_view text() const { return fDocument->text(); }
+    const ParagraphSpatialIndex& spatial_index() const { return fDocument->spatial_index(); }
 
     // View Observation
     void setOnRedrawCallback(RedrawCallback cb) { fOnRedraw = std::move(cb); }

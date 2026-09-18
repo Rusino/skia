@@ -14,8 +14,8 @@
 #include "tools/fonts/FontToolUtils.h"
 #include "tools/sk_app/Application.h"
 #include "tools/sk_app/Window.h"
-#include "tools/text_editor/include/TextEditorController.h"
 #include "tools/text_editor/include/TextEditorPainter.h"
+#include "tools/text_editor/include/TextEditorViewModel.h"
 #include "tools/window/DisplayParams.h"
 
 using namespace sk_app;
@@ -26,6 +26,7 @@ public:
     TextEditorApp(int argc, char** argv, void* platformData)
         : fBackendType(Window::kRaster_BackendType)
         , fIsMouseDown(false)
+        , fPadding(24.0f)
     {
         SkGraphics::Init();
 
@@ -61,11 +62,15 @@ public:
         LayoutConstraints constraints;
         constraints.max_width = 760.0f;
 
-        fEditor = TextEditorController::Make(
+        fViewModel = std::make_unique<TextEditorViewModel>(
             initialText,
             font,
             SkColor4f{0.1f, 0.1f, 0.12f, 1.0f},
             constraints);
+
+        fViewModel->setOnRedrawCallback([this]() {
+            fWindow->inval();
+        });
     }
 
     ~TextEditorApp() override {
@@ -76,75 +81,69 @@ public:
     void onIdle() override {}
 
     void onBackendCreated() override {
-        fWindow->setTitle("Skia Text Editor (Project KEEPER)");
+        fWindow->setTitle("Skia Text Editor (Project KEEPER - MVVM)");
         fWindow->show();
         fWindow->inval();
     }
 
     void onResize(int width, int height) override {
-        if (fEditor) {
-            LayoutConstraints c = fEditor->constraints();
-            c.max_width = std::max(100.0f, static_cast<float>(width - 40));
-            fEditor->setConstraints(c);
+        if (fViewModel) {
+            LayoutConstraints c = fViewModel->document().constraints();
+            c.max_width = std::max(100.0f, static_cast<float>(width - 2 * fPadding));
+            fViewModel->document().setConstraints(c);
         }
         fWindow->inval();
     }
 
     void onPaint(SkSurface* surface) override {
-        if (!surface || !fEditor) {
+        if (!surface || !fViewModel) {
             return;
         }
         auto canvas = surface->getCanvas();
         canvas->clear(SkColorSetRGB(252, 252, 254));
 
+        canvas->save();
+        canvas->translate(fPadding, fPadding);
+
         PaintOptions options;
-        options.origin = SkPoint::Make(20.0f, 20.0f);
+        options.origin = SkPoint::Make(0, 0); // Text editor starts at (0, 0)
         options.caret_width = 2.0f;
         options.caret_color = SkColor4f{0.15f, 0.45f, 0.95f, 1.0f};
         options.selection_color = SkColor4f{0.75f, 0.85f, 1.0f, 0.5f};
         options.show_caret = true;
 
-        TextEditorPainter::Paint(canvas, *fEditor, options);
+        TextEditorPainter::Paint(canvas, *fViewModel, options);
+        canvas->restore();
     }
 
     bool onChar(SkUnichar c, skui::ModifierKey modifiers) override {
-        if (!fEditor) {
+        if (!fViewModel) {
             return false;
         }
-        if (fEditor->handleChar(c, modifiers)) {
-            fWindow->inval();
-            return true;
-        }
-        return false;
+        return fViewModel->handleChar(c, modifiers);
     }
 
     bool onKey(skui::Key key, skui::InputState state, skui::ModifierKey modifiers) override {
-        if (!fEditor) {
+        if (!fViewModel) {
             return false;
         }
-        if (fEditor->handleKey(key, state, modifiers)) {
-            fWindow->inval();
-            return true;
-        }
-        return false;
+        return fViewModel->handleKey(key, state, modifiers);
     }
 
     bool onMouse(int x, int y, skui::InputState state, skui::ModifierKey modifiers) override {
-        if (!fEditor) {
+        if (!fViewModel) {
             return false;
         }
         bool shift = (modifiers & skui::ModifierKey::kShift) != skui::ModifierKey::kNone;
-        SkScalar localX = x - 20.0f;
-        SkScalar localY = y - 20.0f;
+        SkScalar localX = static_cast<SkScalar>(x) - fPadding;
+        SkScalar localY = static_cast<SkScalar>(y) - fPadding;
 
         if (state == skui::InputState::kDown) {
             fIsMouseDown = true;
-            fEditor->moveCaretToPoint(localX, localY, shift);
-            fWindow->inval();
+            fViewModel->moveCaretToPoint(localX, localY, shift);
             return true;
         } else if (state == skui::InputState::kMove && fIsMouseDown) {
-            fEditor->moveCaretToPoint(localX, localY, true);
-            fWindow->inval();
+            fViewModel->moveCaretToPoint(localX, localY, true);
             return true;
         } else if (state == skui::InputState::kUp) {
             fIsMouseDown = false;
@@ -156,8 +155,9 @@ public:
 private:
     Window* fWindow;
     Window::BackendType fBackendType;
-    std::unique_ptr<TextEditorController> fEditor;
+    std::unique_ptr<TextEditorViewModel> fViewModel;
     bool fIsMouseDown;
+    SkScalar fPadding;
 };
 
 Application* Application::Create(int argc, char** argv, void* platformData) {

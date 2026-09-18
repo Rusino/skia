@@ -55,7 +55,7 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 ## Domain Invariant 5: BiDi Directional Navigation & Caret Hit-Testing
 
 1. **Dual Navigation Modes**:
-   `ParagraphSpatialIndex::moveCaret` and `TextEditorController::moveCaret` must accept `NavigationMode`:
+   `ParagraphSpatialIndex::moveCaret` and `TextEditorViewModel::moveCaret` must accept `NavigationMode`:
    - `kScreenPhysical`: Arrow keys move visually on screen (Right = visual right, Left = visual left).
    - `kTextLogical`: Arrow keys advance along reading/buffer order (Right = `text_index + 1`, which moves visually leftward inside RTL Arabic/Hebrew runs).
 2. **Vertical Caret Navigation (Arrow Up / Down)**:
@@ -68,9 +68,9 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 ## Domain Invariant 6: Headless Event Dispatch & Modifier Shielding
 
 1. **The Anti-Glue Law for Input Handling**:
-   All keyboard and character handling logic (`handleKey`, `handleChar`) must live inside `TextEditorController`, decoupled from OS window glue (`sk_app::Window`).
+   All keyboard and character handling logic (`handleKey`, `handleChar`) must live inside `TextEditorViewModel`, decoupled from OS window glue (`sk_app::Window`).
 2. **Modifier Shielding (Ctrl/Cmd Shortcut Isolation)**:
-   When a shortcut key is dispatched (e.g. `Ctrl+A` / `Cmd+A`), the controller must consume the event and shield the text buffer from subsequent character inputs (`onChar('a')`), preventing accidental buffer overwrites.
+   When a shortcut key is dispatched (e.g. `Ctrl+A` / `Cmd+A`), the ViewModel must consume the event and shield the text buffer from subsequent character inputs (`onChar('a')`), preventing accidental buffer overwrites.
 
 ---
 

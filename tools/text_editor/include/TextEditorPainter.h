@@ -15,8 +15,6 @@
 
 namespace skia::text_editor {
 
-class TextEditorController;
-
 struct PaintOptions {
     SkColor4f selection_color = SkColor4f{0.26f, 0.52f, 0.96f, 0.35f};
     SkColor4f caret_color = SkColor4f{0.1f, 0.4f, 0.9f, 1.0f};
@@ -33,9 +31,6 @@ struct PaintOptions {
 class TextEditorPainter {
 public:
     static void Paint(SkCanvas* canvas, const TextEditorViewModel& viewModel, const PaintOptions& options = {});
-
-    // Backward compatibility adapter during migration
-    static void Paint(SkCanvas* canvas, const TextEditorController& controller, const PaintOptions& options = {});
 };
 
 } // namespace skia::text_editor
