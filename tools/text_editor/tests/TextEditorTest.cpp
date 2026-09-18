@@ -1091,6 +1091,62 @@ DEF_TEST(TextEditor_Invariant12_CrossDirectionalBiDiDragSelection, reporter) {
     REPORTER_ASSERT(reporter, textAfter.find("\xd9\x85") != std::string::npos);
 }
 
+// =============================================================================
+// TRAP 21: Domain Invariant 13 - Single-Source Render Projection & Painter Purity
+// =============================================================================
+class RectRecordingCanvas : public SkCanvas {
+public:
+    RectRecordingCanvas(const SkBitmap& bm) : SkCanvas(bm) {}
+    std::vector<SkRect> drawnRects;
+
+protected:
+    void onDrawRect(const SkRect& rect, const SkPaint& paint) override {
+        if (paint.getStyle() == SkPaint::kFill_Style) {
+            drawnRects.push_back(rect);
+        }
+        SkCanvas::onDrawRect(rect, paint);
+    }
+};
+
+DEF_TEST(TextEditor_Invariant13_PainterPurityOnBiDiDrag, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    const std::string text = "Hello \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7";
+    auto vm = std::make_unique<TextEditorViewModel>(text, font);
+
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, !lines.empty());
+    const auto& line = lines[0];
+
+    std::vector<SkRect> spaceRects;
+    vm->document().spatial_index().getSelectionRects(TextRange(TextIndex(5), TextIndex(6)), spaceRects);
+    REPORTER_ASSERT(reporter, !spaceRects.empty());
+    SkScalar spaceX = spaceRects[0].centerX();
+
+    // Drag from space 15px to the right:
+    vm->moveCaretToPoint(spaceX, line.bounds.centerY(), false);
+    SkScalar dragX = spaceRects[0].fRight + 15.0f;
+    vm->moveCaretToPoint(dragX, line.bounds.centerY(), true);
+
+    // Record what TextEditorPainter actually draws!
+    SkBitmap bitmap;
+    bitmap.allocN32Pixels(500, 200);
+    RectRecordingCanvas canvas(bitmap);
+    PaintOptions options;
+    TextEditorPainter::Paint(&canvas, *vm, options);
+
+    REPORTER_ASSERT(reporter, !canvas.drawnRects.empty());
+    SkScalar maxDrawnRight = canvas.drawnRects[0].fRight;
+    for (const auto& r : canvas.drawnRects) {
+        maxDrawnRight = std::max(maxDrawnRight, r.fRight);
+    }
+
+    // HOSTILE GATE A ASSERTION:
+    // TextEditorPainter must draw STRICTLY what the user dragged across!
+    // It must NEVER expand to line.content_width!
+    REPORTER_ASSERT(reporter, maxDrawnRight <= dragX + 20.0f);
+    REPORTER_ASSERT(reporter, maxDrawnRight < line.content_width - 15.0f);
+}
+
 
 
 

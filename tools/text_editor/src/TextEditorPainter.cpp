@@ -25,17 +25,17 @@ void TextEditorPainter::Paint(
     canvas->translate(options.origin.fX - viewModel.scrollOffset().fX,
                       options.origin.fY - viewModel.scrollOffset().fY);
 
-    // 1. Draw Selection Rectangles
+    // 1. Draw Selection Rectangles (Pure Consumer of ViewModel Projection - Invariant 13)
     if (!viewModel.selection().is_collapsed()) {
-        std::vector<SkRect> selRects;
-        viewModel.document().spatial_index().getSelectionRects(
-            viewModel.selection().text_range(), selRects);
-
         SkPaint selPaint;
         selPaint.setColor4f(options.selection_color);
         selPaint.setStyle(SkPaint::kFill_Style);
 
-        for (const auto& r : selRects) {
+        // Note: canvas is already translated by (-scrollOffset), and screenSelectionRects()
+        // provides screen-space rects (which already include -scrollOffset).
+        // Since canvas has translate(-scrollOffset), we draw document-space rects or compensate:
+        for (SkRect r : viewModel.screenSelectionRects()) {
+            r.offset(viewModel.scrollOffset().fX, viewModel.scrollOffset().fY);
             canvas->drawRect(r, selPaint);
         }
     }

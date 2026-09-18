@@ -150,3 +150,13 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 3. **Inverted Topological Deletion Order**:
    - Deletion of a discontinuous selection (via Backspace, Delete, or character replacement) must execute against the underlying document in reverse logical order (from highest byte offset down to lowest byte offset).
    - Deletion must remove strictly and exclusively the bytes corresponding to the physically highlighted glyphs, leaving unselected logical segments of adjacent runs structurally intact.
+
+---
+
+## Domain Invariant 13: Single-Source Render Projection & Painter Purity
+
+1. **Passive Projection Consumer Invariant**:
+   - `TextEditorPainter` is strictly a passive consumer of `TextEditorViewModel` projections. It is strictly prohibited from recalculating geometry, querying `ParagraphSpatialIndex`, or constructing `TextRange` spans internally.
+   - All visual elements (selection rectangles, caret bounds) must be queried directly from `viewModel.screenSelectionRects()` and `viewModel.screenCaretRect()`.
+2. **Dual-Contract Canvas Testing Requirement**:
+   - Every regression trap or interactive test that validates cursor movement or text selection must assert BOTH the ViewModel geometry (`screenSelectionRects()`) AND the actual rendered primitives produced by passing a headless/mock canvas to `TextEditorPainter::Paint()`.
