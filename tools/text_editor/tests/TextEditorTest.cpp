@@ -11,6 +11,7 @@
 #include "include/core/SkFontMetrics.h"
 #include "include/core/SkFontMgr.h"
 #include "include/core/SkTypeface.h"
+#include "src/base/SkUTF.h"
 #include "tests/Test.h"
 #include "tools/fonts/FontToolUtils.h"
 #include "tools/text_editor/include/EditorTypes.h"
@@ -1002,9 +1003,34 @@ DEF_TEST(TextEditor_Invariant11_BiDiClusterHitTestingAndDrag, reporter) {
     REPORTER_ASSERT(reporter, !lines.empty());
     const auto& line = lines[0];
 
+    // Explicit Invariant 11 Check: Hit-testing within an RTL cluster MUST invert edges!
+    // Arabic text is bytes [8..18).
+    // Letter 'م' (start of Arabic word) is at bytes [8, 10).
+    // Letter 'ا' (end of Arabic word) is at bytes [16, 18).
+    const auto& spatial = vm->document().spatial_index();
+    std::vector<SkRect> firstLetterRects;
+    std::vector<SkRect> lastLetterRects;
+    spatial.getSelectionRects(TextRange(TextIndex(8), TextIndex(10)), firstLetterRects);
+    spatial.getSelectionRects(TextRange(TextIndex(16), TextIndex(18)), lastLetterRects);
+    REPORTER_ASSERT(reporter, !firstLetterRects.empty());
+    REPORTER_ASSERT(reporter, !lastLetterRects.empty());
+
+    // In RTL, last letter 'ا' is visually to the LEFT of first letter 'م':
+    REPORTER_ASSERT(reporter, lastLetterRects[0].fLeft < firstLetterRects[0].fLeft);
+
+    // Hit-testing inside the left half of the last letter (RTL):
+    // Since last letter is RTL, its left half corresponds to its logical end (18):
+    CaretPosition hitLastLetterLeft = spatial.hitTest(lastLetterRects[0].fLeft + 1.0f, line.bounds.centerY());
+    REPORTER_ASSERT(reporter, hitLastLetterLeft.text_index.value == 18);
+
+    // Hit-testing inside the right half of the first letter (RTL):
+    // Since first letter is RTL, its right half corresponds to its logical start (8):
+    CaretPosition hitFirstLetterRight = spatial.hitTest(firstLetterRects[0].fRight - 1.0f, line.bounds.centerY());
+    REPORTER_ASSERT(reporter, hitFirstLetterRight.text_index.value == 8);
+
     // Dragging from X1 to X2 in Arabic text:
-    SkScalar x1 = line.content_width - 40.0f;
-    SkScalar x2 = line.content_width - 10.0f;
+    SkScalar x1 = lastLetterRects[0].fLeft;
+    SkScalar x2 = firstLetterRects[0].fRight;
     vm->moveCaretToPoint(x1, line.bounds.centerY(), false); // anchor
     vm->moveCaretToPoint(x2, line.bounds.centerY(), true);  // focus (dragged right)
 
@@ -1054,8 +1080,13 @@ DEF_TEST(TextEditor_Invariant12_CrossDirectionalBiDiDragSelection, reporter) {
     vm->moveCaretToPoint(spaceX, line.bounds.centerY(), false); // anchor
     REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
 
-    // Drag slightly to the right (e.g. 15px right of spaceX, entering the left edge of Arabic text):
-    SkScalar dragX = spaceRects[0].fRight + 15.0f;
+    // Find the left-most Arabic cluster (letter 'ا' at bytes [14, 16)):
+    std::vector<SkRect> alefRects;
+    vm->document().spatial_index().getSelectionRects(TextRange(TextIndex(14), TextIndex(16)), alefRects);
+    REPORTER_ASSERT(reporter, !alefRects.empty());
+
+    // Drag from space to center of final alef:
+    SkScalar dragX = alefRects[0].centerX();
     vm->moveCaretToPoint(dragX, line.bounds.centerY(), true); // focus
 
     REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
@@ -1072,14 +1103,12 @@ DEF_TEST(TextEditor_Invariant12_CrossDirectionalBiDiDragSelection, reporter) {
 
     // HOSTILE INVARIANT:
     // The selection MUST NOT jump to cover the entire line width or the entire Arabic word!
-    // The right edge of the selection MUST be close to dragX (+/- 1 cluster tolerance),
-    // and MUST NOT expand to line.content_width (which is > 50px further right)!
-    REPORTER_ASSERT(reporter, maxRight <= dragX + 20.0f);
+    REPORTER_ASSERT(reporter, maxRight <= alefRects[0].fRight + 2.0f);
     REPORTER_ASSERT(reporter, maxRight < line.content_width - 15.0f);
 
     // Verify Discontinuous Deletion:
-    // Deleting the selection must remove the space and the end-letter of the Arabic word,
-    // but the beginning of the Arabic word MUST remain intact!
+    // Deleting the selection must remove the space and the final letter 'ا',
+    // leaving "Hello" + "مرحب" ("Hello\xd9\x85\xd8\xb1\xd8\xad\xd8\xa8"):
     std::string textBefore = std::string(vm->document().text());
     vm->deleteBackward();
     std::string textAfter = std::string(vm->document().text());
@@ -1089,6 +1118,11 @@ DEF_TEST(TextEditor_Invariant12_CrossDirectionalBiDiDragSelection, reporter) {
     REPORTER_ASSERT(reporter, textAfter.rfind("Hello", 0) == 0);
     // Arabic first letter 'م' (0xd9 0x85) must still exist in textAfter!
     REPORTER_ASSERT(reporter, textAfter.find("\xd9\x85") != std::string::npos);
+
+    // Hardened Invariant 12: Deleted EXACTLY the space [5..6) and the final letter 'ا' [14..16).
+    const std::string expectedText = "Hello\xd9\x85\xd8\xb1\xd8\xad\xd8\xa8";
+    REPORTER_ASSERT(reporter, textAfter == expectedText);
+    REPORTER_ASSERT(reporter, SkUTF::CountUTF8(textAfter.data(), textAfter.size()) >= 0);
 }
 
 // =============================================================================
