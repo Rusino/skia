@@ -31,6 +31,29 @@ public:
     SkScalar width() const override { return fWidth; }
     SkScalar height() const override { return fHeight; }
 
+    void visitParagraphRuns(const SkRect& localClip, RenderRunVisitor visitor) const override {
+        if (!visitor) {
+            return;
+        }
+        for (const auto& line : fLines) {
+            if (!line.bounds.intersects(localClip)) {
+                continue;
+            }
+            for (const auto& vr : line.visual_runs) {
+                if (vr.glyph_ids.empty()) {
+                    continue;
+                }
+                RenderRun run{
+                    vr.font,
+                    vr.color,
+                    SkSpan<const SkGlyphID>(vr.glyph_ids),
+                    SkSpan<const SkPoint>(vr.glyph_positions),
+                };
+                visitor(run);
+            }
+        }
+    }
+
 private:
     void layout(const LayoutConstraints& constraints) {
         if (!fShaped) {
@@ -130,6 +153,20 @@ private:
             currentLine.ascent = lineAscent - maxZalgoTop;
             currentLine.descent = lineDescent + maxZalgoBottom;
             currentLine.total_width = lineWidth;
+
+            // Precompute flat glyph arrays for zero-allocation rendering
+            for (auto& vr : currentLine.visual_runs) {
+                vr.glyph_ids.reserve(vr.glyphs.size());
+                vr.glyph_positions.reserve(vr.glyphs.size());
+                SkScalar curGlyphX = vr.x_offset;
+                for (const auto& g : vr.glyphs) {
+                    if (!g.is_zero_width_control) {
+                        vr.glyph_ids.push_back(static_cast<SkGlyphID>(g.glyph_id));
+                        vr.glyph_positions.push_back(SkPoint::Make(curGlyphX + g.offset.fX, currentLine.baseline + g.offset.fY));
+                    }
+                    curGlyphX += g.advance.fX;
+                }
+            }
 
             yCursor += lineHeight;
             fLines.push_back(std::move(currentLine));

@@ -16,9 +16,10 @@
 #include "tools/text_editor/include/EditorTypes.h"
 #include "tools/text_editor/include/FormattedParagraph.h"
 #include "tools/text_editor/include/ParagraphSpatialIndex.h"
-#include "tools/text_editor/include/ShapedParagraph.h"
+#include "tools/text_editor/include/TextDocument.h"
 #include "tools/text_editor/include/TextEditorController.h"
 #include "tools/text_editor/include/TextEditorPainter.h"
+#include "tools/text_editor/include/TextEditorViewModel.h"
 #include "tools/text_editor/include/UnicodeParagraph.h"
 #include "tools/text_editor/tests/StressCorpus.h"
 
@@ -854,6 +855,112 @@ DEF_TEST(TextEditor_Invariant_CrossLayerStressPropagation, reporter) {
         }
         REPORTER_ASSERT(reporter, steps < kMaxSteps);
     }
+}
+
+// =============================================================================
+// TRAP 16: MVVM TextDocument Domain Invariants
+// =============================================================================
+DEF_TEST(TextEditor_MVVM_Model_DocumentInvariants, reporter) {
+    SkFont font = ToolUtils::DefaultPortableFont();
+    TextDocument doc("Hello World", font);
+
+    // 1. Initial State & Monotonic Revision
+    REPORTER_ASSERT(reporter, doc.text() == "Hello World");
+    REPORTER_ASSERT(reporter, doc.revision() == 0);
+    REPORTER_ASSERT(reporter, doc.styles().size() == 1);
+    REPORTER_ASSERT(reporter, doc.styles()[0].range.start.value == 0);
+    REPORTER_ASSERT(reporter, doc.styles()[0].range.end.value == 11);
+
+    // 2. Insert Mutation
+    doc.insert(TextIndex(5), ", Beautiful");
+    REPORTER_ASSERT(reporter, doc.text() == "Hello, Beautiful World");
+    REPORTER_ASSERT(reporter, doc.revision() == 1);
+    REPORTER_ASSERT(reporter, doc.styles()[0].range.end.value == doc.text().size());
+
+    // 3. Atomic Replace Mutation
+    TextRange replaceRange(TextIndex(7), TextIndex(16)); // "Beautiful"
+    doc.replace(replaceRange, "Brave");
+    REPORTER_ASSERT(reporter, doc.text() == "Hello, Brave World");
+    REPORTER_ASSERT(reporter, doc.revision() == 2);
+    REPORTER_ASSERT(reporter, doc.styles()[0].range.end.value == doc.text().size());
+
+    // 4. Erase Mutation
+    doc.erase(TextRange(TextIndex(5), TextIndex(12))); // ", Brave"
+    REPORTER_ASSERT(reporter, doc.text() == "Hello World");
+    REPORTER_ASSERT(reporter, doc.revision() == 3);
+
+    // 5. Streaming Visitor on Document
+    int runCount = 0;
+    size_t totalGlyphs = 0;
+    doc.visitDocumentRuns(SkRect::MakeXYWH(0, 0, 1000, 1000), [&](const RenderRun& run) {
+        ++runCount;
+        totalGlyphs += run.glyphs.size();
+        REPORTER_ASSERT(reporter, run.glyphs.size() == run.positions.size());
+    });
+    REPORTER_ASSERT(reporter, runCount > 0);
+    REPORTER_ASSERT(reporter, totalGlyphs > 0);
+}
+
+// =============================================================================
+// TRAP 17: MVVM TextEditorViewModel Presentation & Visitor
+// =============================================================================
+DEF_TEST(TextEditor_MVVM_ViewModel_PresentationAndVisitor, reporter) {
+    SkFont font = ToolUtils::DefaultPortableFont();
+    auto doc = std::make_unique<TextDocument>("The quick brown fox", font);
+    TextEditorViewModel vm(std::move(doc));
+
+    // 1. Initial state and headless caret
+    REPORTER_ASSERT(reporter, vm.document().text() == "The quick brown fox");
+    REPORTER_ASSERT(reporter, vm.selection().is_collapsed());
+    SkRect initialCaret = vm.screenCaretRect();
+    REPORTER_ASSERT(reporter, initialCaret.height() > 0);
+
+    // 2. Redraw notification observer
+    int redrawCount = 0;
+    vm.setOnRedrawCallback([&]() {
+        ++redrawCount;
+    });
+
+    vm.handleChar('!', skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, redrawCount == 1);
+    REPORTER_ASSERT(reporter, vm.document().text() == "!The quick brown fox");
+
+    // 3. Arrow movement (kTextLogical)
+    vm.handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, redrawCount == 2);
+    REPORTER_ASSERT(reporter, vm.selection().focus.text_index.value == 2);
+
+    // 4. Viewport Scroll and coordinate translation
+    vm.setScrollOffset(SkPoint::Make(50, 100));
+    REPORTER_ASSERT(reporter, vm.scrollOffset().fX == 50);
+    REPORTER_ASSERT(reporter, vm.scrollOffset().fY == 100);
+    SkRect shiftedCaret = vm.screenCaretRect();
+    REPORTER_ASSERT(reporter, std::abs((initialCaret.fTop - 100) - shiftedCaret.fTop) < 1.0f);
+
+    // 5. EnsureCaretVisible adjusts scroll offset
+    SkRect smallViewport = SkRect::MakeXYWH(0, 0, 20, 20);
+    vm.ensureCaretVisible(smallViewport);
+    REPORTER_ASSERT(reporter, vm.screenCaretRect().fLeft >= 0);
+
+    // 6. Streaming Visitor into Paint
+    SkBitmap bitmap;
+    bitmap.allocN32Pixels(400, 200);
+    SkCanvas canvas(bitmap);
+    canvas.clear(SK_ColorWHITE);
+
+    PaintOptions options;
+    TextEditorPainter::Paint(&canvas, vm, options);
+
+    // Must have non-empty pixels drawn (not pure white)
+    bool hasTextPixels = false;
+    for (int y = 0; y < bitmap.height() && !hasTextPixels; ++y) {
+        for (int x = 0; x < bitmap.width() && !hasTextPixels; ++x) {
+            if (bitmap.getColor(x, y) != SK_ColorWHITE) {
+                hasTextPixels = true;
+            }
+        }
+    }
+    REPORTER_ASSERT(reporter, hasTextPixels);
 }
 
 

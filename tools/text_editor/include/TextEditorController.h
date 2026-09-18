@@ -28,25 +28,6 @@
 namespace skia::text_editor {
 
 /**
- * EditorSelection represents the active cursor or selection range.
- * If anchor == focus, the selection is collapsed to a blinking caret.
- */
-struct EditorSelection {
-    CaretPosition anchor;
-    CaretPosition focus;
-
-    bool is_collapsed() const {
-        return anchor.text_index == focus.text_index && anchor.affinity == focus.affinity;
-    }
-
-    TextRange text_range() const {
-        TextIndex s = std::min(anchor.text_index, focus.text_index);
-        TextIndex e = std::max(anchor.text_index, focus.text_index);
-        return TextRange(s, e);
-    }
-};
-
-/**
  * TextEditorController maintains the mutable document text, styling,
  * selection state, and orchestrates full immutable rebuilds of Layers 1-4.
  */

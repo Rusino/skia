@@ -11,9 +11,11 @@
 #include "include/core/SkCanvas.h"
 #include "include/core/SkColor.h"
 #include "include/core/SkPoint.h"
-#include "tools/text_editor/include/TextEditorController.h"
+#include "tools/text_editor/include/TextEditorViewModel.h"
 
 namespace skia::text_editor {
+
+class TextEditorController;
 
 struct PaintOptions {
     SkColor4f selection_color = SkColor4f{0.26f, 0.52f, 0.96f, 0.35f};
@@ -24,12 +26,16 @@ struct PaintOptions {
 };
 
 /**
- * TextEditorPainter provides stateless rendering of document text,
- * selection bounding boxes, and carets onto an SkCanvas.
+ * TextEditorPainter (View in MVVM):
+ * Stateless rendering of document text lines, selection bounding boxes,
+ * and carets onto an SkCanvas using presentation data from TextEditorViewModel.
  */
 class TextEditorPainter {
 public:
-    static void Paint(SkCanvas* canvas, const TextEditorController& editor, const PaintOptions& options = {});
+    static void Paint(SkCanvas* canvas, const TextEditorViewModel& viewModel, const PaintOptions& options = {});
+
+    // Backward compatibility adapter during migration
+    static void Paint(SkCanvas* canvas, const TextEditorController& controller, const PaintOptions& options = {});
 };
 
 } // namespace skia::text_editor

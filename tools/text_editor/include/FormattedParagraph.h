@@ -10,6 +10,7 @@
 
 #include "tools/text_editor/include/EditorTypes.h"
 #include "tools/text_editor/include/ShapedParagraph.h"
+#include <functional>
 #include <memory>
 #include <vector>
 
@@ -25,6 +26,8 @@ struct VisualRun {
     SkColor4f color{0, 0, 0, 1};
     TextRange text_range;
     std::vector<ShapedGlyph> glyphs; // Holds shaped glyphs (including any terminal ellipsis glyph)
+    std::vector<SkGlyphID> glyph_ids;
+    std::vector<SkPoint> glyph_positions; // Absolute X, Y coordinates within paragraph
     SkScalar x_offset{0};            // Absolute X coordinate within paragraph (alignment baked in)
     SkScalar width{0};
     SkScalar ascent{0};
@@ -57,6 +60,15 @@ struct LayoutConstraints {
     TextAlign align{TextAlign::kLeft};
 };
 
+struct RenderRun {
+    const SkFont& font;
+    SkColor4f color{0, 0, 0, 1};
+    SkSpan<const SkGlyphID> glyphs;
+    SkSpan<const SkPoint> positions;
+};
+
+using RenderRunVisitor = std::function<void(const RenderRun& run)>;
+
 /**
  * Layer 3: Formatting Layer (Line Breaking & Layout)
  * Immutable multi-line layout with dynamic Zalgo ascent/descent expansion.
@@ -69,6 +81,11 @@ public:
     virtual SkSpan<const LineBox> lines() const = 0;
     virtual SkScalar width() const = 0;
     virtual SkScalar height() const = 0;
+
+    // Zero-allocation streaming visitor for paint layers (local paragraph coordinates)
+    virtual void visitParagraphRuns(
+        const SkRect& localClip,
+        RenderRunVisitor visitor) const = 0;
 
     // Factory method
     static std::unique_ptr<const FormattedParagraph> Make(

@@ -92,3 +92,25 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
    Stress test inputs (Zalgo stacked marks, Arabic vowels/tashkeel, Hebrew niqqud, multi-line mixed linebreaks, empty buffers) must reside in a centralized header (`StressCorpus.h`). All functional layers (Formatting, Spatial Navigation, Mutation) must systematically execute against this shared corpus to prevent partial-dimension testing blindspots.
 2. **Zero-Delta Phantom Navigation Prohibition**:
    Walking the caret across any non-empty text buffer must NEVER produce a zero-advance step where logical index advances while spatial position ($X, Y$) remains frozen. Every directional navigation step must produce non-zero visual motion or reach an authentic line/document boundary.
+
+---
+
+## Domain Invariant 9: Model-View-ViewModel (MVVM) Decoupling & Zero-Allocation Streaming Rendering
+
+1. **Model Domain Purity & Monotonic Revision**:
+   - `TextDocument` strictly encapsulates domain text, style spans, layout constraints, and the 4 immutable layout layers (`UnicodeParagraph`, `ShapedParagraph`, `FormattedParagraph`, `ParagraphSpatialIndex`).
+   - `TextDocument` contains zero knowledge of carets, selections, scroll offsets, blink timers, or windowing/rendering concepts.
+   - Every mutating operation (`insert`, `erase`, `replace`, `setStyles`, `setConstraints`) strictly increments `revision()` monotonically.
+2. **Atomic Replacement & Style Span Range Continuity**:
+   - Replacing text over an active non-collapsed selection must execute atomically via `replace(range, text)` with a single layout pipeline rebuild and single revision increment.
+   - Any mutation automatically shifts and truncates overlapping/subsequent `StyleSpan` ranges to prevent style drift.
+3. **Headless ViewModel Session Management**:
+   - `TextEditorViewModel` encapsulates interaction session state (selection, caret blinking, viewport scroll offset).
+   - All navigation and hit-testing queries on the hot path must execute without heap allocations ($O(1)$ allocations).
+   - High-level editing actions automatically synchronize caret position with the updated spatial index and notify the view via `RedrawCallback`.
+4. **Zero-Allocation Streaming Visitor Pipeline**:
+   - Rendering data is delivered via a coordinate-explicit streaming visitor hierarchy:
+     `FormattedParagraph::visitParagraphRuns(localClip, visitor)` $\to$
+     `TextDocument::visitDocumentRuns(docClip, visitor)` $\to$
+     `TextEditorViewModel::visitScreenRuns(screenClip, visitor)`.
+   - The visitor delivers pre-baked `SkSpan<const SkGlyphID>` and `SkSpan<const SkPoint>` directly to `SkCanvas::drawGlyphs`. Frame rendering must perform zero heap allocations in the draw loop.

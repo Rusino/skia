@@ -142,6 +142,28 @@ struct CaretPosition {
     }
 };
 
+struct EditorSelection {
+    CaretPosition anchor;
+    CaretPosition focus;
+
+    bool is_collapsed() const {
+        return anchor.text_index == focus.text_index && anchor.affinity == focus.affinity;
+    }
+
+    TextRange text_range() const {
+        TextIndex s = std::min(anchor.text_index, focus.text_index);
+        TextIndex e = std::max(anchor.text_index, focus.text_index);
+        return TextRange(s, e);
+    }
+
+    bool operator==(const EditorSelection& other) const {
+        return anchor == other.anchor && focus == other.focus;
+    }
+    bool operator!=(const EditorSelection& other) const {
+        return !(*this == other);
+    }
+};
+
 } // namespace skia::text_editor
 
 #endif // EditorTypes_DEFINED
