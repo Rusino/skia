@@ -1181,6 +1181,89 @@ DEF_TEST(TextEditor_Invariant13_PainterPurityOnBiDiDrag, reporter) {
     REPORTER_ASSERT(reporter, maxDrawnRight < line.content_width - 15.0f);
 }
 
+// =============================================================================
+// TRAP 22 (Invariant 14): Enter Key Splits Line, Updates Document & Advances Caret
+// =============================================================================
+DEF_TEST(TextEditor_Invariant14_EnterKeySplitsLineAndAdvancesCaret, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    auto vm = std::make_unique<TextEditorViewModel>("HelloWorld", font);
+
+    // Position caret between "Hello" and "World" (index 5)
+    vm->setSelection(CaretPosition{TextIndex(5), Affinity::kDownstream, SkRect::MakeEmpty()},
+                     CaretPosition{TextIndex(5), Affinity::kDownstream, SkRect::MakeEmpty()});
+
+    // Simulate Enter Key press
+    bool handled = vm->handleKey(skui::Key::kOK, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, handled);
+
+    // Assert document text is split
+    REPORTER_ASSERT(reporter, vm->text() == "Hello\nWorld");
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, lines.size() == 2);
+
+    // Assert caret advanced to start of second line (index 6, which is start of "World")
+    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(6));
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+
+    // Second line caret rect must have Y below first line
+    SkRect caretRect = vm->screenCaretRect();
+    REPORTER_ASSERT(reporter, caretRect.fTop >= lines[0].bounds.fBottom);
+}
+
+// =============================================================================
+// TRAP 23 (Invariant 14): Tab Key Inserts Immediate Soft Spaces Modulo 4
+// =============================================================================
+DEF_TEST(TextEditor_Invariant14_TabKeyInsertsSoftSpaces, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    auto vm = std::make_unique<TextEditorViewModel>("", font);
+
+    // 1. Tab at column 0 -> must insert 4 soft spaces
+    bool tab1 = vm->handleKey(skui::Key::kTab, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, tab1);
+    REPORTER_ASSERT(reporter, vm->text() == "    ");
+    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(4));
+
+    // 2. Type "a" (column becomes 5)
+    vm->handleChar('a', skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, vm->text() == "    a");
+    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(5));
+
+    // 3. Tab at column 5 -> (4 - (5 % 4)) = 3 soft spaces
+    bool tab2 = vm->handleKey(skui::Key::kTab, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, tab2);
+    REPORTER_ASSERT(reporter, vm->text() == "    a   ");
+    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(8));
+}
+
+// =============================================================================
+// TRAP 24 (Invariant 14): Control Character Sanitization & Shaping Format Preservation
+// =============================================================================
+DEF_TEST(TextEditor_Invariant14_ControlCharacterSanitizationAndShapingPreservation, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    auto vm = std::make_unique<TextEditorViewModel>("", font);
+
+    // Ingest noisy text: null bytes, BELL, ESC, DEL, and Windows CRLF
+    const char noisyData[] = "A\0B\x07\x1b\x7f\r\nC\rD";
+    std::string_view explicitNoisy(noisyData, sizeof(noisyData) - 1);
+
+    vm->insertText(explicitNoisy);
+
+    // Expected sanitization:
+    // \0, \x07, \x1b, \x7f dropped
+    // \r\n normalized to \n
+    // single \r normalized to \n
+    // Result: "AB\nC\nD"
+    REPORTER_ASSERT(reporter, vm->text() == "AB\nC\nD");
+    REPORTER_ASSERT(reporter, vm->document().formatted().lines().size() == 3);
+
+    // Verify Shaping Format Controls preservation (ZWJ U+200D: \xE2\x80\x8D, ZWNJ U+200C: \xE2\x80\x8C)
+    auto vmBidi = std::make_unique<TextEditorViewModel>("", font);
+    std::string persianText = "\xd9\x85\xe2\x80\x8c\xd8\xae\xd9\x88\xd8\xa7\xd9\x87\xd9\x85"; // "می‌خواهم" with ZWNJ
+    vmBidi->insertText(persianText);
+    REPORTER_ASSERT(reporter, vmBidi->text() == persianText);
+    REPORTER_ASSERT(reporter, SkUTF::CountUTF8(vmBidi->text().data(), vmBidi->text().size()) > 0);
+}
+
 
 
 

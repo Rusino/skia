@@ -151,8 +151,6 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
    - Deletion of a discontinuous selection (via Backspace, Delete, or character replacement) must execute against the underlying document in reverse logical order (from highest byte offset down to lowest byte offset).
    - Deletion must remove strictly and exclusively the bytes corresponding to the physically highlighted glyphs, leaving unselected logical segments of adjacent runs structurally intact.
 
----
-
 ## Domain Invariant 13: Single-Source Render Projection & Painter Purity
 
 1. **Passive Projection Consumer Invariant**:
@@ -160,3 +158,18 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
    - All visual elements (selection rectangles, caret bounds) must be queried directly from `viewModel.screenSelectionRects()` and `viewModel.screenCaretRect()`.
 2. **Dual-Contract Canvas Testing Requirement**:
    - Every regression trap or interactive test that validates cursor movement or text selection must assert BOTH the ViewModel geometry (`screenSelectionRects()`) AND the actual rendered primitives produced by passing a headless/mock canvas to `TextEditorPainter::Paint()`.
+
+---
+
+## Domain Invariant 14: Control Character Ingestion, Line Splitting & Immediate Soft-Tab Normalization
+
+1. **Document Structure Control Separation**:
+   - The Enter / Return keyboard event (`skui::Key::kOK` or `skui::Key::kReturn`) is a structural document command. It must split lines/paragraphs atomically by invoking `insertText("\n")`.
+   - Newline sequences (`\r\n` or single `\r`) from external ingest must be normalized to `\n` before reaching downstream layers or shaping engines.
+2. **Immediate Soft-Tab Normalization**:
+   - The Tab keyboard event (`skui::Key::kTab`) must not inject raw `0x09` bytes into the font shaping engine.
+   - Tab must immediately resolve to $N$ soft-space characters (`0x20`), where $N = \text{tabSize} - (\text{column} \pmod{\text{tabSize}})$, with $\text{tabSize} = 4$.
+   - Any raw `\t` encountered in external text ingest must likewise be normalized into appropriate soft spaces.
+3. **Control Character Noise Elimination & Shaping Control Preservation**:
+   - Destructive or noisy control codes (ASCII `0x00–0x1F` other than `\n`, `0x7F` DEL, C1 controls) must be sanitized and rejected upon ingest.
+   - Unicode Format Controls (`Cf` category, including ZWJ `U+200D`, ZWNJ `U+200C`, LRM `U+200E`, RLM `U+200F`) are strictly preserved as essential typographical inputs for HarfBuzz and BiDi analysis.

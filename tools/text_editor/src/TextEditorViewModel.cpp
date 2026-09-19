@@ -38,7 +38,79 @@ TextEditorViewModel::TextEditorViewModel(
     updateCursorPosition(0);
 }
 
+namespace {
+
+// Sanitizes input text per Domain Invariant 14:
+// - Normalizes \r\n and single \r to \n
+// - Expands \t to 4 soft spaces
+// - Drops ASCII C0 (< 32, except \n), DEL (127), and binary nulls
+// - Preserves all valid UTF-8 sequences including Unicode Format Controls (Cf, like ZWJ/ZWNJ/LRM/RLM)
+std::string SanitizeInputText(std::string_view raw) {
+    std::string sanitized;
+    sanitized.reserve(raw.size());
+
+    const char* ptr = raw.data();
+    const char* end = ptr + raw.size();
+
+    while (ptr < end) {
+        // Check for CRLF or CR
+        if (*ptr == '\r') {
+            ptr++;
+            if (ptr < end && *ptr == '\n') {
+                ptr++;
+            }
+            sanitized.push_back('\n');
+            continue;
+        }
+
+        // Check for Tab
+        if (*ptr == '\t') {
+            sanitized.append("    ");
+            ptr++;
+            continue;
+        }
+
+        // Check single-byte ASCII
+        unsigned char byte = static_cast<unsigned char>(*ptr);
+        if (byte < 0x80) {
+            if (byte == '\n' || byte >= 32) {
+                if (byte != 0x7F) { // Exclude DEL
+                    sanitized.push_back(static_cast<char>(byte));
+                }
+            }
+            ptr++;
+            continue;
+        }
+
+        // Multi-byte UTF-8 sequence
+        const char* prev = ptr;
+        SkUnichar u = SkUTF::NextUTF8(&ptr, end);
+        if (u < 0) {
+            // Invalid UTF-8 sequence, skip bad byte
+            ptr = prev + 1;
+            continue;
+        }
+
+        // Exclude Unicode C1 controls (0x80 - 0x9F)
+        if (u >= 0x80 && u <= 0x9F) {
+            continue;
+        }
+
+        // Append valid multi-byte sequence (includes Cf category like ZWJ/ZWNJ/LRM/RLM)
+        sanitized.append(prev, ptr - prev);
+    }
+
+    return sanitized;
+}
+
+} // namespace
+
 void TextEditorViewModel::insertText(std::string_view utf8_text) {
+    std::string sanitized = SanitizeInputText(utf8_text);
+    if (sanitized.empty()) {
+        return;
+    }
+
     if (!fSelection.is_collapsed()) {
         if (!fSelection.ranges.empty()) {
             // Delete ranges in reverse order
@@ -47,21 +119,44 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
             }
             size_t insertPos = fSelection.ranges.front().start.value;
             fSelection.ranges.clear();
-            fDocument->insert(TextIndex(insertPos), utf8_text);
-            updateCursorPosition(insertPos + utf8_text.size());
+            fDocument->insert(TextIndex(insertPos), sanitized);
+            // Move caret via spatial index hit-test/moveCaret to ensure accurate multi-line caret_rect
+            size_t finalCaret = insertPos + sanitized.size();
+            updateCursorPosition(finalCaret);
+            CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
+                fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
+            if (accuratePos.text_index.value == finalCaret) {
+                fSelection.anchor = accuratePos;
+                fSelection.focus = accuratePos;
+            }
         } else {
             TextRange range = fSelection.text_range();
             size_t start = range.start.value;
-            fDocument->replace(range, utf8_text);
-            updateCursorPosition(start + utf8_text.size());
+            fDocument->replace(range, sanitized);
+            size_t finalCaret = start + sanitized.size();
+            updateCursorPosition(finalCaret);
+            CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
+                fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
+            if (accuratePos.text_index.value == finalCaret) {
+                fSelection.anchor = accuratePos;
+                fSelection.focus = accuratePos;
+            }
         }
     } else {
         size_t pos = std::min(fSelection.focus.text_index.value, fDocument->text().size());
-        fDocument->insert(TextIndex(pos), utf8_text);
-        updateCursorPosition(pos + utf8_text.size());
+        fDocument->insert(TextIndex(pos), sanitized);
+        size_t finalCaret = pos + sanitized.size();
+        updateCursorPosition(finalCaret);
+        CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
+            fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
+        if (accuratePos.text_index.value == finalCaret) {
+            fSelection.anchor = accuratePos;
+            fSelection.focus = accuratePos;
+        }
     }
     notifyRedraw();
 }
+
 
 void TextEditorViewModel::deleteBackward(MovementGranularity gran) {
     if (!fSelection.is_collapsed()) {
@@ -272,11 +367,41 @@ bool TextEditorViewModel::handleKey(skui::Key key, skui::InputState state, skui:
                 return true;
             }
             break;
+        case skui::Key::kOK:
+            insertText("\n");
+            return true;
+        case skui::Key::kTab: {
+            // Immediate Soft-Tab Normalization:
+            // Calculate column offset from start of line
+            std::string_view fullText = fDocument->text();
+            size_t cursor = std::min(fSelection.focus.text_index.value, fullText.size());
+            size_t lineStart = 0;
+            if (cursor > 0) {
+                size_t lastNewline = fullText.rfind('\n', cursor - 1);
+                if (lastNewline != std::string_view::npos) {
+                    lineStart = lastNewline + 1;
+                }
+            }
+            // Count codepoints from lineStart to cursor
+            size_t col = 0;
+            const char* p = fullText.data() + lineStart;
+            const char* end = fullText.data() + cursor;
+            while (p < end) {
+                SkUTF::NextUTF8(&p, end);
+                col++;
+            }
+            constexpr size_t kTabSize = 4;
+            size_t spacesNeeded = kTabSize - (col % kTabSize);
+            std::string spaces(spacesNeeded, ' ');
+            insertText(spaces);
+            return true;
+        }
         default:
             break;
     }
     return false;
 }
+
 
 bool TextEditorViewModel::handleChar(SkUnichar c, skui::ModifierKey modifiers) {
     if ((modifiers & (skui::ModifierKey::kControl | skui::ModifierKey::kCommand)) != skui::ModifierKey::kNone) {
@@ -335,9 +460,19 @@ void TextEditorViewModel::updateCursorPosition(size_t index) {
 
     const auto& lines = fDocument->formatted().lines();
     if (!lines.empty()) {
-        const auto& firstLine = lines[0];
-        SkScalar caretTop = firstLine.baseline + firstLine.typographic_ascent;
-        SkScalar caretHeight = std::abs(firstLine.typographic_ascent) + std::abs(firstLine.typographic_descent);
+        const auto* targetLine = &lines[0];
+        for (const auto& line : lines) {
+            if (index >= line.text_range.start.value && index < line.text_range.end.value) {
+                targetLine = &line;
+                break;
+            }
+        }
+        if (index >= lines.back().text_range.end.value) {
+            targetLine = &lines.back();
+        }
+
+        SkScalar caretTop = targetLine->baseline + targetLine->typographic_ascent;
+        SkScalar caretHeight = std::abs(targetLine->typographic_ascent) + std::abs(targetLine->typographic_descent);
         if (caretHeight <= 0.0f) {
             caretHeight = 16.0f;
         }
@@ -352,9 +487,11 @@ void TextEditorViewModel::updateCursorPosition(size_t index) {
             std::vector<SkRect> rects;
             fDocument->spatial_index().getSelectionRects(TextRange(TextIndex(index), TextIndex(index + 1)), rects);
             if (!rects.empty()) {
-                pos.caret_rect = SkRect::MakeXYWH(rects[0].fLeft, caretTop, 1.0f, caretHeight);
+                SkScalar h = rects[0].height() > 0.0f ? rects[0].height() : caretHeight;
+                pos.caret_rect = SkRect::MakeXYWH(rects[0].fLeft, rects[0].fTop, 1.0f, h);
             } else {
-                pos.caret_rect = SkRect::MakeXYWH(firstLine.bounds.fLeft, caretTop, 1.0f, caretHeight);
+                SkScalar x = (index > targetLine->text_range.start.value) ? targetLine->bounds.fRight : targetLine->bounds.fLeft;
+                pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
             }
         }
     }
