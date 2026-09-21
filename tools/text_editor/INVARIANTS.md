@@ -284,7 +284,7 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 
 ---
 
-## Domain Invariant 21: BiDi Deletion Caret Continuity & Boundary Retention
+## Domain Invariant 21: BiDi Mutation Caret Continuity & Explicit Affinity (Deletion & Insertion)
 
 1. **Physical Deletion Boundary Retention**:
    - When deleting a selection within or across BiDi (RTL/LTR) runs via `deleteBackward()` or `deleteForward()`, the resulting caret must remain at the exact physical visual cut boundary where the deletion occurred.
@@ -298,3 +298,6 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
    - It is strictly prohibited to attach the caret to the downstream following cluster or jump to the visual opposite boundary of an adjacent BiDi run.
 5. **Prohibition of Synthetic Caret Post-Adjustment**:
    - `insertText` must directly and atomically compute the correct caret geometry via `updateCursorPosition(finalCaret, Affinity::kUpstream)`. Calling synthetic adjustments (such as `moveCaret(..., kRight, ...)`) after insertion is strictly prohibited.
+6. **Prohibition of Affinity-Free Coordinate Queries**:
+   - Any internal or ViewModel method resolving or updating caret positions (`resolveCaretPosition`, `updateCursorPosition`) MUST explicitly accept and propagate `Affinity`.
+   - Ad-hoc boolean branching like `index == text.size() ? kUpstream : kDownstream` is strictly prohibited on discontinuous/BiDi boundaries; caller intent (e.g. typing vs navigation) must dictate affinity.

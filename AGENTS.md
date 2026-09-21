@@ -106,6 +106,17 @@ You are acting as an engine in **Project KEEPER**.
    (c) **Gate A Pre-Flight Certificate Requirement**: The Artificer subagent may NEVER be launched to write or modify implementation logic until The Trapsmith subagent has executed against unmodified code and returned an authentic, verified failing test log (`Assert: Test(Defect) == FAIL`). Launching implementation without a verified Gate A log constitutes an immediate constitutional breach.
    (d) **The Dual-Contract Mechanical Enforcement Rule**: Every unit test validating mutations (`deleteBackward`, `deleteForward`, `insertText`, `moveCaret`) MUST explicitly assert spatial output geometry (`fLeft`, `bounds`, $X, Y$ coordinates). Any test asserting solely boolean status flags (`is_collapsed()`, `ranges().empty()`) without spatial verification is classified as a Ghost Test and immediately rejected.
 
+19. **The Mutation Symmetry & Dual-Primitive Protocol (Anti-Asymmetry Law)**:
+   To prevent operational blind spots where an invariant is fixed on one editing primitive but left broken on its symmetric dual:
+   (a) **Mandatory Mutation Quad Coverage**: Whenever a defect or spatial invariant is identified on a text-mutating operation, verification and contract updates MUST apply symmetrically across the entire Mutation Quad:
+       $$\{\text{insertText}, \text{deleteBackward}, \text{deleteForward}, \text{replaceSelection}\}$$
+   (b) **Prohibition of Asymmetric Certification**: The Trapsmith is strictly prohibited from certifying an invariant or bugfix exclusively on deletion or exclusively on insertion. The characterization trap matrix must parameterize and assert spatial continuity across both insertion and deletion operations under identical dimensional/BiDi boundary conditions.
+
+20. **The Heterogeneous Boundary & Anti-Smearing Law**:
+   To prevent ghost test scaffolding where neutral characters artificially mask coordinate divergence:
+   (a) **Direct Heterogeneous Junction Mandate**: When testing spatial transitions, caret positioning, or selection continuity across directional (BiDi), font-fallback, or script boundaries, test scaffolding MUST construct direct adjacent heterogeneous junctions ($A \cdot B$) without intervening neutral buffer characters (ASCII whitespace, punctuation, formatting marks) that could collapse dual coordinates.
+   (b) **Mandatory Theoretical Delta Threshold**: Before certifying a Gate A trap on discontinuous boundaries (such as BiDi transitions where Upstream vs Downstream coordinates diverge), The Trapsmith must assert that the expected coordinate delta on broken code strictly exceeds the testing tolerance ($\Delta > \text{tolerance}$), proving that the trap is physically capable of catching the defect.
+
 ### 1.5 The Two-Tier Invariant Hierarchy (Master Codex vs. Local Domain Invariants)
 
 Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
