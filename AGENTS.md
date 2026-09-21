@@ -269,10 +269,11 @@ The Censor executes constitutional hygiene under strict anti-fossilization and a
 5. **The Invariant Preservation Theorem ($\mathcal{N}' \supseteq \mathcal{N}$)**:
    - For any proposed codex transformation, the set of prohibited behaviors must not decrease: $\mathcal{N}(\text{Codex}') \supseteq \mathcal{N}(\text{Codex})$.
    - The Censor must construct an explicit **Semantic Equivalence Table** and cite historical defect lineage (proving counter-factual resistance to past bugs).
-6. **The Inquisitor Pruning Counter-Audit**:
-   - The Censor emits a Constitutional Pruning RFC. Prior to presenting it to The Overgod, The Invariant Inquisitor executes an adversarial counter-audit, generating a **Lost Constraint Ledger**. Only RFCs with a clean Inquisitor verdict may proceed to Overgod ratification. Zero autonomous rule-committing authority.
+6. **The Inquisitor Pruning Counter-Audit & Strict Physical Artifact Boundary**:
+   - The Censor is **strictly prohibited from directly modifying `AGENTS.md` or `INVARIANTS.md` in-place**, and strictly prohibited from running `git commit`. Its sole output artifact MUST be a formal RFC written to `docs/rfcs/RFC-<id>-constitutional-pruning.md`.
+   - Prior to presenting the RFC to The Overgod, The Invariant Inquisitor executes an adversarial counter-audit, generating a **Lost Constraint Ledger**. Only RFCs with a clean Inquisitor verdict may proceed to Overgod ratification. Zero autonomous rule-committing authority.
 7. **The Invariant Immunity Period (Anti-Ping-Pong Rule)**:
-   - Any rule, axiom, or domain invariant enacted by The Coroner following an escape inquest is granted mandatory constitutional immunity for at least **2 subsequent milestones** (or 30 days). The Censor is strictly prohibited from proposing mergers, abstractions, or deletions of an immune invariant, ensuring the rule has sufficient real-world battle-testing.
+   - Any rule, axiom, or domain invariant enacted by The Coroner following an escape inquest is granted mandatory constitutional immunity for at least **2 subsequent milestones** (or 30 days). The Censor is strictly prohibited from proposing mergers, abstractions, or deletions of an immune invariant, ensuring the rule has sufficient real-world battle-tested stability.
 
 ### Phase 10: The Interactive Hand-off Directive
 Upon completing implementation, passing tests, and committing locally:
