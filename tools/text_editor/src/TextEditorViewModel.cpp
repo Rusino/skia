@@ -646,6 +646,18 @@ void TextEditorViewModel::cutSelection() {
 }
 
 void TextEditorViewModel::pasteText(std::string_view raw) {
+    if (raw.empty()) {
+        return;
+    }
+    // Smart Duplicate Invariant:
+    // If the active selection is non-collapsed and its content is identical to the pasted payload,
+    // collapse the selection to its end (right edge) and insert the text adjacent to it.
+    // This allows immediate duplication via Ctrl+C -> Ctrl+V without requiring manual cursor movement!
+    if (!fSelection.is_collapsed() && raw == copySelection()) {
+        TextRange r = fSelection.text_range();
+        size_t rightEdge = std::max(r.start.value, r.end.value);
+        collapseTo(CaretPosition{TextIndex(rightEdge), Affinity::kDownstream, SkRect::MakeEmpty()});
+    }
     insertText(raw);
 }
 

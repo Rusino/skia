@@ -1693,6 +1693,25 @@ DEF_TEST(TextEditor_Invariant19_EmptyClipboardAndEnterTypingIntegrity, reporter)
     REPORTER_ASSERT(reporter, pasteHandled2);
     REPORTER_ASSERT(reporter, vm->text() == "Keep This Replacement");
     REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+
+    // 3. User Acceptance Scenario: Select -> Ctrl+C -> immediate Ctrl+V on the same selection:
+    // When pasting clipboard content that is identical to the active selection,
+    // it must duplicate the selection immediately (X -> XX) instead of a degenerate X -> X replace!
+    vm->insertText("CopyMe");
+    size_t copyMeStart = vm->text().size() - 6;
+    size_t copyMeEnd = vm->text().size();
+    vm->setSelection(CaretPosition{TextIndex(copyMeStart), Affinity::kDownstream, SkRect::MakeEmpty()},
+                     CaretPosition{TextIndex(copyMeEnd), Affinity::kDownstream, SkRect::MakeEmpty()});
+    REPORTER_ASSERT(reporter, vm->copySelection() == "CopyMe");
+
+    vm->setClipboardHandlers(nullptr, []() { return "CopyMe"; });
+    bool dupHandled = vm->handleKey(skui::Key::kV, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, dupHandled);
+
+    // HOSTILE ASSERTION: Must duplicate into "CopyMeCopyMe", not remain "CopyMe"!
+    std::string expectedText = "Keep This ReplacementCopyMeCopyMe";
+    REPORTER_ASSERT(reporter, vm->text() == expectedText,
+                    "Immediate Ctrl+V on identical selection did not duplicate!");
 }
 
 
