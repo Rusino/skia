@@ -7,6 +7,7 @@
 
 #include "tools/text_editor/include/FormattedParagraph.h"
 #include "include/core/SkFontTypes.h"
+#include "src/base/SkUTF.h"
 #include <algorithm>
 #include <cmath>
 
@@ -74,6 +75,7 @@ private:
 
         SkScalar yCursor = 0;
 
+        std::string_view fullText = fShaped->unicode().text();
         LineBox currentLine;
         currentLine.line_index = fLines.size();
         currentLine.baseline = 0;
@@ -87,6 +89,8 @@ private:
                     return;
                 }
                 // Handle empty lines gracefully
+                size_t emptyStart = fLines.empty() ? 0 : fLines.back().text_range.end.value;
+                currentLine.text_range = TextRange(TextIndex(emptyStart), TextIndex(emptyStart));
                 currentLine.baseline = yCursor + std::abs(defaultAscent);
                 SkScalar lineHeight = std::abs(defaultAscent) + std::abs(defaultDescent);
                 currentLine.bounds = SkRect::MakeXYWH(0, yCursor, 0, lineHeight);
@@ -104,6 +108,26 @@ private:
                 lineAscent = 0;
                 lineDescent = 0;
                 return;
+            }
+
+            // Compute text_range for non-empty line
+            size_t minStart = SIZE_MAX;
+            size_t maxEnd = 0;
+            for (const auto& vr : currentLine.visual_runs) {
+                for (const auto& g : vr.glyphs) {
+                    minStart = std::min(minStart, g.cluster_text_index.value);
+                    size_t endIdx = g.cluster_text_index.value + 1;
+                    if (g.cluster_text_index.value < fullText.size()) {
+                        const char* ptr = fullText.data() + g.cluster_text_index.value;
+                        const char* end = fullText.data() + fullText.size();
+                        SkUTF::NextUTF8(&ptr, end);
+                        endIdx = ptr - fullText.data();
+                    }
+                    maxEnd = std::max(maxEnd, endIdx);
+                }
+            }
+            if (minStart != SIZE_MAX) {
+                currentLine.text_range = TextRange(TextIndex(minStart), TextIndex(maxEnd));
             }
 
             // Apply horizontal text alignment (bake offset into visual runs)
@@ -189,7 +213,6 @@ private:
                 breakOffsets.push_back(lb.offset.value);
             }
         }
-        std::string_view fullText = fShaped->unicode().text();
         for (size_t i = 0; i < fullText.size(); ++i) {
             if (fShaped->unicode().isSpace(TextIndex(i)) || fullText[i] == ' ') {
                 breakOffsets.push_back(i + 1);

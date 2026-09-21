@@ -1264,6 +1264,57 @@ DEF_TEST(TextEditor_Invariant14_ControlCharacterSanitizationAndShapingPreservati
     REPORTER_ASSERT(reporter, SkUTF::CountUTF8(vmBidi->text().data(), vmBidi->text().size()) > 0);
 }
 
+// =============================================================================
+// TRAP 25 (Invariant 15): Soft-Wrap Boundary Caret Affinity & Disambiguation
+// =============================================================================
+DEF_TEST(TextEditor_Invariant15_SoftWrapBoundaryCaretAffinity, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    LayoutConstraints constraints;
+    constraints.max_width = 70.0f; // Narrow width forces "Hello World" to wrap into 2 lines
+
+    auto vm = std::make_unique<TextEditorViewModel>("Hello World", font, SkColor4f{0, 0, 0, 1}, constraints);
+
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, lines.size() >= 2);
+    REPORTER_ASSERT(reporter, vm->text().find('\n') == std::string_view::npos);
+
+    SkScalar line0Y = lines[0].bounds.centerY();
+    SkScalar line1Y = lines[1].bounds.centerY();
+
+    // 1. Click far to the right of Line 0 content:
+    // Caret must take Affinity::kUpstream and snap to line 0 right edge (NOT jump down to line 1)
+    vm->moveCaretToPoint(lines[0].bounds.fRight + 50.0f, line0Y, false);
+    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kUpstream);
+    SkRect caret0 = vm->screenCaretRect();
+    REPORTER_ASSERT(reporter, caret0.fTop < lines[1].bounds.fTop);
+    REPORTER_ASSERT(reporter, caret0.fLeft >= lines[0].bounds.fRight - 1.0f);
+
+    // 2. Click at the start/left edge of Line 1:
+    // Caret must take Affinity::kDownstream and snap to line 1 left edge (NOT jump up to line 0)
+    vm->moveCaretToPoint(lines[1].bounds.fLeft, line1Y, false);
+    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kDownstream);
+    SkRect caret1 = vm->screenCaretRect();
+    REPORTER_ASSERT(reporter, caret1.fTop >= lines[1].bounds.fTop);
+    REPORTER_ASSERT(reporter, caret1.fLeft <= lines[1].bounds.fLeft + 2.0f);
+
+    // 3. Step-through horizontal navigation across soft wrap boundary:
+    // Move caret back to upstream position on Line 0
+    vm->moveCaretToPoint(lines[0].bounds.fRight + 50.0f, line0Y, false);
+    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kUpstream);
+
+    // Press Right arrow: must transition to Line 1 downstream position
+    bool handled = vm->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, handled);
+    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kDownstream);
+    REPORTER_ASSERT(reporter, vm->screenCaretRect().fTop >= lines[1].bounds.fTop);
+
+    // Press Left arrow: must transition back to Line 0 upstream position
+    bool leftHandled = vm->handleKey(skui::Key::kLeft, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, leftHandled);
+    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kUpstream);
+    REPORTER_ASSERT(reporter, vm->screenCaretRect().fTop < lines[1].bounds.fTop);
+}
+
 
 
 

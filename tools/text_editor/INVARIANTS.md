@@ -173,3 +173,19 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 3. **Control Character Noise Elimination & Shaping Control Preservation**:
    - Destructive or noisy control codes (ASCII `0x00–0x1F` other than `\n`, `0x7F` DEL, C1 controls) must be sanitized and rejected upon ingest.
    - Unicode Format Controls (`Cf` category, including ZWJ `U+200D`, ZWNJ `U+200C`, LRM `U+200E`, RLM `U+200F`) are strictly preserved as essential typographical inputs for HarfBuzz and BiDi analysis.
+
+---
+
+## Domain Invariant 15: Soft-Wrap Boundary Disambiguation & Caret Affinity
+
+1. **Soft-Wrap Boundary Singularity**:
+   - In soft-wrapped lines, the transition from line $k$ to line $k+1$ occurs without a hard newline character (`\n`). The scalar index $I = \text{line}_k.\text{text\_range.end} = \text{line}_{k+1}.\text{text\_range.start}$ is topologically shared between two distinct geometric screen locations.
+2. **Upstream Affinity & Line-Tail Snapping**:
+   - If a mouse click or hit-test query lands on line $k$ at or to the right of its content bounds ($\ge \text{line}_k.\text{bounds.fRight}$), the resolved position must take `Affinity::kUpstream`.
+   - When resolving screen coordinates for a position with `Affinity::kUpstream` at index $I$, the caret rectangle must be positioned strictly at the right edge of line $k$ ($\text{line}_k.\text{bounds.fRight}$) at vertical coordinate $Y_k$. It must NEVER jump down to the start of line $k+1$.
+3. **Downstream Affinity & Line-Head Snapping**:
+   - If a hit-test query lands on line $k+1$ at or before its first glyph, the resolved position must take `Affinity::kDownstream`.
+   - When resolving screen coordinates for a position with `Affinity::kDownstream` at index $I$, the caret rectangle must be positioned strictly at the left edge of line $k+1$ ($\text{line}_{k+1}.\text{bounds.fLeft}$) at vertical coordinate $Y_{k+1}$.
+4. **Step-Through Horizontal Navigation**:
+   - Horizontal caret movement across a soft-wrap boundary (via `kRight` or `kLeft`) must transition sequentially through both geometric positions via affinity toggling ($(\text{line}_k.\text{end}, \text{kUpstream}) \leftrightarrow (\text{line}_{k+1}.\text{start}, \text{kDownstream})$) without skipping visual positions on screen.
+
