@@ -437,40 +437,79 @@ public:
             return;
         }
 
-        // 1. Determine target line index for the drag
-        SkScalar minY = std::min(y1, y2);
-        SkScalar maxY = std::max(y1, y2);
-        SkScalar minX = std::min(x1, x2);
-        SkScalar maxX = std::max(x1, x2);
-
-        size_t lineIdx = lines.size() - 1;
-        for (size_t i = 0; i < lines.size(); ++i) {
-            if (maxY <= lines[i].bounds.fBottom || i == lines.size() - 1) {
-                lineIdx = i;
-                break;
+        auto getLineIdx = [&](SkScalar y) -> size_t {
+            if (y < lines.front().bounds.fTop) {
+                return 0;
             }
-        }
+            for (size_t i = 0; i < lines.size(); ++i) {
+                if (y <= lines[i].bounds.fBottom || i == lines.size() - 1) {
+                    return i;
+                }
+            }
+            return lines.size() - 1;
+        };
 
-        if (lineIdx >= fLineClusters.size() || fLineClusters[lineIdx].empty()) {
-            return;
-        }
+        size_t line1 = getLineIdx(y1);
+        size_t line2 = getLineIdx(y2);
 
-        const auto& clustersOnLine = fLineClusters[lineIdx];
-
-        // 2. Collect all clusters whose horizontal bounds overlap [minX, maxX]
         std::vector<TextRange> rawRanges;
-        for (const auto& cb : clustersOnLine) {
-            SkScalar cbLeft = cb.bounds.fLeft;
-            SkScalar cbRight = cb.bounds.fRight;
-            if (cbLeft > cbRight) {
-                std::swap(cbLeft, cbRight);
+
+        if (line1 == line2) {
+            // 1D visual drag within a single line
+            SkScalar minX = std::min(x1, x2);
+            SkScalar maxX = std::max(x1, x2);
+
+            if (minX < maxX && line1 < fLineClusters.size()) {
+                const auto& clustersOnLine = fLineClusters[line1];
+                for (const auto& cb : clustersOnLine) {
+                    SkScalar cbLeft = std::min(cb.bounds.fLeft, cb.bounds.fRight);
+                    SkScalar cbRight = std::max(cb.bounds.fLeft, cb.bounds.fRight);
+                    bool overlaps = !(cbRight <= minX || cbLeft >= maxX);
+                    if (overlaps) {
+                        out_rects.push_back(cb.bounds);
+                        rawRanges.push_back(cb.text_range);
+                    }
+                }
+            }
+        } else {
+            // 2D multi-line visual drag crossing line boundaries
+            size_t topLine = std::min(line1, line2);
+            size_t bottomLine = std::max(line1, line2);
+            SkScalar xTop = (line1 < line2) ? x1 : x2;
+            SkScalar xBottom = (line1 < line2) ? x2 : x1;
+
+            // 1. Top line: from xTop to line trailing edge [xTop, +infinity)
+            if (topLine < fLineClusters.size()) {
+                for (const auto& cb : fLineClusters[topLine]) {
+                    SkScalar cbLeft = std::min(cb.bounds.fLeft, cb.bounds.fRight);
+                    SkScalar cbRight = std::max(cb.bounds.fLeft, cb.bounds.fRight);
+                    if (cbRight > xTop || (cbRight == cbLeft && cbLeft >= xTop)) {
+                        out_rects.push_back(cb.bounds);
+                        rawRanges.push_back(cb.text_range);
+                    }
+                }
             }
 
-            // Check horizontal overlap: cluster intersects [minX, maxX]
-            bool overlaps = !(cbRight <= minX || cbLeft >= maxX);
-            if (overlaps) {
-                out_rects.push_back(cb.bounds);
-                rawRanges.push_back(cb.text_range);
+            // 2. Intermediate lines: 100% full line cluster saturation
+            for (size_t k = topLine + 1; k < bottomLine; ++k) {
+                if (k < fLineClusters.size()) {
+                    for (const auto& cb : fLineClusters[k]) {
+                        out_rects.push_back(cb.bounds);
+                        rawRanges.push_back(cb.text_range);
+                    }
+                }
+            }
+
+            // 3. Bottom line: from line leading edge to xBottom (-infinity, xBottom]
+            if (bottomLine < fLineClusters.size()) {
+                for (const auto& cb : fLineClusters[bottomLine]) {
+                    SkScalar cbLeft = std::min(cb.bounds.fLeft, cb.bounds.fRight);
+                    SkScalar cbRight = std::max(cb.bounds.fLeft, cb.bounds.fRight);
+                    if (cbLeft < xBottom || (cbRight == cbLeft && cbLeft <= xBottom)) {
+                        out_rects.push_back(cb.bounds);
+                        rawRanges.push_back(cb.text_range);
+                    }
+                }
             }
         }
 
@@ -478,7 +517,7 @@ public:
             return;
         }
 
-        // 3. Sort ranges logically and merge adjacent/overlapping spans
+        // Sort ranges logically and merge adjacent/overlapping spans
         std::sort(rawRanges.begin(), rawRanges.end(), [](const TextRange& a, const TextRange& b) {
             return a.start < b.start;
         });
@@ -491,6 +530,20 @@ public:
                 out_ranges.push_back(rawRanges[i]);
             }
         }
+
+#if defined(SK_DEBUG)
+        // Postcondition Integrity Assertion (Axiom 11 / Rule 8: Dimensional Honesty)
+        if (line1 != line2) {
+            SkASSERT(!out_ranges.empty() && "Multi-line visual drag must produce non-empty selection");
+            size_t topLine = std::min(line1, line2);
+            size_t bottomLine = std::max(line1, line2);
+            for (size_t k = topLine + 1; k < bottomLine; ++k) {
+                if (k < fLineClusters.size() && !fLineClusters[k].empty()) {
+                    SkASSERT(!out_rects.empty() && "Intermediate lines must be saturated");
+                }
+            }
+        }
+#endif
     }
 
 private:

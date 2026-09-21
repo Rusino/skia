@@ -150,6 +150,17 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 3. **Inverted Topological Deletion Order**:
    - Deletion of a discontinuous selection (via Backspace, Delete, or character replacement) must execute against the underlying document in reverse logical order (from highest byte offset down to lowest byte offset).
    - Deletion must remove strictly and exclusively the bytes corresponding to the physically highlighted glyphs, leaving unselected logical segments of adjacent runs structurally intact.
+4. **2D Multi-Line Drag Continuity & Intermediate Saturation (Dimensional Honesty)**:
+   - When an interactive visual drag spans multiple lines ($(x_1, y_1) \to (x_2, y_2)$ where $\text{line}(y_1) \ne \text{line}(y_2)$):
+     - **Downward Drag ($\text{startLine} < \text{endLine}$)**:
+       - On `startLine`: All clusters intersecting $[x_1, +\infty)$ (trailing line direction) are selected.
+       - On intermediate lines ($k \in (\text{startLine}, \text{endLine})$): 100% of the clusters on the line are saturated/selected across their entire line bounds.
+       - On `endLine`: All clusters intersecting $[-\infty, x_2]$ (leading line direction) are selected.
+     - **Upward Drag ($\text{startLine} > \text{endLine}$)**:
+       - On `endLine` (upper focus): All clusters intersecting $[x_2, +\infty)$ are selected.
+       - On intermediate lines ($k \in (\text{endLine}, \text{startLine})$): 100% of clusters are saturated.
+       - On `startLine` (lower anchor): All clusters intersecting $[-\infty, x_1]$ are selected.
+   - **Dimensional Honesty Invariant**: Under no circumstances may a multi-line visual drag collapse to a single line or silently discard previous lines. `getSelectionForVisualDrag` must defensively assert cross-line continuity in Debug builds.
 
 ## Domain Invariant 13: Single-Source Render Projection & Painter Purity
 

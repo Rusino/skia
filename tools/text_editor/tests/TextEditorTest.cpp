@@ -1369,6 +1369,111 @@ DEF_TEST(TextEditor_Invariant16_ClipboardCopyCutPasteSanitization, reporter) {
     REPORTER_ASSERT(reporter, vm->document().formatted().lines().size() == 3);
 }
 
+// =============================================================================
+// TRAP 27: Domain Invariant 12 - 2D Multi-Line Visual Drag Continuity
+// =============================================================================
+DEF_TEST(TextEditor_Invariant12_MultiLineVisualDrag, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+
+    // 3 lines of distinct text:
+    const std::string text = "First line of text.\nSecond line of text.\nThird line of text.";
+    auto vm = std::make_unique<TextEditorViewModel>(text, font);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, lines.size() == 3);
+
+    // 1. Matrix 1D / 0D sanity check:
+    // Single point drag (0D): anchor and focus identical
+    vm->moveCaretToPoint(10.0f, lines[0].bounds.centerY(), false);
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+
+    // 2. Matrix 2D Downward Drag across 2 lines:
+    // Anchor at middle of Line 0, Focus at middle of Line 1
+    SkScalar x0 = lines[0].bounds.centerX();
+    SkScalar y0 = lines[0].bounds.centerY();
+    SkScalar x1 = lines[1].bounds.centerX();
+    SkScalar y1 = lines[1].bounds.centerY();
+
+    vm->moveCaretToPoint(x0, y0, false); // anchor on line 0
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+    vm->moveCaretToPoint(x1, y1, true);  // drag down to line 1
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+
+    std::vector<SkRect> rects2D = vm->screenSelectionRects();
+    // HOSTILE CHECK: Both line 0 and line 1 MUST have selection rectangles!
+    bool hasLine0Rect = false;
+    bool hasLine1Rect = false;
+    for (const auto& r : rects2D) {
+        if (r.fTop >= lines[0].bounds.fTop - 1.0f && r.fBottom <= lines[0].bounds.fBottom + 1.0f) {
+            hasLine0Rect = true;
+        }
+        if (r.fTop >= lines[1].bounds.fTop - 1.0f && r.fBottom <= lines[1].bounds.fBottom + 1.0f) {
+            hasLine1Rect = true;
+        }
+    }
+    REPORTER_ASSERT(reporter, hasLine0Rect, "Line 0 selection dropped during downward 2D drag!");
+    REPORTER_ASSERT(reporter, hasLine1Rect, "Line 1 selection missing during downward 2D drag!");
+
+    // 3. Matrix 2D Downward Drag across 3 lines with Intermediate Saturation:
+    // Anchor at middle of Line 0, Focus at middle of Line 2
+    SkScalar x2 = lines[2].bounds.centerX();
+    SkScalar y2 = lines[2].bounds.centerY();
+    vm->moveCaretToPoint(x0, y0, false); // anchor on line 0
+    vm->moveCaretToPoint(x2, y2, true);  // drag to line 2
+
+    std::vector<SkRect> rects3Lines = vm->screenSelectionRects();
+    hasLine0Rect = false;
+    hasLine1Rect = false;
+    bool hasLine2Rect = false;
+    SkScalar line1SelectedWidth = 0.0f;
+    for (const auto& r : rects3Lines) {
+        if (r.fTop >= lines[0].bounds.fTop - 1.0f && r.fBottom <= lines[0].bounds.fBottom + 1.0f) {
+            hasLine0Rect = true;
+        }
+        if (r.fTop >= lines[1].bounds.fTop - 1.0f && r.fBottom <= lines[1].bounds.fBottom + 1.0f) {
+            hasLine1Rect = true;
+            line1SelectedWidth += r.width();
+        }
+        if (r.fTop >= lines[2].bounds.fTop - 1.0f && r.fBottom <= lines[2].bounds.fBottom + 1.0f) {
+            hasLine2Rect = true;
+        }
+    }
+    REPORTER_ASSERT(reporter, hasLine0Rect, "Line 0 missing during 3-line drag!");
+    REPORTER_ASSERT(reporter, hasLine1Rect, "Intermediate Line 1 missing during 3-line drag!");
+    REPORTER_ASSERT(reporter, hasLine2Rect, "Line 2 missing during 3-line drag!");
+    REPORTER_ASSERT(reporter, line1SelectedWidth >= lines[1].content_width - 5.0f,
+                    "Intermediate line 1 must be 100%% saturated!");
+
+    // 4. Matrix 2D Upward Drag (Inverse Vector):
+    // Anchor at middle of Line 2, Focus at middle of Line 0
+    vm->moveCaretToPoint(x2, y2, false); // anchor on line 2
+    vm->moveCaretToPoint(x0, y0, true);  // drag UP to line 0
+    std::vector<SkRect> rectsUpward = vm->screenSelectionRects();
+    hasLine0Rect = false;
+    hasLine1Rect = false;
+    hasLine2Rect = false;
+    line1SelectedWidth = 0.0f;
+    for (const auto& r : rectsUpward) {
+        if (r.fTop >= lines[0].bounds.fTop - 1.0f && r.fBottom <= lines[0].bounds.fBottom + 1.0f) {
+            hasLine0Rect = true;
+        }
+        if (r.fTop >= lines[1].bounds.fTop - 1.0f && r.fBottom <= lines[1].bounds.fBottom + 1.0f) {
+            hasLine1Rect = true;
+            line1SelectedWidth += r.width();
+        }
+        if (r.fTop >= lines[2].bounds.fTop - 1.0f && r.fBottom <= lines[2].bounds.fBottom + 1.0f) {
+            hasLine2Rect = true;
+        }
+    }
+    REPORTER_ASSERT(reporter, hasLine0Rect, "Line 0 missing during upward drag!");
+    REPORTER_ASSERT(reporter, hasLine1Rect, "Intermediate Line 1 missing during upward drag!");
+    REPORTER_ASSERT(reporter, hasLine2Rect, "Line 2 missing during upward drag!");
+    REPORTER_ASSERT(reporter, line1SelectedWidth >= lines[1].content_width - 5.0f,
+                    "Intermediate line 1 must be 100%% saturated on upward drag!");
+}
+
+
 
 
 
