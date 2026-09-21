@@ -161,12 +161,12 @@ std::vector<LineClusterInfo> getLineClusters(const LineBox& line,
     return clusters;
 }
 
-CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index) {
+CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index, Affinity affinity = Affinity::kDownstream) {
     std::string_view text = doc.text();
     index = std::min(index, text.size());
     CaretPosition pos;
     pos.text_index = TextIndex(index);
-    pos.affinity = (index == text.size()) ? Affinity::kUpstream : Affinity::kDownstream;
+    pos.affinity = (index == text.size()) ? Affinity::kUpstream : affinity;
 
     const auto& lines = doc.formatted().lines();
     if (lines.empty()) {
@@ -195,6 +195,25 @@ CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index) {
     if (clusters.empty()) {
         pos.caret_rect = SkRect::MakeXYWH(targetLine->bounds.fLeft, caretTop, 1.0f, caretHeight);
         return pos;
+    }
+
+    if (affinity == Affinity::kUpstream && index > 0) {
+        const LineClusterInfo* prevCluster = nullptr;
+        for (const auto& cb : clusters) {
+            if (cb.text_range.contains(TextIndex(index - 1))) {
+                prevCluster = &cb;
+                break;
+            }
+        }
+        if (prevCluster) {
+            SkScalar x = prevCluster->is_rtl ? prevCluster->bounds.fLeft : prevCluster->bounds.fRight;
+            pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
+            pos.affinity = Affinity::kUpstream;
+            if (pos.caret_rect.isEmpty()) {
+                pos.caret_rect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
+            }
+            return pos;
+        }
     }
 
     const LineClusterInfo* lastCluster = nullptr;
@@ -289,23 +308,13 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
             }
             fDocument->insert(TextIndex(insertPos), sanitized);
             size_t finalCaret = insertPos + sanitized.size();
-            updateCursorPosition(finalCaret);
-            CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
-                fSelection.focus(), CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
-            if (accuratePos.text_index.value == finalCaret) {
-                fSelection.collapse_to(accuratePos);
-            }
+            updateCursorPosition(finalCaret, Affinity::kUpstream);
         } else {
             TextRange range = fSelection.text_range();
             insertPos = range.start.value;
             fDocument->replace(range, sanitized);
             size_t finalCaret = insertPos + sanitized.size();
-            updateCursorPosition(finalCaret);
-            CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
-                fSelection.focus(), CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
-            if (accuratePos.text_index.value == finalCaret) {
-                fSelection.collapse_to(accuratePos);
-            }
+            updateCursorPosition(finalCaret, Affinity::kUpstream);
         }
     } else {
         insertPos = std::min(fSelection.focus().text_index.value, fDocument->text().size());
@@ -318,12 +327,7 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
         }
         fDocument->insert(TextIndex(insertPos), sanitized);
         size_t finalCaret = insertPos + sanitized.size();
-        updateCursorPosition(finalCaret);
-        CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
-            fSelection.focus(), CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
-        if (accuratePos.text_index.value == finalCaret) {
-            fSelection.collapse_to(accuratePos);
-        }
+        updateCursorPosition(finalCaret, Affinity::kUpstream);
     }
 
     if (!fIsPerformingUndoRedo) {
@@ -697,8 +701,8 @@ void TextEditorViewModel::visitScreenRuns(const SkRect& screenClip, RenderRunVis
     fDocument->visitDocumentRuns(docClip, std::move(visitor));
 }
 
-void TextEditorViewModel::updateCursorPosition(size_t index) {
-    CaretPosition pos = resolveCaretPosition(*fDocument, index);
+void TextEditorViewModel::updateCursorPosition(size_t index, Affinity affinity) {
+    CaretPosition pos = resolveCaretPosition(*fDocument, index, affinity);
     fSelection.collapse_to(pos);
 }
 

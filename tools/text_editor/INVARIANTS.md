@@ -293,3 +293,8 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
    - The caret coordinate $X$ after deletion must be continuous with the remaining text boundary.
 3. **BiDi-Aware Caret Geometry Resolution**:
    - `updateCursorPosition` and all caret coordinate resolution methods must query `ParagraphSpatialIndex` or examine cluster directionality (`is_rtl`). In RTL clusters, the logical start boundary of a cluster resides at `bounds.fRight`, and the end boundary at `bounds.fLeft`. Taking `rects[0].fLeft` for RTL text without direction inversion is strictly prohibited.
+4. **BiDi Insertion Boundary & Typing Affinity Invariant**:
+   - Upon text insertion (`insertText`), the caret MUST maintain `Affinity::kUpstream`, positioning strictly at the trailing edge (for LTR: `bounds.fRight`, for RTL: `bounds.fLeft`) of the newly inserted cluster.
+   - It is strictly prohibited to attach the caret to the downstream following cluster or jump to the visual opposite boundary of an adjacent BiDi run.
+5. **Prohibition of Synthetic Caret Post-Adjustment**:
+   - `insertText` must directly and atomically compute the correct caret geometry via `updateCursorPosition(finalCaret, Affinity::kUpstream)`. Calling synthetic adjustments (such as `moveCaret(..., kRight, ...)`) after insertion is strictly prohibited.

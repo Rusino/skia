@@ -1895,6 +1895,102 @@ DEF_TEST(TextEditor_Defect_ArabicDeletionCaretContinuity, reporter) {
                     actualCaretX, expectedCutBoundary, newArabicRight);
 }
 
+// =============================================================================
+// DEFECT REPRODUCTION (Gate A / Gate B): Arabic-Latin Insertion Caret Continuity Trap
+// =============================================================================
+DEF_TEST(TextEditor_Defect_ArabicLatinInsertionCaretContinuity, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    LayoutConstraints constraints;
+    constraints.max_width = 760.0f;
+
+    // Text: English prefix + 3 Arabic words "مرحبا بكم بالعالم"
+    // "مرحبا" = \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7 (10 bytes)
+    // "بكم"   = \xd8\xa8\xd9\x83\xd9\x85 (6 bytes)
+    // "بالعالم" = \xd8\xa8\xd8\xa7\xd9\x84\xd8\xb9\xd8\xa7\xd9\x84\xd9\x85 (14 bytes)
+    const std::string text = "- UAX #9 Arabic: \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7 \xd8\xa8\xd9\x83\xd9\x85 \xd8\xa8\xd8\xa7\xd9\x84\xd8\xb9\xd8\xa7\xd9\x84\xd9\x85";
+    auto vm = std::make_unique<TextEditorViewModel>(text, font, SkColor4f{0, 0, 0, 1}, constraints);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+    REPORTER_ASSERT(reporter, vm->text() == text);
+
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, lines.size() == 1);
+    const auto& line = lines[0];
+    SkScalar y = line.bounds.centerY();
+
+    // Target the middle Arabic word and its trailing space: "بكم "
+    // Consuming the trailing space ensures the newly inserted Latin letter "a" is immediately
+    // adjacent to the RTL Arabic word "بالعالم" without an intervening LTR space buffer.
+    const std::string midWordWithSpace = "\xd8\xa8\xd9\x83\xd9\x85 ";
+    size_t midPos = text.find(midWordWithSpace);
+    REPORTER_ASSERT(reporter, midPos != std::string::npos);
+    TextRange midRange(TextIndex(midPos), TextIndex(midPos + midWordWithSpace.size()));
+
+    // Query spatial index for the visual bounds of "بكم "
+    std::vector<SkRect> midRects;
+    vm->document().spatial_index().getSelectionRects(midRange, midRects);
+    REPORTER_ASSERT(reporter, !midRects.empty());
+
+    SkScalar midLeft = SK_ScalarMax;
+    SkScalar midRight = SK_ScalarMin;
+    for (const auto& r : midRects) {
+        midLeft = std::min(midLeft, r.fLeft);
+        midRight = std::max(midRight, r.fRight);
+    }
+    REPORTER_ASSERT(reporter, midLeft < midRight);
+
+    // Simulate mouse drag across "بكم " using moveCaretToPoint
+    vm->moveCaretToPoint(midRight - 1.0f, y, false); // anchor
+    vm->moveCaretToPoint(midLeft + 1.0f, y, true);  // focus (drag)
+
+    // Selection must not be collapsed and copied text must match "بكم "
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+    std::string copied = vm->copySelection();
+    if (copied != midWordWithSpace) {
+        vm->moveCaretToPoint(midLeft + 1.0f, y, false);
+        vm->moveCaretToPoint(midRight - 1.0f, y, true);
+        copied = vm->copySelection();
+    }
+    REPORTER_ASSERT(reporter, copied == midWordWithSpace, "Selected text must match middle Arabic word with space 'بكم '");
+
+    // Insert an English letter "a" replacing "بكم "
+    vm->insertText("a");
+
+    // 1. Dual-Contract: Assert logical state
+    const std::string expectedText = "- UAX #9 Arabic: \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7 a\xd8\xa8\xd8\xa7\xd9\x84\xd8\xb9\xd8\xa7\xd9\x84\xd9\x85";
+    REPORTER_ASSERT(reporter, vm->text() == expectedText,
+                    "Middle Arabic word with space must be replaced by 'a' in logical text");
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed(),
+                    "Selection must be collapsed after insertion");
+    REPORTER_ASSERT(reporter, vm->selection().ranges().empty(),
+                    "Selection ranges must be cleared after insertion");
+
+    // 2. Dual-Contract: Assert spatial geometry (Axiom 18(d) & Invariant 21)
+    // Find visual bounds of the newly inserted letter "a" (using rfind to avoid matching 'a' in "Arabic")
+    size_t aPos = vm->text().rfind("a");
+    REPORTER_ASSERT(reporter, aPos != std::string::npos);
+    REPORTER_ASSERT(reporter, aPos > text.find("Arabic:"));
+    TextRange aRange(TextIndex(aPos), TextIndex(aPos + 1));
+    std::vector<SkRect> aRects;
+    vm->document().spatial_index().getSelectionRects(aRange, aRects);
+    REPORTER_ASSERT(reporter, !aRects.empty());
+
+    // Because "a" is an LTR character, its visual trailing edge is its right edge!
+    SkScalar expectedCaretX = aRects[0].fRight;
+
+    // In the new layout, find the right edge of the Arabic text run
+    const auto& newLines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, !newLines.empty());
+    SkScalar arabicBoundary = newLines[0].bounds.fRight;
+
+    SkScalar actualCaretX = vm->selection().focus().caret_rect.fLeft;
+
+    // Caret X must match the inserted letter trailing edge within tolerance (<= 2.0f)
+    REPORTER_ASSERT(reporter, std::abs(actualCaretX - expectedCaretX) <= 2.0f,
+                    "KEEPER-DEFECT: Caret X (%.2f) jumped away from inserted letter trailing edge (%.2f) to Arabic boundary (%.2f)!",
+                    actualCaretX, expectedCaretX, arabicBoundary);
+}
+
+
 
 
 

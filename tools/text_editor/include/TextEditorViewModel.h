@@ -141,7 +141,7 @@ private:
             fOnRedraw();
         }
     }
-    void updateCursorPosition(size_t index);
+    void updateCursorPosition(size_t index, Affinity affinity = Affinity::kDownstream);
     void pushEditCommand(EditCommand cmd);
 
     std::unique_ptr<TextDocument> fDocument;
