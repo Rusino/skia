@@ -12,6 +12,7 @@
 #include "tools/text_editor/include/EditorTypes.h"
 #include "tools/text_editor/include/UnicodeParagraph.h"
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 namespace skia::text_editor {
@@ -50,6 +51,9 @@ public:
     static std::unique_ptr<const ShapedParagraph> Make(
         std::shared_ptr<const UnicodeParagraph> unicode_para);
 };
+
+static_assert(!std::is_aggregate_v<ShapedParagraph>,
+    "KEEPER: Domain entity must be strictly encapsulated; raw fields are prohibited");
 
 } // namespace skia::text_editor
 

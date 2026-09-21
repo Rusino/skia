@@ -22,6 +22,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace skia::text_editor {
@@ -86,6 +87,9 @@ private:
     uint64_t fRevision{0};
     std::unique_ptr<const ParagraphSpatialIndex> fSpatialIndex;
 };
+
+static_assert(!std::is_aggregate_v<TextDocument>,
+    "KEEPER: Domain entity must be strictly encapsulated; raw fields are prohibited");
 
 } // namespace skia::text_editor
 

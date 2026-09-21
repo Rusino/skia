@@ -23,6 +23,7 @@
 #include <functional>
 #include <memory>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace skia::text_editor {
@@ -161,6 +162,9 @@ private:
     bool fIsPerformingUndoRedo{false};
     bool fCtrlKeyHeld{false};
 };
+
+static_assert(!std::is_aggregate_v<TextEditorViewModel>,
+    "KEEPER: Domain entity must be strictly encapsulated; raw fields are prohibited");
 
 } // namespace skia::text_editor
 

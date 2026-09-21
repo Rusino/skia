@@ -35,9 +35,8 @@ public:
     }
 
     CaretPosition hitTest(SkScalar x, SkScalar y) const override {
-        CaretPosition pos;
         if (!fFormatted || fFormatted->lines().empty()) {
-            return pos;
+            return CaretPosition();
         }
 
         const auto& lines = fFormatted->lines();
@@ -57,8 +56,10 @@ public:
         }
 
         const auto& line = lines[targetLineIdx];
-        pos.caret_rect = SkRect::MakeXYWH(line.bounds.fLeft, line.baseline + line.typographic_ascent, 1.0f,
+        SkRect caretRect = SkRect::MakeXYWH(line.bounds.fLeft, line.baseline + line.typographic_ascent, 1.0f,
                                           std::abs(line.typographic_ascent) + std::abs(line.typographic_descent));
+        TextIndex textIdx(0);
+        Affinity aff = Affinity::kDownstream;
 
         // 2. Locate closest cluster on line by X coordinate
         if (targetLineIdx < fLineClusters.size() && !fLineClusters[targetLineIdx].empty()) {
@@ -68,40 +69,40 @@ public:
                 bool isNewline = (cb.text_range.start.value < fullText.size() &&
                                   fullText[cb.text_range.start.value] == '\n');
                 if (isNewline) {
-                    pos.text_index = cb.text_range.start;
-                    pos.affinity = Affinity::kDownstream;
-                    pos.caret_rect.fLeft = cb.bounds.fLeft;
-                    pos.caret_rect.fRight = cb.bounds.fLeft + 1.0f;
-                    return pos;
+                    textIdx = cb.text_range.start;
+                    aff = Affinity::kDownstream;
+                    caretRect.fLeft = cb.bounds.fLeft;
+                    caretRect.fRight = cb.bounds.fLeft + 1.0f;
+                    return CaretPosition(textIdx, aff, caretRect);
                 }
                 if (x <= cb.bounds.fLeft || x < cb.bounds.centerX()) {
                     // Left half of cluster box:
                     // For LTR: corresponds to start of cluster.
                     // For RTL: corresponds to end of cluster (characters read right-to-left).
                     if (cb.is_rtl) {
-                        pos.text_index = cb.text_range.end;
-                        pos.affinity = Affinity::kUpstream;
+                        textIdx = cb.text_range.end;
+                        aff = Affinity::kUpstream;
                     } else {
-                        pos.text_index = cb.text_range.start;
-                        pos.affinity = Affinity::kDownstream;
+                        textIdx = cb.text_range.start;
+                        aff = Affinity::kDownstream;
                     }
-                    pos.caret_rect.fLeft = cb.bounds.fLeft;
-                    pos.caret_rect.fRight = cb.bounds.fLeft + 1.0f;
-                    return pos;
+                    caretRect.fLeft = cb.bounds.fLeft;
+                    caretRect.fRight = cb.bounds.fLeft + 1.0f;
+                    return CaretPosition(textIdx, aff, caretRect);
                 } else if (x <= cb.bounds.fRight) {
                     // Right half of cluster box:
                     // For LTR: corresponds to end of cluster.
                     // For RTL: corresponds to start of cluster.
                     if (cb.is_rtl) {
-                        pos.text_index = cb.text_range.start;
-                        pos.affinity = Affinity::kDownstream;
+                        textIdx = cb.text_range.start;
+                        aff = Affinity::kDownstream;
                     } else {
-                        pos.text_index = cb.text_range.end;
-                        pos.affinity = Affinity::kUpstream;
+                        textIdx = cb.text_range.end;
+                        aff = Affinity::kUpstream;
                     }
-                    pos.caret_rect.fLeft = cb.bounds.fRight;
-                    pos.caret_rect.fRight = cb.bounds.fRight + 1.0f;
-                    return pos;
+                    caretRect.fLeft = cb.bounds.fRight;
+                    caretRect.fRight = cb.bounds.fRight + 1.0f;
+                    return CaretPosition(textIdx, aff, caretRect);
                 }
             }
             // Past right edge of line
@@ -109,24 +110,24 @@ public:
             bool isNewline = (lastCb.text_range.start.value < fullText.size() &&
                               fullText[lastCb.text_range.start.value] == '\n');
             if (isNewline) {
-                pos.text_index = lastCb.text_range.start;
-                pos.affinity = Affinity::kDownstream;
-                pos.caret_rect.fLeft = lastCb.bounds.fLeft;
-                pos.caret_rect.fRight = lastCb.bounds.fLeft + 1.0f;
+                textIdx = lastCb.text_range.start;
+                aff = Affinity::kDownstream;
+                caretRect.fLeft = lastCb.bounds.fLeft;
+                caretRect.fRight = lastCb.bounds.fLeft + 1.0f;
             } else {
                 if (lastCb.is_rtl) {
-                    pos.text_index = lastCb.text_range.start;
-                    pos.affinity = Affinity::kDownstream;
+                    textIdx = lastCb.text_range.start;
+                    aff = Affinity::kDownstream;
                 } else {
-                    pos.text_index = lastCb.text_range.end;
-                    pos.affinity = Affinity::kUpstream;
+                    textIdx = lastCb.text_range.end;
+                    aff = Affinity::kUpstream;
                 }
-                pos.caret_rect.fLeft = lastCb.bounds.fRight;
-                pos.caret_rect.fRight = lastCb.bounds.fRight + 1.0f;
+                caretRect.fLeft = lastCb.bounds.fRight;
+                caretRect.fRight = lastCb.bounds.fRight + 1.0f;
             }
         }
 
-        return pos;
+        return CaretPosition(textIdx, aff, caretRect);
     }
 
     CaretPosition moveCaret(
@@ -145,21 +146,19 @@ public:
         switch (dir) {
             case CursorDirection::kRight: {
                 // If currently at upstream on a soft-wrap boundary, transition to downstream on next line
-                if (current.affinity == Affinity::kUpstream) {
+                if (current.affinity() == Affinity::kUpstream) {
                     for (size_t k = 0; k + 1 < lines.size(); ++k) {
-                        if (lines[k].text_range.end == current.text_index && isSoftWrapBoundary(k)) {
-                            next.text_index = current.text_index;
-                            next.affinity = Affinity::kDownstream;
+                        if (lines[k].text_range.end == current.text_index() && isSoftWrapBoundary(k)) {
                             const auto& nextLine = lines[k + 1];
-                            next.caret_rect = SkRect::MakeXYWH(nextLine.bounds.fLeft,
-                                                               nextLine.baseline + nextLine.typographic_ascent,
-                                                               1.0f,
-                                                               std::abs(nextLine.typographic_ascent) + std::abs(nextLine.typographic_descent));
+                            SkRect r = SkRect::MakeXYWH(nextLine.bounds.fLeft,
+                                                        nextLine.baseline + nextLine.typographic_ascent,
+                                                        1.0f,
+                                                        std::abs(nextLine.typographic_ascent) + std::abs(nextLine.typographic_descent));
                             if (k + 1 < fLineClusters.size() && !fLineClusters[k + 1].empty()) {
-                                next.caret_rect.fLeft = fLineClusters[k + 1].front().bounds.fLeft;
-                                next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                                r.fLeft = fLineClusters[k + 1].front().bounds.fLeft;
+                                r.fRight = r.fLeft + 1.0f;
                             }
-                            return next;
+                            return CaretPosition(current.text_index(), Affinity::kDownstream, r);
                         }
                     }
                 }
@@ -167,7 +166,7 @@ public:
                 if (mode == NavigationMode::kTextLogical) {
                     size_t logicalIdx = fLogicalClusters.size();
                     for (size_t i = 0; i < fLogicalClusters.size(); ++i) {
-                        if (fLogicalClusters[i].text_range.contains(current.text_index)) {
+                        if (fLogicalClusters[i].text_range.contains(current.text_index())) {
                             logicalIdx = i;
                             break;
                         }
@@ -176,38 +175,34 @@ public:
                         if (logicalIdx + 1 < fLogicalClusters.size()) {
                             // Check if advancing crosses into the next line across a soft-wrap boundary
                             for (size_t k = 0; k + 1 < lines.size(); ++k) {
-                                if (lines[k].text_range.contains(current.text_index) && isSoftWrapBoundary(k) &&
+                                if (lines[k].text_range.contains(current.text_index()) && isSoftWrapBoundary(k) &&
                                     fLogicalClusters[logicalIdx + 1].text_range.start >= lines[k].text_range.end) {
-                                    next.text_index = lines[k].text_range.end;
-                                    next.affinity = Affinity::kUpstream;
                                     const auto& curLine = lines[k];
-                                    next.caret_rect = SkRect::MakeXYWH(curLine.bounds.fRight,
-                                                                       curLine.baseline + curLine.typographic_ascent,
-                                                                       1.0f,
-                                                                       std::abs(curLine.typographic_ascent) + std::abs(curLine.typographic_descent));
+                                    SkRect r = SkRect::MakeXYWH(curLine.bounds.fRight,
+                                                                curLine.baseline + curLine.typographic_ascent,
+                                                                1.0f,
+                                                                std::abs(curLine.typographic_ascent) + std::abs(curLine.typographic_descent));
                                     if (k < fLineClusters.size() && !fLineClusters[k].empty()) {
-                                        next.caret_rect.fLeft = fLineClusters[k].back().bounds.fRight;
-                                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                                        r.fLeft = fLineClusters[k].back().bounds.fRight;
+                                        r.fRight = r.fLeft + 1.0f;
                                     }
-                                    return next;
+                                    return CaretPosition(lines[k].text_range.end, Affinity::kUpstream, r);
                                 }
                             }
-                            next.text_index = fLogicalClusters[logicalIdx + 1].text_range.start;
-                            next.affinity = Affinity::kDownstream;
-                            next.caret_rect = fLogicalClusters[logicalIdx + 1].bounds;
-                            next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                            SkRect r = fLogicalClusters[logicalIdx + 1].bounds;
+                            r.fRight = r.fLeft + 1.0f;
+                            next = CaretPosition(fLogicalClusters[logicalIdx + 1].text_range.start, Affinity::kDownstream, r);
                         } else {
-                            next.text_index = fLogicalClusters.back().text_range.end;
-                            next.affinity = Affinity::kUpstream;
-                            next.caret_rect = fLogicalClusters.back().bounds;
-                            next.caret_rect.fLeft = next.caret_rect.fRight;
-                            next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                            SkRect r = fLogicalClusters.back().bounds;
+                            r.fLeft = r.fRight;
+                            r.fRight = r.fLeft + 1.0f;
+                            next = CaretPosition(fLogicalClusters.back().text_range.end, Affinity::kUpstream, r);
                         }
                     }
                 } else {
                     size_t currentIdx = fFlatClusters.size();
                     for (size_t i = 0; i < fFlatClusters.size(); ++i) {
-                        if (fFlatClusters[i].text_range.contains(current.text_index)) {
+                        if (fFlatClusters[i].text_range.contains(current.text_index())) {
                             currentIdx = i;
                             break;
                         }
@@ -216,32 +211,28 @@ public:
                         if (currentIdx + 1 < fFlatClusters.size()) {
                             // Check if advancing crosses into the next line across a soft-wrap boundary
                             for (size_t k = 0; k + 1 < lines.size(); ++k) {
-                                if (lines[k].text_range.contains(current.text_index) && isSoftWrapBoundary(k) &&
+                                if (lines[k].text_range.contains(current.text_index()) && isSoftWrapBoundary(k) &&
                                     fFlatClusters[currentIdx + 1].text_range.start >= lines[k].text_range.end) {
-                                    next.text_index = lines[k].text_range.end;
-                                    next.affinity = Affinity::kUpstream;
                                     const auto& curLine = lines[k];
-                                    next.caret_rect = SkRect::MakeXYWH(curLine.bounds.fRight,
-                                                                       curLine.baseline + curLine.typographic_ascent,
-                                                                       1.0f,
-                                                                       std::abs(curLine.typographic_ascent) + std::abs(curLine.typographic_descent));
+                                    SkRect r = SkRect::MakeXYWH(curLine.bounds.fRight,
+                                                                curLine.baseline + curLine.typographic_ascent,
+                                                                1.0f,
+                                                                std::abs(curLine.typographic_ascent) + std::abs(curLine.typographic_descent));
                                     if (k < fLineClusters.size() && !fLineClusters[k].empty()) {
-                                        next.caret_rect.fLeft = fLineClusters[k].back().bounds.fRight;
-                                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                                        r.fLeft = fLineClusters[k].back().bounds.fRight;
+                                        r.fRight = r.fLeft + 1.0f;
                                     }
-                                    return next;
+                                    return CaretPosition(lines[k].text_range.end, Affinity::kUpstream, r);
                                 }
                             }
-                            next.text_index = fFlatClusters[currentIdx + 1].text_range.start;
-                            next.affinity = Affinity::kDownstream;
-                            next.caret_rect = fFlatClusters[currentIdx + 1].bounds;
-                            next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                            SkRect r = fFlatClusters[currentIdx + 1].bounds;
+                            r.fRight = r.fLeft + 1.0f;
+                            next = CaretPosition(fFlatClusters[currentIdx + 1].text_range.start, Affinity::kDownstream, r);
                         } else {
-                            next.text_index = fFlatClusters.back().text_range.end;
-                            next.affinity = Affinity::kUpstream;
-                            next.caret_rect = fFlatClusters.back().bounds;
-                            next.caret_rect.fLeft = next.caret_rect.fRight;
-                            next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                            SkRect r = fFlatClusters.back().bounds;
+                            r.fLeft = r.fRight;
+                            r.fRight = r.fLeft + 1.0f;
+                            next = CaretPosition(fFlatClusters.back().text_range.end, Affinity::kUpstream, r);
                         }
                     }
                 }
@@ -249,21 +240,19 @@ public:
             }
             case CursorDirection::kLeft: {
                 // If currently at downstream at the start of a soft-wrapped line, transition to upstream on previous line
-                if (current.affinity == Affinity::kDownstream) {
+                if (current.affinity() == Affinity::kDownstream) {
                     for (size_t k = 0; k + 1 < lines.size(); ++k) {
-                        if (lines[k + 1].text_range.start == current.text_index && isSoftWrapBoundary(k)) {
-                            next.text_index = current.text_index;
-                            next.affinity = Affinity::kUpstream;
+                        if (lines[k + 1].text_range.start == current.text_index() && isSoftWrapBoundary(k)) {
                             const auto& prevLine = lines[k];
-                            next.caret_rect = SkRect::MakeXYWH(prevLine.bounds.fRight,
-                                                               prevLine.baseline + prevLine.typographic_ascent,
-                                                               1.0f,
-                                                               std::abs(prevLine.typographic_ascent) + std::abs(prevLine.typographic_descent));
+                            SkRect r = SkRect::MakeXYWH(prevLine.bounds.fRight,
+                                                        prevLine.baseline + prevLine.typographic_ascent,
+                                                        1.0f,
+                                                        std::abs(prevLine.typographic_ascent) + std::abs(prevLine.typographic_descent));
                             if (k < fLineClusters.size() && !fLineClusters[k].empty()) {
-                                next.caret_rect.fLeft = fLineClusters[k].back().bounds.fRight;
-                                next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                                r.fLeft = fLineClusters[k].back().bounds.fRight;
+                                r.fRight = r.fLeft + 1.0f;
                             }
-                            return next;
+                            return CaretPosition(current.text_index(), Affinity::kUpstream, r);
                         }
                     }
                 }
@@ -271,61 +260,55 @@ public:
                 if (mode == NavigationMode::kTextLogical) {
                     size_t logicalIdx = fLogicalClusters.size();
                     for (size_t i = 0; i < fLogicalClusters.size(); ++i) {
-                        if (fLogicalClusters[i].text_range.contains(current.text_index)) {
+                        if (fLogicalClusters[i].text_range.contains(current.text_index())) {
                             logicalIdx = i;
                             break;
                         }
                     }
-                    bool atEndOfLogical = (current.text_index >= fLogicalClusters.back().text_range.end);
+                    bool atEndOfLogical = (current.text_index() >= fLogicalClusters.back().text_range.end);
                     if (atEndOfLogical) {
-                        next.text_index = fLogicalClusters.back().text_range.start;
-                        next.affinity = Affinity::kDownstream;
-                        next.caret_rect = fLogicalClusters.back().bounds;
-                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
-                    } else if (logicalIdx < fLogicalClusters.size() && current.text_index > fLogicalClusters[logicalIdx].text_range.start) {
-                        next.text_index = fLogicalClusters[logicalIdx].text_range.start;
-                        next.affinity = Affinity::kDownstream;
-                        next.caret_rect = fLogicalClusters[logicalIdx].bounds;
-                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                        SkRect r = fLogicalClusters.back().bounds;
+                        r.fRight = r.fLeft + 1.0f;
+                        next = CaretPosition(fLogicalClusters.back().text_range.start, Affinity::kDownstream, r);
+                    } else if (logicalIdx < fLogicalClusters.size() && current.text_index() > fLogicalClusters[logicalIdx].text_range.start) {
+                        SkRect r = fLogicalClusters[logicalIdx].bounds;
+                        r.fRight = r.fLeft + 1.0f;
+                        next = CaretPosition(fLogicalClusters[logicalIdx].text_range.start, Affinity::kDownstream, r);
                     } else if (logicalIdx > 0 && logicalIdx < fLogicalClusters.size()) {
-                        next.text_index = fLogicalClusters[logicalIdx - 1].text_range.start;
-                        next.affinity = Affinity::kDownstream;
-                        next.caret_rect = fLogicalClusters[logicalIdx - 1].bounds;
-                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                        SkRect r = fLogicalClusters[logicalIdx - 1].bounds;
+                        r.fRight = r.fLeft + 1.0f;
+                        next = CaretPosition(fLogicalClusters[logicalIdx - 1].text_range.start, Affinity::kDownstream, r);
                     }
                 } else {
                     size_t currentIdx = fFlatClusters.size();
                     for (size_t i = 0; i < fFlatClusters.size(); ++i) {
-                        if (fFlatClusters[i].text_range.contains(current.text_index)) {
+                        if (fFlatClusters[i].text_range.contains(current.text_index())) {
                             currentIdx = i;
                             break;
                         }
                     }
-                    bool atEndOfText = (current.text_index >= fFlatClusters.back().text_range.end);
+                    bool atEndOfText = (current.text_index() >= fFlatClusters.back().text_range.end);
                     if (atEndOfText) {
-                        next.text_index = fFlatClusters.back().text_range.start;
-                        next.affinity = Affinity::kDownstream;
-                        next.caret_rect = fFlatClusters.back().bounds;
-                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
-                    } else if (currentIdx < fFlatClusters.size() && current.text_index > fFlatClusters[currentIdx].text_range.start) {
-                        next.text_index = fFlatClusters[currentIdx].text_range.start;
-                        next.affinity = Affinity::kDownstream;
-                        next.caret_rect = fFlatClusters[currentIdx].bounds;
-                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                        SkRect r = fFlatClusters.back().bounds;
+                        r.fRight = r.fLeft + 1.0f;
+                        next = CaretPosition(fFlatClusters.back().text_range.start, Affinity::kDownstream, r);
+                    } else if (currentIdx < fFlatClusters.size() && current.text_index() > fFlatClusters[currentIdx].text_range.start) {
+                        SkRect r = fFlatClusters[currentIdx].bounds;
+                        r.fRight = r.fLeft + 1.0f;
+                        next = CaretPosition(fFlatClusters[currentIdx].text_range.start, Affinity::kDownstream, r);
                     } else if (currentIdx > 0 && currentIdx < fFlatClusters.size()) {
-                        next.text_index = fFlatClusters[currentIdx - 1].text_range.start;
-                        next.affinity = Affinity::kDownstream;
-                        next.caret_rect = fFlatClusters[currentIdx - 1].bounds;
-                        next.caret_rect.fRight = next.caret_rect.fLeft + 1.0f;
+                        SkRect r = fFlatClusters[currentIdx - 1].bounds;
+                        r.fRight = r.fLeft + 1.0f;
+                        next = CaretPosition(fFlatClusters[currentIdx - 1].text_range.start, Affinity::kDownstream, r);
                     }
                 }
                 break;
             }
             case CursorDirection::kDown: {
                 size_t currentLineIdx = lines.size();
-                SkScalar curY = current.caret_rect.centerY();
-                if (current.caret_rect.height() <= 0) {
-                    curY = current.caret_rect.fTop;
+                SkScalar curY = current.caret_rect().centerY();
+                if (current.caret_rect().height() <= 0) {
+                    curY = current.caret_rect().fTop;
                 }
                 for (size_t i = 0; i < lines.size(); ++i) {
                     if (curY >= lines[i].bounds.fTop && curY <= lines[i].bounds.fBottom) {
@@ -336,8 +319,8 @@ public:
                 if (currentLineIdx >= lines.size()) {
                     for (size_t i = 0; i < fLineClusters.size(); ++i) {
                         if (fLineClusters[i].empty()) continue;
-                        if (current.text_index >= fLineClusters[i].front().text_range.start &&
-                            current.text_index <= fLineClusters[i].back().text_range.end) {
+                        if (current.text_index() >= fLineClusters[i].front().text_range.start &&
+                            current.text_index() <= fLineClusters[i].back().text_range.end) {
                             currentLineIdx = i;
                             break;
                         }
@@ -346,16 +329,16 @@ public:
                 if (currentLineIdx < lines.size() && currentLineIdx + 1 < lines.size()) {
                     size_t targetLineIdx = currentLineIdx + 1;
                     SkScalar targetY = lines[targetLineIdx].bounds.centerY();
-                    SkScalar targetX = current.caret_rect.fLeft;
+                    SkScalar targetX = current.caret_rect().fLeft;
                     next = hitTest(targetX, targetY);
                 }
                 break;
             }
             case CursorDirection::kUp: {
                 size_t currentLineIdx = lines.size();
-                SkScalar curY = current.caret_rect.centerY();
-                if (current.caret_rect.height() <= 0) {
-                    curY = current.caret_rect.fTop;
+                SkScalar curY = current.caret_rect().centerY();
+                if (current.caret_rect().height() <= 0) {
+                    curY = current.caret_rect().fTop;
                 }
                 for (size_t i = 0; i < lines.size(); ++i) {
                     if (curY >= lines[i].bounds.fTop && curY <= lines[i].bounds.fBottom) {
@@ -366,8 +349,8 @@ public:
                 if (currentLineIdx >= lines.size()) {
                     for (size_t i = 0; i < fLineClusters.size(); ++i) {
                         if (fLineClusters[i].empty()) continue;
-                        if (current.text_index >= fLineClusters[i].front().text_range.start &&
-                            current.text_index <= fLineClusters[i].back().text_range.end) {
+                        if (current.text_index() >= fLineClusters[i].front().text_range.start &&
+                            current.text_index() <= fLineClusters[i].back().text_range.end) {
                             currentLineIdx = i;
                             break;
                         }
@@ -376,7 +359,7 @@ public:
                 if (currentLineIdx > 0 && currentLineIdx < lines.size()) {
                     size_t targetLineIdx = currentLineIdx - 1;
                     SkScalar targetY = lines[targetLineIdx].bounds.centerY();
-                    SkScalar targetX = current.caret_rect.fLeft;
+                    SkScalar targetX = current.caret_rect().fLeft;
                     next = hitTest(targetX, targetY);
                 }
                 break;

@@ -12,6 +12,7 @@
 #include "tools/text_editor/include/ShapedParagraph.h"
 #include <functional>
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 namespace skia::text_editor {
@@ -94,6 +95,9 @@ public:
         std::shared_ptr<const ShapedParagraph> shaped_para,
         const LayoutConstraints& constraints);
 };
+
+static_assert(!std::is_aggregate_v<FormattedParagraph>,
+    "KEEPER: Domain entity must be strictly encapsulated; raw fields are prohibited");
 
 } // namespace skia::text_editor
 

@@ -11,6 +11,7 @@
 #include "tools/text_editor/include/EditorTypes.h"
 #include "tools/text_editor/include/FormattedParagraph.h"
 #include <memory>
+#include <type_traits>
 #include <vector>
 
 namespace skia::text_editor {
@@ -65,6 +66,9 @@ public:
     static std::unique_ptr<const ParagraphSpatialIndex> Make(
         std::shared_ptr<const FormattedParagraph> formatted_para);
 };
+
+static_assert(!std::is_aggregate_v<ParagraphSpatialIndex>,
+    "KEEPER: Domain entity must be strictly encapsulated; raw fields are prohibited");
 
 } // namespace skia::text_editor
 

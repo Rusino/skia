@@ -164,14 +164,13 @@ std::vector<LineClusterInfo> getLineClusters(const LineBox& line,
 CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index, Affinity affinity = Affinity::kDownstream) {
     std::string_view text = doc.text();
     index = std::min(index, text.size());
-    CaretPosition pos;
-    pos.text_index = TextIndex(index);
-    pos.affinity = (index == text.size()) ? Affinity::kUpstream : affinity;
+    TextIndex textIndex = TextIndex(index);
+    Affinity resolvedAffinity = (index == text.size()) ? Affinity::kUpstream : affinity;
+    SkRect caretRect = SkRect::MakeEmpty();
 
     const auto& lines = doc.formatted().lines();
     if (lines.empty()) {
-        pos.caret_rect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
-        return pos;
+        return CaretPosition(textIndex, resolvedAffinity, SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f));
     }
 
     const auto* targetLine = &lines[0];
@@ -193,8 +192,7 @@ CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index, Affini
 
     auto clusters = getLineClusters(*targetLine, doc.text(), doc.unicode().grapheme_breaks());
     if (clusters.empty()) {
-        pos.caret_rect = SkRect::MakeXYWH(targetLine->bounds.fLeft, caretTop, 1.0f, caretHeight);
-        return pos;
+        return CaretPosition(textIndex, resolvedAffinity, SkRect::MakeXYWH(targetLine->bounds.fLeft, caretTop, 1.0f, caretHeight));
     }
 
     if (affinity == Affinity::kUpstream && index > 0) {
@@ -207,12 +205,11 @@ CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index, Affini
         }
         if (prevCluster) {
             SkScalar x = prevCluster->is_rtl ? prevCluster->bounds.fLeft : prevCluster->bounds.fRight;
-            pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
-            pos.affinity = Affinity::kUpstream;
-            if (pos.caret_rect.isEmpty()) {
-                pos.caret_rect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
+            caretRect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
+            if (caretRect.isEmpty()) {
+                caretRect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
             }
-            return pos;
+            return CaretPosition(textIndex, Affinity::kUpstream, caretRect);
         }
     }
 
@@ -238,13 +235,13 @@ CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index, Affini
 
     if (index >= targetLine->text_range.end.value || index == text.size()) {
         if (lastCluster && lastCluster->is_rtl) {
-            pos.caret_rect = SkRect::MakeXYWH(lastCluster->bounds.fLeft, caretTop, 1.0f, caretHeight);
+            caretRect = SkRect::MakeXYWH(lastCluster->bounds.fLeft, caretTop, 1.0f, caretHeight);
         } else if (lastNonWsCluster && lastNonWsCluster->is_rtl) {
-            pos.caret_rect = SkRect::MakeXYWH(lastNonWsCluster->bounds.fLeft, caretTop, 1.0f, caretHeight);
+            caretRect = SkRect::MakeXYWH(lastNonWsCluster->bounds.fLeft, caretTop, 1.0f, caretHeight);
         } else if (lastCluster) {
-            pos.caret_rect = SkRect::MakeXYWH(lastCluster->bounds.fRight, caretTop, 1.0f, caretHeight);
+            caretRect = SkRect::MakeXYWH(lastCluster->bounds.fRight, caretTop, 1.0f, caretHeight);
         } else {
-            pos.caret_rect = SkRect::MakeXYWH(targetLine->bounds.fRight, caretTop, 1.0f, caretHeight);
+            caretRect = SkRect::MakeXYWH(targetLine->bounds.fRight, caretTop, 1.0f, caretHeight);
         }
     } else {
         const LineClusterInfo* match = nullptr;
@@ -257,10 +254,10 @@ CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index, Affini
         if (match) {
             bool isTrailingWs = (lastNonWsCluster && match->text_range.start >= lastNonWsCluster->text_range.end);
             if (isTrailingWs && lastNonWsCluster->is_rtl) {
-                pos.caret_rect = SkRect::MakeXYWH(lastNonWsCluster->bounds.fLeft, caretTop, 1.0f, caretHeight);
+                caretRect = SkRect::MakeXYWH(lastNonWsCluster->bounds.fLeft, caretTop, 1.0f, caretHeight);
             } else {
                 SkScalar x = match->is_rtl ? match->bounds.fRight : match->bounds.fLeft;
-                pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
+                caretRect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
             }
         } else {
             const LineClusterInfo* firstCluster = nullptr;
@@ -271,18 +268,18 @@ CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index, Affini
             }
             if (firstCluster && index <= firstCluster->text_range.start.value) {
                 SkScalar x = firstCluster->is_rtl ? firstCluster->bounds.fRight : firstCluster->bounds.fLeft;
-                pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
+                caretRect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
             } else {
                 SkScalar x = (index > targetLine->text_range.start.value) ? targetLine->bounds.fRight : targetLine->bounds.fLeft;
-                pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
+                caretRect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
             }
         }
     }
 
-    if (pos.caret_rect.isEmpty()) {
-        pos.caret_rect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
+    if (caretRect.isEmpty()) {
+        caretRect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
     }
-    return pos;
+    return CaretPosition(textIndex, resolvedAffinity, caretRect);
 }
 
 } // namespace
@@ -317,7 +314,7 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
             updateCursorPosition(finalCaret, Affinity::kUpstream);
         }
     } else {
-        insertPos = std::min(fSelection.focus().text_index.value, fDocument->text().size());
+        insertPos = std::min(fSelection.focus().text_index().value, fDocument->text().size());
         if (sanitized == "\n") {
             kind = EditCommand::Kind::kNewline;
         } else if (sanitized.size() > 4) {
@@ -353,16 +350,46 @@ void TextEditorViewModel::deleteBackward(MovementGranularity gran) {
 
     if (!fSelection.is_collapsed()) {
         textBefore = copySelection();
+        SkScalar cutX = 0.0f;
+        SkScalar cutY = 0.0f;
+        bool hasCutCoord = false;
+
+        TextRange range = fSelection.text_range();
+        std::vector<SkRect> selRects;
+        if (!fSelection.ranges().empty()) {
+            for (const auto& r : fSelection.ranges()) {
+                std::vector<SkRect> rRects;
+                fDocument->spatial_index().getSelectionRects(r, rRects);
+                selRects.insert(selRects.end(), rRects.begin(), rRects.end());
+            }
+        } else {
+            fDocument->spatial_index().getSelectionRects(range, selRects);
+        }
+
+        if (!selRects.empty()) {
+            SkScalar minX = SK_ScalarMax;
+            for (const auto& r : selRects) {
+                minX = std::min(minX, r.fLeft);
+            }
+            cutX = minX;
+            cutY = selRects[0].centerY();
+            hasCutCoord = true;
+        }
+
         if (!fSelection.ranges().empty()) {
             deletePos = fSelection.ranges().front().start.value;
             for (auto it = fSelection.ranges().rbegin(); it != fSelection.ranges().rend(); ++it) {
                 fDocument->erase(*it);
             }
-            updateCursorPosition(deletePos);
         } else {
-            TextRange range = fSelection.text_range();
             deletePos = range.start.value;
             fDocument->erase(range);
+        }
+
+        if (hasCutCoord && !fDocument->text().empty()) {
+            CaretPosition newPos = fDocument->spatial_index().hitTest(cutX, cutY);
+            fSelection.collapse_to(newPos);
+        } else {
             updateCursorPosition(deletePos);
         }
 
@@ -378,7 +405,7 @@ void TextEditorViewModel::deleteBackward(MovementGranularity gran) {
             pushEditCommand(std::move(cmd));
         }
     } else {
-        size_t cursor = fSelection.focus().text_index.value;
+        size_t cursor = fSelection.focus().text_index().value;
         std::string_view text = fDocument->text();
         if (cursor == 0 || text.empty()) {
             return;
@@ -415,7 +442,7 @@ void TextEditorViewModel::deleteForward(MovementGranularity gran) {
         deleteBackward(gran);
         return;
     }
-    size_t cursor = fSelection.focus().text_index.value;
+    size_t cursor = fSelection.focus().text_index().value;
     std::string_view text = fDocument->text();
     if (cursor >= text.size()) {
         return;
@@ -483,9 +510,8 @@ void TextEditorViewModel::selectAll() {
     if (text.empty()) {
         return;
     }
-    CaretPosition start = fDocument->spatial_index().hitTest(0.0f, 0.0f);
-    start.text_index = TextIndex(0);
-    start.affinity = Affinity::kDownstream;
+    CaretPosition hitStart = fDocument->spatial_index().hitTest(0.0f, 0.0f);
+    CaretPosition start(TextIndex(0), Affinity::kDownstream, hitStart.caret_rect());
 
     CaretPosition end = resolveCaretPosition(*fDocument, text.size());
     fSelection.set_span(start, end);
@@ -496,15 +522,10 @@ void TextEditorViewModel::selectWordAtPoint(SkScalar screenX, SkScalar screenY) 
     SkScalar docX = screenX + fScrollOffset.fX;
     SkScalar docY = screenY + fScrollOffset.fY;
     CaretPosition hit = fDocument->spatial_index().hitTest(docX, docY);
-    TextRange wr = fDocument->spatial_index().getWordBoundary(hit.text_index);
+    TextRange wr = fDocument->spatial_index().getWordBoundary(hit.text_index());
 
-    CaretPosition anchor;
-    anchor.text_index = wr.start;
-    anchor.affinity = Affinity::kDownstream;
-
-    CaretPosition focus;
-    focus.text_index = wr.end;
-    focus.affinity = Affinity::kUpstream;
+    CaretPosition anchor(wr.start, Affinity::kDownstream);
+    CaretPosition focus(wr.end, Affinity::kUpstream);
 
     fSelection.set_span(anchor, focus);
     notifyRedraw();
@@ -623,7 +644,7 @@ bool TextEditorViewModel::handleKey(skui::Key key, skui::InputState state, skui:
             // Immediate Soft-Tab Normalization:
             // Calculate column offset from start of line
             std::string_view fullText = fDocument->text();
-            size_t cursor = std::min(fSelection.focus().text_index.value, fullText.size());
+            size_t cursor = std::min(fSelection.focus().text_index().value, fullText.size());
             size_t lineStart = 0;
             if (cursor > 0) {
                 size_t lastNewline = fullText.rfind('\n', cursor - 1);
@@ -671,7 +692,7 @@ bool TextEditorViewModel::handleChar(SkUnichar c, skui::ModifierKey modifiers) {
 }
 
 SkRect TextEditorViewModel::screenCaretRect() const {
-    SkRect r = fSelection.focus().caret_rect;
+    SkRect r = fSelection.focus().caret_rect();
     r.offset(-fScrollOffset.fX, -fScrollOffset.fY);
     return r;
 }
@@ -802,7 +823,7 @@ bool TextEditorViewModel::undo() {
 
     // 3. Restore selection state
     if (cmd.selectionBefore.is_collapsed()) {
-        updateCursorPosition(cmd.selectionBefore.focus().text_index.value);
+        updateCursorPosition(cmd.selectionBefore.focus().text_index().value);
     } else {
         fSelection = cmd.selectionBefore;
     }
@@ -833,7 +854,7 @@ bool TextEditorViewModel::redo() {
     }
 
     if (cmd.selectionAfter.is_collapsed()) {
-        updateCursorPosition(cmd.selectionAfter.focus().text_index.value);
+        updateCursorPosition(cmd.selectionAfter.focus().text_index().value);
     } else {
         fSelection = cmd.selectionAfter;
     }

@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace skia::text_editor {
@@ -69,6 +70,9 @@ public:
         std::string_view utf8_text,
         SkSpan<const StyleSpan> styles);
 };
+
+static_assert(!std::is_aggregate_v<UnicodeParagraph>,
+    "KEEPER: Domain entity must be strictly encapsulated; raw fields are prohibited");
 
 } // namespace skia::text_editor
 

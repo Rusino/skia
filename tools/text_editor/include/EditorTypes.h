@@ -129,20 +129,33 @@ struct StyleSpan {
     SkColor4f color{0, 0, 0, 1};
 };
 
-struct CaretPosition {
-    TextIndex text_index{0};
-    Affinity affinity{Affinity::kDownstream};
-    SkRect caret_rect{SkRect::MakeEmpty()};
+class CaretPosition {
+public:
+    CaretPosition() = default;
+    CaretPosition(TextIndex idx, Affinity aff = Affinity::kDownstream, SkRect rect = SkRect::MakeEmpty())
+        : fTextIndex(idx), fAffinity(aff), fCaretRect(rect) {}
+
+    TextIndex text_index() const { return fTextIndex; }
+    Affinity affinity() const { return fAffinity; }
+    const SkRect& caret_rect() const { return fCaretRect; }
 
     bool operator==(const CaretPosition& other) const {
-        return text_index == other.text_index &&
-               affinity == other.affinity &&
-               caret_rect == other.caret_rect;
+        return fTextIndex == other.fTextIndex &&
+               fAffinity == other.fAffinity &&
+               fCaretRect == other.fCaretRect;
     }
     bool operator!=(const CaretPosition& other) const {
         return !(*this == other);
     }
+
+private:
+    TextIndex fTextIndex{0};
+    Affinity fAffinity{Affinity::kDownstream};
+    SkRect fCaretRect{SkRect::MakeEmpty()};
 };
+
+static_assert(!std::is_aggregate_v<CaretPosition>,
+    "KEEPER: Domain entity must be strictly encapsulated; raw fields are prohibited");
 
 class EditorSelection {
 public:
@@ -160,15 +173,15 @@ public:
         if (!fRanges.empty()) {
             return false;
         }
-        return fAnchor.text_index == fFocus.text_index && fAnchor.affinity == fFocus.affinity;
+        return fAnchor.text_index() == fFocus.text_index() && fAnchor.affinity() == fFocus.affinity();
     }
 
     TextRange text_range() const {
         if (!fRanges.empty()) {
             return TextRange(fRanges.front().start, fRanges.back().end);
         }
-        TextIndex s = std::min(fAnchor.text_index, fFocus.text_index);
-        TextIndex e = std::max(fAnchor.text_index, fFocus.text_index);
+        TextIndex s = std::min(fAnchor.text_index(), fFocus.text_index());
+        TextIndex e = std::max(fAnchor.text_index(), fFocus.text_index());
         return TextRange(s, e);
     }
 
