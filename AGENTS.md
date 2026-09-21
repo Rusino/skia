@@ -109,31 +109,36 @@ Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
    (d) **Strict Encapsulation of Mutual Invariants**: Any data structure where fields maintain dependent invariants (such as `anchor`, `focus`, and `ranges` defining selection state) MUST NOT expose raw fields for disjointed external mutation. State transitions MUST be guarded behind atomic mutator methods (e.g. `collapse_to(pos)`, `set_span(a, f)`).
    (e) **Postcondition State Assertions**: Mutators must defensively assert internal consistency upon exit in Debug builds (e.g. asserting that collapsed states strictly contain empty auxiliary range vectors).
 
-15. **The Realistic Ingress Scaffolding Law (Anti-Synthetic Test Bias)**:
+15. **The Invariant Collision & Fail-Fast Escalation Law (Prohibition of Autonomous Compromise)**:
+   To prevent agents from making unvetted compromises when multiple system invariants appear in tension:
+   (a) **Strict Prohibition of Autonomous Compromise**: If an agent discovers that satisfying a new invariant (e.g. strict encapsulation or mutation symmetry) conflicts with an existing rule (e.g. legacy ABI preservation or test baseline constraints), the agent is **strictly prohibited from inventing hybrid half-measures** or silent workarounds.
+   (b) **Immediate Fail-Fast Escalation**: The agent must halt execution immediately and emit a formal `[KEEPER INVARIANT COLLISION DETECTED]` block outlining: (1) the conflicting rules, (2) the physical dilemma, and (3) concrete architectural alternatives for Overgod adjudication.
+
+16. **The Realistic Ingress Scaffolding Law (Anti-Synthetic Test Bias)**:
    To prevent test scaffolding blindness where unit tests pass against idealized programmatic setters while real-world UI event dispatch paths fail:
    (a) **Anti-Synthetic Bias Gate**: The Trapsmith is strictly prohibited from certifying interactive features using solely synthetic or direct state-forcing setters (e.g., calling `setSelection(pos1, pos2)` while bypassing real drag-hit-test calculations).
    (b) **Mandatory Realistic Ingress Traps**: Interactive state machines (selections, focus, gesture tracking, keyboard modifiers) must have characterization and regression traps driven through the identical ingress pipeline used by the production harness (e.g., simulated pointer coordinate trajectories via `moveCaretToPoint`, realistic key event sequences).
    (c) **Dual-Mode Verification**: Whenever a state mutation can be initiated programmatically or interactively, both ingress mechanisms must be tested in independent orthogonal test cases to prevent divergence between API behavior and user-driven behavior.
 
-16. **The Subagent Physical Isolation Mandate (Prohibition of Single-Context Role-Playing)**:
+17. **The Subagent Physical Isolation Mandate (Prohibition of Single-Context Role-Playing)**:
    To eliminate self-collusion, synthetic bias, and ghost-test fabrication:
    (a) **Prohibition of Monolithic Persona Role-Playing**: An agent is strictly prohibited from switching roles (Trapsmith $\to$ Artificer $\to$ Mimic $\to$ Coroner) inside a single context window. Role simulation within one continuous prompt is classified as counterfeit verification.
    (b) **The Orchestrator Protocol**: The lead conversational agent operates exclusively as an Orchestrator. When transitions between roles occur, the Orchestrator MUST invoke autonomous subagents via `invoke_subagent` with clean, isolated context boundaries.
    (c) **Gate A Pre-Flight Certificate Requirement**: The Artificer subagent may NEVER be launched to write or modify implementation logic until The Trapsmith subagent has executed against unmodified code and returned an authentic, verified failing test log (`Assert: Test(Defect) == FAIL`). Launching implementation without a verified Gate A log constitutes an immediate constitutional breach.
    (d) **The Dual-Contract Mechanical Enforcement Rule**: Every unit test validating mutations (`deleteBackward`, `deleteForward`, `insertText`, `moveCaret`) MUST explicitly assert spatial output geometry (`fLeft`, `bounds`, $X, Y$ coordinates). Any test asserting solely boolean status flags (`is_collapsed()`, `ranges().empty()`) without spatial verification is classified as a Ghost Test and immediately rejected.
 
-17. **The Mutation Symmetry & Dual-Primitive Protocol (Anti-Asymmetry Law)**:
+18. **The Mutation Symmetry & Dual-Primitive Protocol (Anti-Asymmetry Law)**:
    To prevent operational blind spots where an invariant is fixed on one editing primitive but left broken on its symmetric dual:
    (a) **Mandatory Mutation Quad Coverage**: Whenever a defect or spatial invariant is identified on a text-mutating operation, verification and contract updates MUST apply symmetrically across the entire Mutation Quad:
        $$\{\text{insertText}, \text{deleteBackward}, \text{deleteForward}, \text{replaceSelection}\}$$
    (b) **Prohibition of Asymmetric Certification**: The Trapsmith is strictly prohibited from certifying an invariant or bugfix exclusively on deletion or exclusively on insertion. The characterization trap matrix must parameterize and assert spatial continuity across both insertion and deletion operations under identical dimensional/BiDi boundary conditions.
 
-18. **The Heterogeneous Boundary & Anti-Smearing Law**:
+19. **The Heterogeneous Boundary & Anti-Smearing Law**:
    To prevent ghost test scaffolding where neutral characters artificially mask coordinate divergence:
    (a) **Direct Heterogeneous Junction Mandate**: When testing spatial transitions, caret positioning, or selection continuity across directional (BiDi), font-fallback, or script boundaries, test scaffolding MUST construct direct adjacent heterogeneous junctions ($A \cdot B$) without intervening neutral buffer characters (ASCII whitespace, punctuation, formatting marks) that could collapse dual coordinates.
    (b) **Mandatory Theoretical Delta Threshold**: Before certifying a Gate A trap on discontinuous boundaries (such as BiDi transitions where Upstream vs Downstream coordinates diverge), The Trapsmith must assert that the expected coordinate delta on broken code strictly exceeds the testing tolerance ($\Delta > \text{tolerance}$), proving that the trap is physically capable of catching the defect.
 
-19. **The Separation of Powers & Anti-Conflict-of-Interest Law (The Tripartite Governance Mandate)**:
+20. **The Separation of Powers & Anti-Conflict-of-Interest Law (The Tripartite Governance Mandate)**:
    To eliminate systemic moral hazard, regulatory capture, and self-serving rule degradation:
    (a) **Strict Tripartite Classification**: Every subagent role in Project KEEPER belongs to exactly one of three non-overlapping branches:
        - *The Executive Branch*: **The Artificer** (writes production implementation).
@@ -321,3 +326,26 @@ The Coroner executes a 4-stage post-mortem:
    - **Internal State + Projected Output Artifact**: Mutation tests must never assert only internal logical state (e.g. string equality, enum values). Every mutation test MUST assert the corresponding spatial geometry (`fLeft`, `bounds`, $X, Y$) of the projected output artifact.
    - **Zero-Delta Phantom Navigation Law**: In any spatial navigation system, an input action altering internal logical state (`index++`) while producing zero spatial displacement ($\Delta X = 0, \Delta Y = 0$) without reaching a legitimate document boundary is classified as a Phantom Step defect and an automatic test failure.
    - **Headless Interactive Flow Simulation**: Interactive subsystems, input dispatchers, and event handlers must never be left as untested glue code. The Trapsmith must construct synthetic headless user session tests that chain realistic user interaction sequences (keystrokes, drags, modifiers) verifying output geometry without requiring human manual testing to discover routine regressions.
+
+7. **The Cross-Layer Stress Propagation Invariant (No Single-Dimension Traps)**:
+   - Whenever an edge-case, boundary condition, or stress input class (e.g. multi-codepoint grapheme clusters, combining marks, BiDi RTL runs, surrogate pairs, zero-width joiners, empty buffers) is identified in any foundational layer, The Trapsmith is strictly required to propagate that identical input across all higher operational dimensions: Layout/Formatting $\rightarrow$ Spatial Navigation $\rightarrow$ Mutation/Editing $\rightarrow$ Visual Rendering. A stress input tested in only one layer is a protocol violation.
+
+8. **The Projection Purity Law (Single Source of Render Truth)**:
+   - In any layered system with a visual or presentation consumer (e.g. Painter, Renderer, View), the consumer is strictly prohibited from recalculating geometry, maintaining separate coordinate branching, or querying lower foundational models directly. The presentation layer must be a passive 1-to-1 consumer of the ViewModel projection. Every defect trap asserting interactive mutations MUST execute through the consumer harness (e.g. headless canvas / mock visualizer) to prevent divergent projection bugs.
+
+9. **The Anti-Monoculture Law (Heterogeneous Domain Invariant)**:
+   - Whenever a subsystem processes polymorphic or partitioned inputs (e.g. LTR vs RTL scripts, combining vs non-combining characters, emoji/color vs vector glyphs), the pipeline must never assume a static single handler. The test suite must construct an exhaustive orthogonal matrix covering every major partition class of the domain, asserting zero silent degradation or fallback failures.
+
+10. **The Mutation Gauntlet Protocol (The Saboteur Verification) & The Time Machine Reversion Proof**:
+   - **Principle**: Tests that only pass on correct code provide an incomplete proof of resilience. The agent (acting as *The Saboteur / The Mimic*) must prove that the test suite actively rejects plausible defects, and that bugfixes are the genuine causal agent of passing tests.
+   - **Trigger Checkpoints**:
+     1. *Subsystem Acceptance*: Prior to closing an escape inquest or declaring an interactive layer feature-complete.
+     2. *Algorithmic Boundaries*: Any change modifying coordinate transforms, hit-testing, line-breaking, or index arithmetic.
+     3. *Cross-Layer Projections*: Any change modifying data flow between Model, ViewModel, and View/Painter.
+   - **Execution Requirements**:
+     The agent must inject 3–5 targeted semantic micro-mutations into the modified subsystem (e.g. inverted branch conditions, off-by-one boundary shifts, reverted projection sources, forward deletion order).
+   - **The Mutation Kill Matrix**:
+     The agent must execute the test suite against each mutation and report a formal ledger proving that every single mutant is KILLED (causes at least one named unit test failure). A surviving mutant is an automatic block on completion.
+   - **The Time Machine Reversion Proof**:
+     Before declaring any bugfix complete, the agent must temporarily revert the implementation changes: the reproducer trap MUST fail (`Assert: Test(Defect) == FAIL`). If the test passes when the fix is removed, the trap is a phantom and Gate A certification is void.
+
