@@ -150,6 +150,24 @@ Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
    (b) **Absolute Ban on Cross-Branch Collusion**: Any role in the Judicial Branch evaluating whether code satisfies milestones or passes tests (e.g. The Oracle) is **strictly prohibited from holding legislative or rule-pruning authority**. An agent judging compliance may NEVER alter, soften, or prune the laws it judges against.
    (c) **Prohibition of Legislative Code-Writing**: Agents in the Legislative Branch (The Coroner, The Censor) are strictly prohibited from writing production or test code. Their output is restricted exclusively to formal RFCs, amendment diffs, and inquest reports for Overgod ratification.
 
+21. **The Subagent Liveness Watchdog & Command Containment Law (Anti-Hang Law)**:
+   To eliminate silent subagent deadlocks, zombie tasks, and indefinite parent-agent stalls:
+   (a) **Mandatory POSIX Command Timeout Wrapping**:
+       Every shell command executed by any agent or subagent via `run_command` MUST be explicitly wrapped in a deterministic timeout:
+       - Fast inspection commands (`git`, `ls`, `grep`): strictly bounded by `timeout 15s <cmd>`.
+       - Compilation and test execution (`ninja`, `dm`): strictly bounded by `timeout 60s <cmd>`.
+       Issuing unbounded shell invocations is classified as an immediate operational hazard and strictly prohibited.
+   (b) **Mandatory Orchestrator Liveness Watchdog (The Scheduler Shield)**:
+       Whenever The Orchestrator launches an asynchronous subagent via `invoke_subagent`, The Orchestrator is STRICTLY FORBIDDEN from entering an unbounded passive wait. The Orchestrator MUST concurrently arm a one-shot watchdog timer using the `schedule` tool:
+       `schedule(DurationSeconds=180, TimerCondition=<conversationId>, Prompt="Watchdog check: Verify subagent liveness")`
+       - If the subagent completes normally, the timer is automatically cancelled by the completion message.
+       - If the subagent stalls or fails to report within 180 seconds, the timer forcefully wakes The Orchestrator.
+   (c) **The Moribund Subagent Kill & Respawn Protocol**:
+       Upon watchdog timer expiration or stall detection:
+       - The Orchestrator queries `manage_subagents(Action='list')` and inspects the subagent's transcript.
+       - If the subagent has remained in an identical `running` or `waiting` state without forward progress for $\ge 120\text{s}$, it is formally classified as *Moribund*.
+       - The Orchestrator MUST immediately execute `manage_subagents(Action='kill', ConversationIds=[<id>])`, log the failure reason, and autonomously re-spawn a fresh subagent instance with clean state, or escalate to The Overgod if the stall persists across 2 consecutive attempts.
+
 ---
 
 ## 3. The Entity & Role Matrix
