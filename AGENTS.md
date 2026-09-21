@@ -269,24 +269,41 @@ Upon completing implementation, passing tests, and committing locally:
 ### Phase 11: The Coroner Protocol (Post-Mortem & Constitutional Hardening)
 Whenever a defect escapes into physical testing or production after pipeline certification, the lead agent MUST autonomously invoke `invoke_subagent(Role='The Coroner')`.
 
-The Coroner executes a 4-stage post-mortem:
-1. **5 Whys & 3-Tier Root Cause Analysis**:
-   - *Physical Cause*: What concrete state, coordinate delta, or memory layout failed?
-   - *Pipeline Blindspot*: Why did The Trapsmith fail to write a trap? Why did The Mimic fail to reject the test?
-   - *Constitutional Void*: What Tier 1 (Master) or Tier 2 (Domain) invariant was missing, ambiguous, or toothless?
-2. **Constitutional Amendment Drafting**:
-   - Formulate actionable negative constraints or compile-time/test mandates.
-   - Enforce Tier 1 vs Tier 2 separation (universal systems laws in `AGENTS.md`, subsystem-specific rules in `INVARIANTS.md`).
-3. **Adversarial Rule Falsification (Pre-Commit Rule Verification)**:
-   - *Historical Counter-Factual Replay*: Replay the proposed rule against the broken commit; prove it mechanically forces a failure on the defective code.
-   - *Adversarial Loophole Audit*: Red-team the rule wording to ensure agents cannot bypass it with dummy assertions, neutral buffers, or boolean-only checks.
-4. **Formal Inquest Report & Defect Ledger**:
-   - Construct a formal Defect Ledger mapping every reported bug $D_k$ to a named unit test $T_k$.
-   - Enforce **The Anti-Glue Law**: if a defect appears in untestable UI glue code, refactor and decouple it into a headless testable interface before constructing the trap.
-   - Enforce **The Atomic Git Triplet Law**: Any git commit resolving an escape is physically rejected unless it atomically includes:
-     - Implementation fix (`src/...`)
-     - Defect Trap & Anti-Monoculture Matrix (`tests/...`)
-     - Tier 2 Domain Codex rule update (`INVARIANTS.md`)
+The agent is strictly forbidden from treating an escape as a localized, one-off symptom. Every escape requires:
+1. **The Mandatory Inquest Header**: The agent's very first response following a reported escape MUST output the structured Inquest Header before executing any code modifications:
+   ```markdown
+   ### 🚨 KEEPER ESCAPE INQUEST INITIATED [Defect D_k]
+   1. Defect Classification: [Family Name, e.g. Zero-Advance Spatial Stalling]
+   2. Layer Origin: [Foundational Layer where the defect originates]
+   3. Reversion Trap Name: [Named test in test suite]
+   4. Anti-Monoculture Matrix Partitions: [Exhaustive domain partitions tested]
+   5. Pending Domain Invariant: [Domain Invariant X to be added to INVARIANTS.md]
+   6. Mode 1 Verification Plan: [Executable Target + Tactile Rubric]
+   ```
+2. **The 4-Stage Post-Mortem Analysis (The Coroner)**:
+   - **Stage A (5 Whys & 3-Tier Root Cause Analysis)**:
+     - *Physical Cause*: What concrete state, coordinate delta, or memory layout failed?
+     - *Pipeline Blindspot*: Why did The Trapsmith fail to write a trap? Why did The Mimic fail to reject the test?
+     - *Constitutional Void*: What Tier 1 (Master) or Tier 2 (Domain) invariant was missing, ambiguous, or toothless?
+   - **Stage B (Constitutional Amendment Drafting)**:
+     - Formulate actionable negative constraints or compile-time/test mandates.
+     - Enforce Tier 1 vs Tier 2 separation (universal systems laws in `AGENTS.md`, subsystem-specific rules in `INVARIANTS.md`).
+   - **Stage C (Adversarial Rule Falsification)**:
+     - *Historical Counter-Factual Replay*: Replay the proposed rule against the broken commit; prove it mechanically forces a failure on the defective code.
+     - *Adversarial Loophole Audit*: Red-team the rule wording to ensure agents cannot bypass it with dummy assertions, neutral buffers, or boolean-only checks.
+   - **Stage D (Formal Inquest Report & Defect Ledger)**:
+     - Construct a formal Defect Ledger mapping every reported bug $D_k$ to a named unit test $T_k$.
+     - Enforce **The Anti-Glue Law**: if a defect appears in untestable UI glue code, refactor and decouple it into a headless testable interface before constructing the trap.
+     - Enforce **The Atomic Git Triplet Law**: Any git commit resolving an escape is physically rejected unless it atomically includes:
+       - Implementation fix (`src/...`)
+       - Defect Trap & Anti-Monoculture Matrix (`tests/...`)
+       - Tier 2 Domain Codex rule update (`INVARIANTS.md`)
+3. **The Mandatory 4-Stage Operational Progression**:
+   Whenever an escape is reported, the system MUST execute this sequence across turns:
+   - **Stage 1 (Inquest & Rule Proposal)**: In the immediate response turn (with zero mutating tools), output the Inquest Header, analyze root causes, identify the specification/test gap, draft the proposed Invariant, and formulate a Time-Machine proof. STOP and await Overgod confirmation.
+   - **Stage 2 (Codification & Gate A Trap)**: Codify the invariant into `INVARIANTS.md`, construct the hostile test trap asserting the visual/consumer output, and prove failure on unmodified code (`Test(Defect) == FAIL`).
+   - **Stage 3 (Artificer Resolution & Gate B Gauntlet)**: Apply the structural fix, prove all tests pass under ASan/UBSan, and run the reversion proof.
+   - **Stage 4 (Interactive Hand-off)**: Issue the Phase 10 Intervention Brief with run command and perceptual verification script.
 
 ---
 
