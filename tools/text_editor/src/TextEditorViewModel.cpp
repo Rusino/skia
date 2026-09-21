@@ -131,8 +131,7 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
             CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
                 fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
             if (accuratePos.text_index.value == finalCaret) {
-                fSelection.anchor = accuratePos;
-                fSelection.focus = accuratePos;
+                fSelection.collapse_to(accuratePos);
             }
         } else {
             TextRange range = fSelection.text_range();
@@ -143,8 +142,7 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
             CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
                 fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
             if (accuratePos.text_index.value == finalCaret) {
-                fSelection.anchor = accuratePos;
-                fSelection.focus = accuratePos;
+                fSelection.collapse_to(accuratePos);
             }
         }
     } else {
@@ -162,8 +160,7 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
         CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
             fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
         if (accuratePos.text_index.value == finalCaret) {
-            fSelection.anchor = accuratePos;
-            fSelection.focus = accuratePos;
+            fSelection.collapse_to(accuratePos);
         }
     }
 
@@ -284,9 +281,10 @@ void TextEditorViewModel::deleteForward(MovementGranularity gran) {
 
 void TextEditorViewModel::moveCaret(CursorDirection dir, MovementGranularity gran, NavigationMode mode, bool select) {
     CaretPosition next = fDocument->spatial_index().moveCaret(fSelection.focus, dir, gran, mode);
-    fSelection.focus = next;
     if (!select) {
-        fSelection.anchor = next;
+        fSelection.collapse_to(next);
+    } else {
+        fSelection.set_span(fSelection.anchor, next);
     }
     notifyRedraw();
 }
@@ -295,10 +293,8 @@ void TextEditorViewModel::moveCaretToPoint(SkScalar screenX, SkScalar screenY, b
     SkScalar docX = screenX + fScrollOffset.fX;
     SkScalar docY = screenY + fScrollOffset.fY;
     CaretPosition hit = fDocument->spatial_index().hitTest(docX, docY);
-    fSelection.focus = hit;
     if (!select) {
-        fSelection.anchor = hit;
-        fSelection.ranges.clear();
+        fSelection.collapse_to(hit);
         fDragAnchorDocPoint = SkPoint::Make(docX, docY);
         fHasDragPoint = true;
     } else {
@@ -312,7 +308,7 @@ void TextEditorViewModel::moveCaretToPoint(SkScalar screenX, SkScalar screenY, b
             fDragAnchorDocPoint.fX, fDragAnchorDocPoint.fY,
             docX, docY,
             visualRects, visualRanges);
-        fSelection.ranges = std::move(visualRanges);
+        fSelection.set_ranges(fSelection.anchor, hit, std::move(visualRanges));
     }
     notifyRedraw();
 }
@@ -335,8 +331,7 @@ void TextEditorViewModel::selectAll() {
         end.caret_rect = SkRect::MakeXYWH(lastLine.bounds.fRight, lastLine.baseline + lastLine.ascent,
                                           1.0f, std::abs(lastLine.ascent) + std::abs(lastLine.descent));
     }
-    fSelection.anchor = start;
-    fSelection.focus = end;
+    fSelection.set_span(start, end);
     notifyRedraw();
 }
 
@@ -354,21 +349,17 @@ void TextEditorViewModel::selectWordAtPoint(SkScalar screenX, SkScalar screenY) 
     focus.text_index = wr.end;
     focus.affinity = Affinity::kUpstream;
 
-    fSelection.anchor = anchor;
-    fSelection.focus = focus;
+    fSelection.set_span(anchor, focus);
     notifyRedraw();
 }
 
 void TextEditorViewModel::setSelection(CaretPosition anchor, CaretPosition focus) {
-    fSelection.anchor = anchor;
-    fSelection.focus = focus;
+    fSelection.set_span(anchor, focus);
     notifyRedraw();
 }
 
 void TextEditorViewModel::collapseTo(CaretPosition pos) {
-    fSelection.anchor = pos;
-    fSelection.focus = pos;
-    fSelection.ranges.clear();
+    fSelection.collapse_to(pos);
     notifyRedraw();
 }
 
@@ -600,8 +591,7 @@ void TextEditorViewModel::updateCursorPosition(size_t index) {
     if (pos.caret_rect.isEmpty()) {
         pos.caret_rect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
     }
-    fSelection.anchor = pos;
-    fSelection.focus = pos;
+    fSelection.collapse_to(pos);
 }
 
 void TextEditorViewModel::setClipboardHandlers(ClipboardSetter setter, ClipboardGetter getter) {

@@ -253,6 +253,23 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 3. **Platform Window Event Absorption**:
    - In `TextEditorApp`, any key event successfully consumed by `onKey` as a command shortcut absorbs the subsequent `onChar` event generated within the same event slice by platform window harnesses (e.g. X11), preventing ghost character injection and protecting undo/redo history trees.
 
+---
 
+## Domain Invariant 19: Clipboard Operation Invariants & Selection Duplication
 
+1. **Empty Clipboard Immunity**:
+   - Pasting with an empty or whitespace-only/null clipboard must be an absolute NO-OP.
+   - It must never delete or overwrite the active selection, nor move the cursor.
 
+2. **Identical Selection Smart Duplication ($X \to XX$)**:
+   - When pasting clipboard content that is identical to the active selection (`raw == copySelection()`), the engine must not execute a degenerate replacement ($X \to X$).
+   - Instead, it must collapse the selection to the trailing boundary across all active ranges, position the caret adjacent to the selected text, and insert the duplicate adjacent to it ($X \to XX$).
+
+---
+
+## Domain Invariant 20: Encapsulated Selection State & Atomic Range Cohesion
+
+1. **Prohibition of Anemic State Mutations**:
+   - `EditorSelection` state transitions (`collapse_to`, `set_span`, `set_ranges`) must be executed exclusively through atomic mutator methods. Direct assignment to individual fields (`anchor`, `focus`, `ranges`) from callers is strictly prohibited.
+2. **Range Invariant Preservation**:
+   - Any operation collapsing the selection (`collapse_to`) or setting a 1D span (`set_span`) must unconditionally clear `ranges`, guaranteeing that `is_collapsed()` accurately reflects the true state of the selection.

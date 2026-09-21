@@ -164,6 +164,25 @@ struct EditorSelection {
         return TextRange(s, e);
     }
 
+    // Cohesive State Invariant: Atomic mutators preventing broken or inconsistent ranges
+    void collapse_to(CaretPosition pos) {
+        anchor = pos;
+        focus = pos;
+        ranges.clear();
+    }
+
+    void set_span(CaretPosition a, CaretPosition f) {
+        anchor = a;
+        focus = f;
+        ranges.clear();
+    }
+
+    void set_ranges(CaretPosition a, CaretPosition f, std::vector<TextRange> r) {
+        anchor = a;
+        focus = f;
+        ranges = std::move(r);
+    }
+
     bool operator==(const EditorSelection& other) const {
         return anchor == other.anchor && focus == other.focus && ranges == other.ranges;
     }
