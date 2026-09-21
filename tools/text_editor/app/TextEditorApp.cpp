@@ -129,6 +129,12 @@ public:
         if (!fViewModel) {
             return false;
         }
+        if (fLastHandledKey != skui::Key::kNONE) {
+            // Event absorption: this key was already consumed as a command by onKey
+            // in this same event slice from the platform window harness.
+            fLastHandledKey = skui::Key::kNONE;
+            return true;
+        }
         return fViewModel->handleChar(c, modifiers);
     }
 
@@ -136,7 +142,11 @@ public:
         if (!fViewModel) {
             return false;
         }
-        return fViewModel->handleKey(key, state, modifiers);
+        bool handled = fViewModel->handleKey(key, state, modifiers);
+        if (handled && state == skui::InputState::kDown) {
+            fLastHandledKey = key;
+        }
+        return handled;
     }
 
     bool onMouse(int x, int y, skui::InputState state, skui::ModifierKey modifiers) override {
@@ -167,6 +177,7 @@ private:
     std::unique_ptr<TextEditorViewModel> fViewModel;
     bool fIsMouseDown;
     SkScalar fPadding;
+    skui::Key fLastHandledKey{skui::Key::kNONE};
 };
 
 Application* Application::Create(int argc, char** argv, void* platformData) {

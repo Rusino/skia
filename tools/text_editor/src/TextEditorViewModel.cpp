@@ -392,13 +392,17 @@ void TextEditorViewModel::ensureCaretVisible(const SkRect& viewportBounds) {
 }
 
 bool TextEditorViewModel::handleKey(skui::Key key, skui::InputState state, skui::ModifierKey modifiers) {
+    if (key == skui::Key::kCtrl) {
+        fCtrlKeyHeld = (state == skui::InputState::kDown);
+        return true;
+    }
+
     if (state != skui::InputState::kDown) {
         return false;
     }
 
     bool shift = (modifiers & skui::ModifierKey::kShift) != skui::ModifierKey::kNone;
-    bool ctrlOrCmd = ((modifiers & skui::ModifierKey::kControl) != skui::ModifierKey::kNone) ||
-                     ((modifiers & skui::ModifierKey::kCommand) != skui::ModifierKey::kNone);
+    bool ctrlOrCmd = ((modifiers & (skui::ModifierKey::kControl | skui::ModifierKey::kCommand)) != skui::ModifierKey::kNone) || fCtrlKeyHeld;
 
     switch (key) {
         case skui::Key::kLeft:
@@ -500,10 +504,11 @@ bool TextEditorViewModel::handleKey(skui::Key key, skui::InputState state, skui:
 
 
 bool TextEditorViewModel::handleChar(SkUnichar c, skui::ModifierKey modifiers) {
-    if ((modifiers & (skui::ModifierKey::kControl | skui::ModifierKey::kCommand)) != skui::ModifierKey::kNone) {
-        return false;
-    }
-    if (c < 32 && c != '\n' && c != '\t') {
+    bool ctrlOrCmd = ((modifiers & (skui::ModifierKey::kControl | skui::ModifierKey::kCommand)) != skui::ModifierKey::kNone) || fCtrlKeyHeld;
+
+    // Hostile Invariant: Never insert text or control characters when Control/Command is held
+    // or when raw ASCII control characters (c < 32) arrive.
+    if (ctrlOrCmd || (c < 32 && c != '\n' && c != '\t')) {
         return false;
     }
 

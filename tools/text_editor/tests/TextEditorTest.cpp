@@ -1592,6 +1592,77 @@ DEF_TEST(TextEditor_Invariant17_LinearCommandHistoryUndoRedo, reporter) {
     REPORTER_ASSERT(reporter, vm->text() == "Hello Skia");
 }
 
+DEF_TEST(TextEditor_Invariant18_ModifierLatchingAndAccidentalCharImmunity, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    auto vm = std::make_unique<TextEditorViewModel>("", font);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+
+    vm->insertText("First paragraph with selected word.");
+
+    // 1. Chained Command Latching (holding Ctrl down across multiple commands):
+    // Simulate pressing physical Ctrl down:
+    vm->handleKey(skui::Key::kCtrl, skui::InputState::kDown, skui::ModifierKey::kControl);
+
+    // Make an edit so we have something to undo
+    vm->insertText(" Extra edit.");
+    REPORTER_ASSERT(reporter, vm->text() == "First paragraph with selected word. Extra edit.");
+
+    // First Undo: with explicit kControl modifier in key event
+    bool u1 = vm->handleKey(skui::Key::kZ, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, u1);
+    REPORTER_ASSERT(reporter, vm->text() == "First paragraph with selected word.");
+
+    // Make another edit, then undo it, but simulate X11 modifier drop (modifiers == kNone while Ctrl is held):
+    vm->insertText(" Another edit.");
+    REPORTER_ASSERT(reporter, vm->text() == "First paragraph with selected word. Another edit.");
+
+    bool u2 = vm->handleKey(skui::Key::kZ, skui::InputState::kDown, skui::ModifierKey::kNone);
+    // HOSTILE ASSERTION: Must succeed because physical Ctrl key is latched in ViewModel!
+    REPORTER_ASSERT(reporter, u2, "Chained shortcut failed: Ctrl latching was lost when modifier mask was dropped!");
+    REPORTER_ASSERT(reporter, vm->text() == "First paragraph with selected word.");
+
+    // Release physical Ctrl
+    vm->handleKey(skui::Key::kCtrl, skui::InputState::kUp, skui::ModifierKey::kNone);
+    // Now with Ctrl released, pressing Z with kNone must NOT perform undo:
+    bool u3 = vm->handleKey(skui::Key::kZ, skui::InputState::kDown, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, !u3);
+
+    // 2. Selection Accidental Overwrite Immunity:
+    // Select the word "selected"
+    vm->setSelection(CaretPosition{TextIndex(21), Affinity::kDownstream, SkRect::MakeEmpty()},
+                     CaretPosition{TextIndex(29), Affinity::kDownstream, SkRect::MakeEmpty()});
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, vm->copySelection() == "selected");
+
+    // Simulate X11 event sequence: user presses shortcut, and platform harness follows up
+    // with handleChar('v', kControl).
+    // Hostile Invariant: handleChar MUST reject 'v' when Control is held, never inserting 'v'
+    // or overwriting the active selection!
+    bool charHandled = vm->handleChar('v', skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, !charHandled, "handleChar should have rejected 'v' with Control modifier!");
+    REPORTER_ASSERT(reporter, vm->text() == "First paragraph with selected word.",
+                    "Literal 'v' was inserted over selection!");
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed(),
+                    "Selection was lost when Control+char arrived!");
+
+    // 3. Redo Branch Preservation on Stray Control Characters:
+    // Move to end of text, add text and undo it to have an active redo branch
+    vm->collapseTo(CaretPosition{TextIndex(vm->text().size()), Affinity::kDownstream, SkRect::MakeEmpty()});
+    vm->insertText(" New word.");
+    REPORTER_ASSERT(reporter, vm->text() == "First paragraph with selected word. New word.");
+    vm->undo();
+    REPORTER_ASSERT(reporter, vm->canRedo());
+
+    // Stray control character (e.g. ASCII 25 = Ctrl+Y or unrecognized control code < 32)
+    // must NOT wipe out the redo stack!
+    bool cHandled = vm->handleChar(25, skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, !cHandled, "Raw ASCII control char < 32 must be rejected!");
+    REPORTER_ASSERT(reporter, vm->canRedo(), "Redo stack was corrupted by stray character!");
+    vm->redo();
+    REPORTER_ASSERT(reporter, vm->text() == "First paragraph with selected word. New word.");
+}
+
+
 
 
 

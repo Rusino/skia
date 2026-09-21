@@ -159,6 +159,7 @@ private:
     std::deque<EditCommand> fUndoStack;
     std::vector<EditCommand> fRedoStack;
     bool fIsPerformingUndoRedo{false};
+    bool fCtrlKeyHeld{false};
 };
 
 } // namespace skia::text_editor

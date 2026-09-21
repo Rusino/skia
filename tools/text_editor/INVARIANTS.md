@@ -238,5 +238,21 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
    - Any new mutation executed while the history cursor is before the head of the stack permanently invalidates and truncates all downstream redo commands.
    - Pushing beyond maximum depth drops the oldest command in $O(1)$ time without reallocation churn.
 
+---
+
+## Domain Invariant 18: Modifier Latching, Chained Shortcut Immunity, and Event Absorption
+
+1. **Modifier Latching & Chained Command Integrity**:
+   - `TextEditorViewModel` latches the physical state of the `Control` modifier between `Key::kCtrl` down and up events.
+   - Chained shortcut execution while holding `Control` (such as sequential `Ctrl+Z`, `Ctrl+Y`, or `Ctrl+C` followed by `Ctrl+V`) must reliably preserve modifier context across all consecutive key events even if the underlying windowing system temporarily drops modifier bits in event state masks.
+
+2. **Accidental Character Insertion & Selection Immunity**:
+   - `TextEditorViewModel::handleChar` unconditionally rejects text insertion when `Control` (or `Command`) is active or when raw ASCII control codes ($c < 32$) arrive.
+   - Under no circumstances may control shortcut keypresses or modifier chattering insert literal characters (e.g. `'v'`, `'y'`) into the document or overwrite active selections.
+
+3. **Platform Window Event Absorption**:
+   - In `TextEditorApp`, any key event successfully consumed by `onKey` as a command shortcut absorbs the subsequent `onChar` event generated within the same event slice by platform window harnesses (e.g. X11), preventing ghost character injection and protecting undo/redo history trees.
+
+
 
 
