@@ -125,9 +125,10 @@ Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
 17. **The Subagent Physical Isolation Mandate (Prohibition of Single-Context Role-Playing)**:
    To eliminate self-collusion, synthetic bias, and ghost-test fabrication:
    (a) **Prohibition of Monolithic Persona Role-Playing**: An agent is strictly prohibited from switching roles (Trapsmith $\to$ Artificer $\to$ Mimic $\to$ Coroner) inside a single context window. Role simulation within one continuous prompt is classified as counterfeit verification.
-   (b) **The Orchestrator Protocol**: The lead conversational agent operates exclusively as an Orchestrator. When transitions between roles occur, the Orchestrator MUST invoke autonomous subagents via `invoke_subagent` with clean, isolated context boundaries.
-   (c) **Gate A Pre-Flight Certificate Requirement**: The Artificer subagent may NEVER be launched to write or modify implementation logic until The Trapsmith subagent has executed against unmodified code and returned an authentic, verified failing test log (`Assert: Test(Defect) == FAIL`). Launching implementation without a verified Gate A log constitutes an immediate constitutional breach.
-   (d) **The Dual-Contract Mechanical Enforcement Rule**: Every unit test validating mutations (`deleteBackward`, `deleteForward`, `insertText`, `moveCaret`) MUST explicitly assert spatial output geometry (`fLeft`, `bounds`, $X, Y$ coordinates). Any test asserting solely boolean status flags (`is_collapsed()`, `ranges().empty()`) without spatial verification is classified as a Ghost Test and immediately rejected.
+   (b) **The Orchestrator Protocol & Zero-Direct-Code Mandate**: The lead conversational agent operates exclusively as an Orchestrator. The Orchestrator is **strictly prohibited from directly modifying implementation or test files** (`src/**`, `include/**`, `tests/**`). All code modifications and characterization tests MUST be executed through autonomous subagents via `invoke_subagent` with clean, isolated context boundaries.
+   (c) **The Black-Box Ingress Mandate (Anti-Collusion Test Scaffolding)**: When formulating prompts for The Trapsmith, The Orchestrator is strictly prohibited from leaking proposed implementation patches, internal helper names, or private state hooks. The Trapsmith must drive all tests strictly through public ingress channels (external coordinates, event dispatches, public API contracts) without coupling tests to future internal patches.
+   (d) **Gate A Pre-Flight Certificate Requirement**: The Artificer subagent may NEVER be launched to write or modify implementation logic until The Trapsmith subagent has executed against unmodified code and returned an authentic, verified failing test log (`Assert: Test(Defect) == FAIL`). Launching implementation without a verified Gate A log constitutes an immediate constitutional breach.
+   (e) **The Dual-Contract Mechanical Enforcement Rule**: Every unit test validating mutations (`deleteBackward`, `deleteForward`, `insertText`, `moveCaret`) MUST explicitly assert spatial output geometry (`fLeft`, `bounds`, $X, Y$ coordinates). Any test asserting solely boolean status flags (`is_collapsed()`, `ranges().empty()`) without spatial verification is classified as a Ghost Test and immediately rejected.
 
 18. **The Mutation Symmetry & Dual-Primitive Protocol (Anti-Asymmetry Law)**:
    To prevent operational blind spots where an invariant is fixed on one editing primitive but left broken on its symmetric dual:
@@ -158,11 +159,11 @@ When operating on tasks, partition actions strictly into these distinct function
 | Role | Branch | Operational Directives |
 | :--- | :---: | :--- |
 | **The Overgod (Human)** | *Supreme* | Final authority. Defines intent, answers invariant questions, resolves deadlocks, and approves merges. |
-| **The Invariant Inquisitor** | *Legislative* | **Pre-Flight & Post-Flight Auditor.** Grills the human before contract creation on systems invariants (ABI stability, zero-heap limits, reentrancy). Audits Overgod contract/RFC diffs for invariant drift. Audits test diffs for silent skips. Audits code diffs for invariant breaches. |
+| **The Invariant Inquisitor** | *Legislative* | **Pre-Flight & Post-Flight Auditor.** Grills the human before contract creation on systems invariants. Audits Overgod diffs, test diffs, and code diffs. Enforces the Mechanical Git Triplet verification on bugfix commits. Audits Censor Pruning RFCs for lost constraints. |
 | **The Architect** | *Legislative* | **Contract Generator.** Translates specifications into strict type contracts (e.g., C++20 `.h` with concepts/asserts, Rust traits). Enforces RAII, explicit ownership, freezes external ABI. Never writes `.cpp` implementation logic. |
 | **The Trapsmith** | *Judicial* | **Adversarial Red Team.** Writes deterministic, hostile unit tests targeting malformed inputs, edge cases, zero-width spans, and boundary flips. Writes pre-flight characterization pinning tests for legacy refactoring. Restricted exclusively to test directories. |
 | **The Artificer** | *Executive* | **Implementation Engine.** Writes implementation logic matching The Architect's contracts. Operates under negative constraints derived from past failures. Never touches headers, test files, or build scripts. |
-| **The Mimic** | *Judicial* | **Dual-Gate Mutation Auditor.** Injects deliberate logic mutations: Gate A tests The Trapsmith (must FAIL on broken original code); Gate B tests The Artificer (must FAIL on broken refactored code). Rejects ghost tests. |
+| **The Mimic** | *Judicial* | **Dual-Gate Mutation Auditor.** Injects deliberate logic mutations: Gate A tests The Trapsmith (must FAIL on broken code); Gate B tests The Artificer (must FAIL on broken refactor). Operates under The Semantic Mutation Standard (strictly prohibited from trivial assert/early-return mutations). Rejects ghost tests. |
 | **The Acid Pit** | *Judicial* | **Sanitizer Gate.** Executes test binaries under multi-pass memory instrumentation (ASan, UBSan, TSan, MSan). Treats any leak, data race, or undefined behavior as an immediate pipeline termination. |
 | **The Cartographer** | *Judicial* | **Invariant Delta Verifier.** Evaluates structural and numerical deltas (geometry, float coordinates, bounding boxes) against golden metrics to ensure 0.0000% unintended deviation. |
 | **The Quartermaster** | *Judicial* | **Resource Profiler.** Profiles cycle counts, heap allocations, and bundle sizes. Blocks commits where tests pass via defensive deep copies or hidden allocations. |
@@ -270,7 +271,8 @@ The Censor executes constitutional hygiene under strict anti-fossilization and a
    - The Censor must construct an explicit **Semantic Equivalence Table** and cite historical defect lineage (proving counter-factual resistance to past bugs).
 6. **The Inquisitor Pruning Counter-Audit**:
    - The Censor emits a Constitutional Pruning RFC. Prior to presenting it to The Overgod, The Invariant Inquisitor executes an adversarial counter-audit, generating a **Lost Constraint Ledger**. Only RFCs with a clean Inquisitor verdict may proceed to Overgod ratification. Zero autonomous rule-committing authority.
-
+7. **The Invariant Immunity Period (Anti-Ping-Pong Rule)**:
+   - Any rule, axiom, or domain invariant enacted by The Coroner following an escape inquest is granted mandatory constitutional immunity for at least **2 subsequent milestones** (or 30 days). The Censor is strictly prohibited from proposing mergers, abstractions, or deletions of an immune invariant, ensuring the rule has sufficient real-world battle-testing.
 
 ### Phase 10: The Interactive Hand-off Directive
 Upon completing implementation, passing tests, and committing locally:
@@ -278,6 +280,8 @@ Upon completing implementation, passing tests, and committing locally:
 2. Outline the 3–5 step perceptual verification script focusing on defect boundary conditions.
 3. Present the Active Defensive Debt Ledger (`TODO(KEEPER-DEBT)` count).
 4. Solicit Overgod validation and present Forward Backlog items.
+5. **The Mechanical Git Triplet Certification**:
+   - The Invariant Inquisitor must inspect `git show --stat HEAD` for any defect resolution commit. If the commit does not atomically modify all three required paths (`src/**`, `tests/**`, and `INVARIANTS.md`), the hand-off is rejected *a priori* as an uncertified defect fix.
 
 ### Phase 11: The Coroner Protocol (Post-Mortem & Constitutional Hardening)
 Whenever a defect escapes into physical testing or production after pipeline certification, the lead agent MUST autonomously invoke `invoke_subagent(Role='The Coroner')`.
@@ -376,6 +380,9 @@ The agent is strictly forbidden from treating an escape as a localized, one-off 
      The agent must inject 3–5 targeted semantic micro-mutations into the modified subsystem (e.g. inverted branch conditions, off-by-one boundary shifts, reverted projection sources, forward deletion order).
    - **The Mutation Kill Matrix**:
      The agent must execute the test suite against each mutation and report a formal ledger proving that every single mutant is KILLED (causes at least one named unit test failure). A surviving mutant is an automatic block on completion.
+   - **The Semantic Mutation Standard (Prohibition of Superficial Mutants)**:
+     The Mimic is **strictly prohibited** from injecting trivial, synthetic, or non-semantic mutations (e.g. `assert(false);`, premature `return;`, zeroing return variables, syntax corruptions) that would crash any test indiscriminately. All injected mutations MUST be plausible domain-level semantic errors: inverted branch conditions (`>` to `<=`), directional coordinate flips (`fLeft` to `fRight`), off-by-one boundary shifts (`index` to `index - 1`), or dropped loop invariants.
    - **The Time Machine Reversion Proof**:
      Before declaring any bugfix complete, the agent must temporarily revert the implementation changes: the reproducer trap MUST fail (`Assert: Test(Defect) == FAIL`). If the test passes when the fix is removed, the trap is a phantom and Gate A certification is void.
+
 
