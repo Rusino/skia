@@ -146,6 +146,7 @@ When operating on tasks, partition your actions into these distinct functional r
 | **The Quartermaster** | **Resource Profiler.** Profiles cycle counts, heap allocations, and bundle sizes. Blocks commits where tests pass via defensive deep copies or hidden allocations. |
 | **The Graveyard** | **Anti-Pattern Memory (RAG).** Stores past crash traces, compiler stderr, and failed patches in a local SQLite/vector store. Injects them as negative prompts ("Do not use X; it previously failed due to Y"). |
 | **The Oracle** | **Long-Term Drift Forecaster & Debt Clearance Auditor.** Audits git history and scans codebases at milestone finish lines for `TODO(KEEPER-DEBT)` markers. Semantically verifies whether debt assertions are still active or obsolete, audits deferred trap tests, and blocks milestone releases until all debt is reconciled or resolved. |
+| **The Coroner** | **Escape Inquest & Constitutional Hardening Auditor.** Autonomously invoked upon any defect escape to physical testing/production. Executes 5 Whys root cause analysis across physical, pipeline, and constitutional tiers, drafts actionable amendments for `AGENTS.md` or `INVARIANTS.md`, and subjects proposed rules to adversarial backtesting and loophole hunting before Overgod sign-off. |
 
 ---
 
@@ -221,13 +222,33 @@ Graveyard]    Lead agent autonomously invokes `invoke_subagent("The Oracle")`:
               [Phase 9: The Overgod Final Approval]
               Human reviews diff for elegance and merges.
                     │
-            [Defects Found]
+            [Defects Found / Production Escape]
                     ▼
-            [The Bug-to-Trap Inquest]
-            1. The Trapsmith writes reproducer test.
-            2. Gate A: Assert Test(Defect) == FAIL.
-            3. Return to Phase 6 (The Artificer Fix).
+            [Phase 11: The Coroner Protocol (Inquest & Hardening)]
+            1. 5 Whys & 3-Tier Classification (Physical, Pipeline, Constitutional).
+            2. Constitutional Amendment Drafting (Tier 1 AGENTS.md vs Tier 2 INVARIANTS.md).
+            3. Rule Falsification: Counter-Factual Replay on broken code & Loophole Audit.
+            4. Inquest Report to The Overgod for constitutional sign-off.
+            5. Transition to The Trapsmith (Phase 4 reproducer trap) & The Artificer (Phase 6 fix).
 ```
+
+### Phase 11: The Coroner Protocol (Post-Mortem & Constitutional Hardening)
+
+Whenever a defect escapes into physical testing or production after pipeline certification, the lead agent MUST autonomously invoke `invoke_subagent` with Role='The Coroner'.
+
+The Coroner executes a 4-stage post-mortem:
+1. **5 Whys & 3-Tier Root Cause Analysis**:
+   - *Physical Cause*: What concrete state, coordinate delta, or memory layout failed?
+   - *Pipeline Blindspot*: Why did The Trapsmith fail to write a trap? Why did The Mimic fail to reject the test?
+   - *Constitutional Void*: What Tier 1 (Master) or Tier 2 (Domain) invariant was missing, ambiguous, or toothless?
+2. **Constitutional Amendment Drafting**:
+   - Formulate actionable negative constraints or compile-time/test mandates.
+   - Enforce Tier 1 vs Tier 2 separation (universal systems laws in `AGENTS.md`, subsystem-specific rules in `INVARIANTS.md`).
+3. **Adversarial Rule Falsification (Pre-Commit Rule Verification)**:
+   - *Historical Counter-Factual Replay*: Replay the proposed rule against the broken commit; prove it mechanically forces a failure on the defective code.
+   - *Adversarial Loophole Audit*: Red-team the rule wording to ensure agents cannot bypass it with dummy assertions, neutral buffers, or boolean-only checks.
+4. **Formal Inquest Report**:
+   - Present the Escape Inquest Report to The Overgod for constitutional ratification before downstream repair begins.
 
 ---
 
