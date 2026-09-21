@@ -18,6 +18,8 @@
 #include "tools/text_editor/include/EditorTypes.h"
 #include "tools/text_editor/include/TextDocument.h"
 
+#include <chrono>
+#include <deque>
 #include <functional>
 #include <memory>
 #include <string_view>
@@ -87,12 +89,20 @@ public:
     void collapseTo(CaretPosition pos);
 
     // Clipboard Interop (Headless Provider Delegation)
+    // Clipboard Interop (Headless Provider Delegation)
     using ClipboardSetter = std::function<void(std::string_view)>;
     using ClipboardGetter = std::function<std::string()>;
     void setClipboardHandlers(ClipboardSetter setter, ClipboardGetter getter);
     std::string copySelection() const;
     void cutSelection();
     void pasteText(std::string_view raw);
+
+    // History & Undo/Redo Commands (Domain Invariant 17)
+    bool canUndo() const;
+    bool canRedo() const;
+    bool undo();
+    bool redo();
+    void clearHistory();
 
     // Viewport & Scrolling Management
     void ensureCaretVisible(const SkRect& viewportBounds);
@@ -109,12 +119,30 @@ public:
     void visitScreenRuns(const SkRect& screenClip, RenderRunVisitor visitor) const;
 
 private:
+    struct EditCommand {
+        enum class Kind {
+            kTyping,
+            kPaste,
+            kDelete,
+            kCutOrBlock,
+            kNewline
+        };
+        Kind kind;
+        TextIndex position;
+        std::string textBefore;
+        std::string textAfter;
+        EditorSelection selectionBefore;
+        EditorSelection selectionAfter;
+        std::chrono::steady_clock::time_point timestamp;
+    };
+
     void notifyRedraw() {
         if (fOnRedraw) {
             fOnRedraw();
         }
     }
     void updateCursorPosition(size_t index);
+    void pushEditCommand(EditCommand cmd);
 
     std::unique_ptr<TextDocument> fDocument;
     EditorSelection fSelection;
@@ -126,6 +154,11 @@ private:
     RedrawCallback fOnRedraw;
     ClipboardSetter fClipboardSetter;
     ClipboardGetter fClipboardGetter;
+
+    static constexpr size_t kMaxUndoDepth = 1000;
+    std::deque<EditCommand> fUndoStack;
+    std::vector<EditCommand> fRedoStack;
+    bool fIsPerformingUndoRedo{false};
 };
 
 } // namespace skia::text_editor

@@ -1473,6 +1473,126 @@ DEF_TEST(TextEditor_Invariant12_MultiLineVisualDrag, reporter) {
                     "Intermediate line 1 must be 100%% saturated on upward drag!");
 }
 
+// =============================================================================
+// TRAP 28: Domain Invariant 17 - Linear Command History (Undo/Redo)
+// =============================================================================
+DEF_TEST(TextEditor_Invariant17_LinearCommandHistoryUndoRedo, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    auto vm = std::make_unique<TextEditorViewModel>("", font);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+
+    // 1. Initial State
+    REPORTER_ASSERT(reporter, !vm->canUndo());
+    REPORTER_ASSERT(reporter, !vm->canRedo());
+    REPORTER_ASSERT(reporter, !vm->undo());
+    REPORTER_ASSERT(reporter, !vm->redo());
+
+    // 2. Typing with Coalescing across Word Boundaries:
+    // Type "Hello"
+    for (char c : std::string("Hello")) {
+        vm->handleChar(c, skui::ModifierKey::kNone);
+    }
+    REPORTER_ASSERT(reporter, vm->text() == "Hello");
+    REPORTER_ASSERT(reporter, vm->canUndo());
+    REPORTER_ASSERT(reporter, !vm->canRedo());
+
+    // Type space " " (Word Boundary partition)
+    vm->handleChar(' ', skui::ModifierKey::kNone);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello ");
+
+    // Type "World"
+    for (char c : std::string("World")) {
+        vm->handleChar(c, skui::ModifierKey::kNone);
+    }
+    REPORTER_ASSERT(reporter, vm->text() == "Hello World");
+
+    // 3. Sequential Undo across Word Boundaries
+    // First undo: removes "World"
+    bool u1 = vm->undo();
+    REPORTER_ASSERT(reporter, u1);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello ");
+    REPORTER_ASSERT(reporter, vm->canUndo());
+    REPORTER_ASSERT(reporter, vm->canRedo());
+
+    // Second undo: removes " "
+    bool u2 = vm->undo();
+    REPORTER_ASSERT(reporter, u2);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello");
+
+    // Third undo: removes "Hello"
+    bool u3 = vm->undo();
+    REPORTER_ASSERT(reporter, u3);
+    REPORTER_ASSERT(reporter, vm->text().empty());
+    REPORTER_ASSERT(reporter, !vm->canUndo());
+    REPORTER_ASSERT(reporter, vm->canRedo());
+
+    // 4. Sequential Redo
+    bool r1 = vm->redo();
+    REPORTER_ASSERT(reporter, r1);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello");
+
+    bool r2 = vm->redo();
+    REPORTER_ASSERT(reporter, r2);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello ");
+
+    bool r3 = vm->redo();
+    REPORTER_ASSERT(reporter, r3);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello World");
+    REPORTER_ASSERT(reporter, !vm->canRedo());
+
+    // 5. Branch Truncation Invariant:
+    // Undo "World", then type "Skia" -> redo history must be discarded
+    vm->undo();
+    REPORTER_ASSERT(reporter, vm->text() == "Hello ");
+    REPORTER_ASSERT(reporter, vm->canRedo());
+
+    for (char c : std::string("Skia")) {
+        vm->handleChar(c, skui::ModifierKey::kNone);
+    }
+    REPORTER_ASSERT(reporter, vm->text() == "Hello Skia");
+    REPORTER_ASSERT(reporter, !vm->canRedo(), "Branch truncation violated: Redo stack not discarded!");
+    REPORTER_ASSERT(reporter, !vm->redo());
+
+    // 6. Block Deletion & Selection Restoration:
+    // Select "Skia" (indices 6 to 10)
+    vm->setSelection(CaretPosition{TextIndex(6), Affinity::kDownstream, SkRect::MakeEmpty()},
+                     CaretPosition{TextIndex(10), Affinity::kDownstream, SkRect::MakeEmpty()});
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+
+    // Delete selection
+    vm->deleteBackward();
+    REPORTER_ASSERT(reporter, vm->text() == "Hello ");
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+
+    // Undo deletion: must restore "Hello Skia" AND non-collapsed selection over "Skia"
+    vm->undo();
+    REPORTER_ASSERT(reporter, vm->text() == "Hello Skia");
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed(), "Undo must restore non-collapsed selection!");
+    REPORTER_ASSERT(reporter, vm->selection().text_range() == TextRange(TextIndex(6), TextIndex(10)));
+
+    // 7. Shortcut Key Bindings (Ctrl+Z and Ctrl+Shift+Z / Ctrl+Y)
+    // Ctrl+Z: undo selection restoration
+    bool keyUndo = vm->handleKey(skui::Key::kZ, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, keyUndo);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello ");
+
+    // Ctrl+Shift+Z: redo
+    bool keyRedoShift = vm->handleKey(skui::Key::kZ, skui::InputState::kDown,
+                                      skui::ModifierKey::kControl | skui::ModifierKey::kShift);
+    REPORTER_ASSERT(reporter, keyRedoShift);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello Skia");
+
+    // Ctrl+Z again
+    vm->handleKey(skui::Key::kZ, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello ");
+
+    // Ctrl+Y: redo
+    bool keyRedoY = vm->handleKey(skui::Key::kY, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, keyRedoY);
+    REPORTER_ASSERT(reporter, vm->text() == "Hello Skia");
+}
+
+
 
 
 

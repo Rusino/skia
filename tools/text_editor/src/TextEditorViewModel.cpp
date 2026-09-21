@@ -111,16 +111,21 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
         return;
     }
 
+    EditorSelection selBefore = fSelection;
+    std::string textBefore;
+    size_t insertPos = 0;
+    EditCommand::Kind kind = EditCommand::Kind::kTyping;
+
     if (!fSelection.is_collapsed()) {
+        kind = EditCommand::Kind::kCutOrBlock;
+        textBefore = copySelection();
         if (!fSelection.ranges.empty()) {
-            // Delete ranges in reverse order
+            insertPos = fSelection.ranges.front().start.value;
             for (auto it = fSelection.ranges.rbegin(); it != fSelection.ranges.rend(); ++it) {
                 fDocument->erase(*it);
             }
-            size_t insertPos = fSelection.ranges.front().start.value;
             fSelection.ranges.clear();
             fDocument->insert(TextIndex(insertPos), sanitized);
-            // Move caret via spatial index hit-test/moveCaret to ensure accurate multi-line caret_rect
             size_t finalCaret = insertPos + sanitized.size();
             updateCursorPosition(finalCaret);
             CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
@@ -131,9 +136,9 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
             }
         } else {
             TextRange range = fSelection.text_range();
-            size_t start = range.start.value;
+            insertPos = range.start.value;
             fDocument->replace(range, sanitized);
-            size_t finalCaret = start + sanitized.size();
+            size_t finalCaret = insertPos + sanitized.size();
             updateCursorPosition(finalCaret);
             CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
                 fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
@@ -143,9 +148,16 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
             }
         }
     } else {
-        size_t pos = std::min(fSelection.focus.text_index.value, fDocument->text().size());
-        fDocument->insert(TextIndex(pos), sanitized);
-        size_t finalCaret = pos + sanitized.size();
+        insertPos = std::min(fSelection.focus.text_index.value, fDocument->text().size());
+        if (sanitized == "\n") {
+            kind = EditCommand::Kind::kNewline;
+        } else if (sanitized.size() > 4) {
+            kind = EditCommand::Kind::kPaste;
+        } else {
+            kind = EditCommand::Kind::kTyping;
+        }
+        fDocument->insert(TextIndex(insertPos), sanitized);
+        size_t finalCaret = insertPos + sanitized.size();
         updateCursorPosition(finalCaret);
         CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
             fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
@@ -154,24 +166,54 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
             fSelection.focus = accuratePos;
         }
     }
+
+    if (!fIsPerformingUndoRedo) {
+        EditCommand cmd;
+        cmd.kind = kind;
+        cmd.position = TextIndex(insertPos);
+        cmd.textBefore = std::move(textBefore);
+        cmd.textAfter = sanitized;
+        cmd.selectionBefore = selBefore;
+        cmd.selectionAfter = fSelection;
+        cmd.timestamp = std::chrono::steady_clock::now();
+        pushEditCommand(std::move(cmd));
+    }
+
     notifyRedraw();
 }
 
 
 void TextEditorViewModel::deleteBackward(MovementGranularity gran) {
+    EditorSelection selBefore = fSelection;
+    std::string textBefore;
+    size_t deletePos = 0;
+
     if (!fSelection.is_collapsed()) {
+        textBefore = copySelection();
         if (!fSelection.ranges.empty()) {
-            size_t targetCaret = fSelection.ranges.front().start.value;
+            deletePos = fSelection.ranges.front().start.value;
             for (auto it = fSelection.ranges.rbegin(); it != fSelection.ranges.rend(); ++it) {
                 fDocument->erase(*it);
             }
             fSelection.ranges.clear();
-            updateCursorPosition(targetCaret);
+            updateCursorPosition(deletePos);
         } else {
             TextRange range = fSelection.text_range();
-            size_t start = range.start.value;
+            deletePos = range.start.value;
             fDocument->erase(range);
-            updateCursorPosition(start);
+            updateCursorPosition(deletePos);
+        }
+
+        if (!fIsPerformingUndoRedo) {
+            EditCommand cmd;
+            cmd.kind = EditCommand::Kind::kCutOrBlock;
+            cmd.position = TextIndex(deletePos);
+            cmd.textBefore = std::move(textBefore);
+            cmd.textAfter = "";
+            cmd.selectionBefore = selBefore;
+            cmd.selectionAfter = fSelection;
+            cmd.timestamp = std::chrono::steady_clock::now();
+            pushEditCommand(std::move(cmd));
         }
     } else {
         size_t cursor = fSelection.focus.text_index.value;
@@ -186,40 +228,56 @@ void TextEditorViewModel::deleteBackward(MovementGranularity gran) {
                 break;
             }
         }
+        deletePos = prevPos;
+        textBefore = std::string(text.substr(prevPos, cursor - prevPos));
         fDocument->erase(TextRange(TextIndex(prevPos), TextIndex(cursor)));
         updateCursorPosition(prevPos);
+
+        if (!fIsPerformingUndoRedo) {
+            EditCommand cmd;
+            cmd.kind = EditCommand::Kind::kDelete;
+            cmd.position = TextIndex(deletePos);
+            cmd.textBefore = std::move(textBefore);
+            cmd.textAfter = "";
+            cmd.selectionBefore = selBefore;
+            cmd.selectionAfter = fSelection;
+            cmd.timestamp = std::chrono::steady_clock::now();
+            pushEditCommand(std::move(cmd));
+        }
     }
     notifyRedraw();
 }
 
 void TextEditorViewModel::deleteForward(MovementGranularity gran) {
     if (!fSelection.is_collapsed()) {
-        if (!fSelection.ranges.empty()) {
-            size_t targetCaret = fSelection.ranges.front().start.value;
-            for (auto it = fSelection.ranges.rbegin(); it != fSelection.ranges.rend(); ++it) {
-                fDocument->erase(*it);
-            }
-            fSelection.ranges.clear();
-            updateCursorPosition(targetCaret);
-        } else {
-            TextRange range = fSelection.text_range();
-            size_t start = range.start.value;
-            fDocument->erase(range);
-            updateCursorPosition(start);
-        }
-    } else {
-        size_t cursor = fSelection.focus.text_index.value;
-        std::string_view text = fDocument->text();
-        if (cursor >= text.size()) {
-            return;
-        }
-        const char* begin = text.data();
-        const char* ptr = begin + cursor;
-        const char* end = begin + text.size();
-        SkUTF::NextUTF8(&ptr, end);
-        size_t nextPos = ptr - begin;
-        fDocument->erase(TextRange(TextIndex(cursor), TextIndex(nextPos)));
-        updateCursorPosition(cursor);
+        deleteBackward(gran);
+        return;
+    }
+    size_t cursor = fSelection.focus.text_index.value;
+    std::string_view text = fDocument->text();
+    if (cursor >= text.size()) {
+        return;
+    }
+    EditorSelection selBefore = fSelection;
+    const char* begin = text.data();
+    const char* ptr = begin + cursor;
+    const char* end = begin + text.size();
+    SkUTF::NextUTF8(&ptr, end);
+    size_t nextPos = ptr - begin;
+    std::string textBefore = std::string(text.substr(cursor, nextPos - cursor));
+    fDocument->erase(TextRange(TextIndex(cursor), TextIndex(nextPos)));
+    updateCursorPosition(cursor);
+
+    if (!fIsPerformingUndoRedo) {
+        EditCommand cmd;
+        cmd.kind = EditCommand::Kind::kDelete;
+        cmd.position = TextIndex(cursor);
+        cmd.textBefore = std::move(textBefore);
+        cmd.textAfter = "";
+        cmd.selectionBefore = selBefore;
+        cmd.selectionAfter = fSelection;
+        cmd.timestamp = std::chrono::steady_clock::now();
+        pushEditCommand(std::move(cmd));
     }
     notifyRedraw();
 }
@@ -386,6 +444,22 @@ bool TextEditorViewModel::handleKey(skui::Key key, skui::InputState state, skui:
                 if (fClipboardGetter) {
                     pasteText(fClipboardGetter());
                 }
+                return true;
+            }
+            break;
+        case skui::Key::kZ:
+            if (ctrlOrCmd) {
+                if (shift) {
+                    redo();
+                } else {
+                    undo();
+                }
+                return true;
+            }
+            break;
+        case skui::Key::kY:
+            if (ctrlOrCmd) {
+                redo();
                 return true;
             }
             break;
@@ -568,6 +642,136 @@ void TextEditorViewModel::cutSelection() {
 
 void TextEditorViewModel::pasteText(std::string_view raw) {
     insertText(raw);
+}
+
+bool TextEditorViewModel::canUndo() const {
+    return !fUndoStack.empty();
+}
+
+bool TextEditorViewModel::canRedo() const {
+    return !fRedoStack.empty();
+}
+
+bool TextEditorViewModel::undo() {
+    if (fUndoStack.empty()) {
+        return false;
+    }
+
+    EditCommand cmd = std::move(fUndoStack.back());
+    fUndoStack.pop_back();
+
+    fIsPerformingUndoRedo = true;
+
+    // Apply inverse mutation:
+    // 1. If text was inserted, erase it
+    if (!cmd.textAfter.empty()) {
+        fDocument->erase(TextRange(cmd.position, cmd.position + cmd.textAfter.size()));
+    }
+    // 2. If text was deleted, re-insert it
+    if (!cmd.textBefore.empty()) {
+        fDocument->insert(cmd.position, cmd.textBefore);
+    }
+
+    // 3. Restore selection state
+    if (cmd.selectionBefore.is_collapsed()) {
+        updateCursorPosition(cmd.selectionBefore.focus.text_index.value);
+    } else {
+        fSelection = cmd.selectionBefore;
+    }
+
+    fIsPerformingUndoRedo = false;
+    fRedoStack.push_back(std::move(cmd));
+
+    notifyRedraw();
+    return true;
+}
+
+bool TextEditorViewModel::redo() {
+    if (fRedoStack.empty()) {
+        return false;
+    }
+
+    EditCommand cmd = std::move(fRedoStack.back());
+    fRedoStack.pop_back();
+
+    fIsPerformingUndoRedo = true;
+
+    // Apply forward mutation:
+    if (!cmd.textBefore.empty()) {
+        fDocument->erase(TextRange(cmd.position, cmd.position + cmd.textBefore.size()));
+    }
+    if (!cmd.textAfter.empty()) {
+        fDocument->insert(cmd.position, cmd.textAfter);
+    }
+
+    if (cmd.selectionAfter.is_collapsed()) {
+        updateCursorPosition(cmd.selectionAfter.focus.text_index.value);
+    } else {
+        fSelection = cmd.selectionAfter;
+    }
+
+    fIsPerformingUndoRedo = false;
+    fUndoStack.push_back(std::move(cmd));
+
+    notifyRedraw();
+    return true;
+}
+
+void TextEditorViewModel::clearHistory() {
+    fUndoStack.clear();
+    fRedoStack.clear();
+}
+
+void TextEditorViewModel::pushEditCommand(EditCommand cmd) {
+    if (fIsPerformingUndoRedo) {
+        return;
+    }
+
+    // Any new mutation invalidates the entire Redo stack
+    fRedoStack.clear();
+
+    auto now = cmd.timestamp;
+    bool coalesced = false;
+
+    if (!fUndoStack.empty()) {
+        auto& last = fUndoStack.back();
+        auto dt = std::chrono::duration_cast<std::chrono::milliseconds>(now - last.timestamp).count();
+
+        // 1. Typing coalescing
+        if (last.kind == EditCommand::Kind::kTyping && cmd.kind == EditCommand::Kind::kTyping) {
+            bool isBoundary = (cmd.textAfter == " " || cmd.textAfter == "\t" ||
+                               std::ispunct(static_cast<unsigned char>(cmd.textAfter[0])));
+            bool lastWasBoundary = (last.textAfter == " " || last.textAfter == "\t" ||
+                                    (last.textAfter.size() == 1 && std::ispunct(static_cast<unsigned char>(last.textAfter[0]))));
+
+            if (dt <= 750 &&
+                cmd.position.value == (last.position.value + last.textAfter.size()) &&
+                !isBoundary && !lastWasBoundary)
+            {
+                last.textAfter.append(cmd.textAfter);
+                last.selectionAfter = cmd.selectionAfter;
+                last.timestamp = now;
+                coalesced = true;
+            }
+        }
+        // 2. Backward deletion coalescing
+        else if (last.kind == EditCommand::Kind::kDelete && cmd.kind == EditCommand::Kind::kDelete) {
+            if (dt <= 750 && (cmd.position.value + cmd.textBefore.size() == last.position.value)) {
+                last.textBefore = cmd.textBefore + last.textBefore;
+                last.position = cmd.position;
+                last.selectionAfter = cmd.selectionAfter;
+                last.timestamp = now;
+                coalesced = true;
+            }
+        }
+    }
+
+    if (!coalesced) {
+        fUndoStack.push_back(std::move(cmd));
+        if (fUndoStack.size() > kMaxUndoDepth) {
+            fUndoStack.pop_front();
+        }
+    }
 }
 
 } // namespace skia::text_editor

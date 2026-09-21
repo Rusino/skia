@@ -217,4 +217,26 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
    - All pasted content is strictly piped through `Invariant 14` input sanitization (normalizing CRLF to `\n`, replacing tabs with soft-spaces, filtering C0 noise and DEL, while preserving UTF-8 shaping controls).
    - Upon completion, the selection must be collapsed, and the caret must be synchronously placed immediately after the inserted text.
 
+---
+
+## Domain Invariant 17: Linear Reversible Command History (Undo/Redo) & Typing Coalescing
+
+1. **Deterministic Bounded Reversibility**:
+   - `TextEditorViewModel` maintains a bounded linear history of reversible edit commands (max depth = 1000).
+   - Any state mutating document text (`insert`, `delete`, `replace`, `paste`, `cut`) must be executed as a command pair `(ForwardMutation, InverseMutation)` preserving exact byte spans and selection states (`selectionBefore`, `selectionAfter`).
+   - Executing `undo()` strictly reverses the mutation and restores `selectionBefore`. Executing `redo()` reapplies the mutation and restores `selectionAfter`.
+
+2. **Typing Coalescing & Boundary Partitioning**:
+   - Monotonic character typing is coalesced into a single undoable transaction if and only if:
+     (a) Elapsed time between consecutive keystrokes is $\le 750\text{ ms}$;
+     (b) Insert position is immediately contiguous;
+     (c) The typed character does not cross a word boundary (space, punctuation, newline).
+   - Deletions via Backspace/Delete are coalesced similarly within a contiguous run, but never merged with insertions.
+   - External paste, cut, block replace, and newline ingestion are atomic and never coalesced.
+
+3. **Branch Truncation & Zero Memory Leak**:
+   - Any new mutation executed while the history cursor is before the head of the stack permanently invalidates and truncates all downstream redo commands.
+   - Pushing beyond maximum depth drops the oldest command in $O(1)$ time without reallocation churn.
+
+
 
