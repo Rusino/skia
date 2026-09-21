@@ -86,6 +86,14 @@ public:
     void setSelection(CaretPosition anchor, CaretPosition focus);
     void collapseTo(CaretPosition pos);
 
+    // Clipboard Interop (Headless Provider Delegation)
+    using ClipboardSetter = std::function<void(std::string_view)>;
+    using ClipboardGetter = std::function<std::string()>;
+    void setClipboardHandlers(ClipboardSetter setter, ClipboardGetter getter);
+    std::string copySelection() const;
+    void cutSelection();
+    void pasteText(std::string_view raw);
+
     // Viewport & Scrolling Management
     void ensureCaretVisible(const SkRect& viewportBounds);
 
@@ -116,6 +124,8 @@ private:
     bool fCaretVisible{true};
     NavigationMode fNavMode{NavigationMode::kTextLogical};
     RedrawCallback fOnRedraw;
+    ClipboardSetter fClipboardSetter;
+    ClipboardGetter fClipboardGetter;
 };
 
 } // namespace skia::text_editor

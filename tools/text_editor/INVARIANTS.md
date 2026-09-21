@@ -189,3 +189,21 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
 4. **Step-Through Horizontal Navigation**:
    - Horizontal caret movement across a soft-wrap boundary (via `kRight` or `kLeft`) must transition sequentially through both geometric positions via affinity toggling ($(\text{line}_k.\text{end}, \text{kUpstream}) \leftrightarrow (\text{line}_{k+1}.\text{start}, \text{kDownstream})$) without skipping visual positions on screen.
 
+---
+
+## Domain Invariant 16: Headless Clipboard Interop & Sanitized Insertion
+
+1. **Headless Clipboard Provider Invariant**:
+   - `TextEditorViewModel` manages copy, cut, and paste transactions strictly without hard dependencies on OS windowing or display servers.
+   - System clipboard interaction is mediated via optional non-allocating or functional hooks (`ClipboardSetter`, `ClipboardGetter`).
+2. **Copy Purity & Logical Coherence**:
+   - `copySelection()` extracts strictly the logical text corresponding to active selection spans. For discontinuous BiDi selections, text is gathered in canonical logical order.
+   - Copying with a collapsed selection is a safe no-op that emits an empty string without altering document or selection state.
+3. **Atomic Cut Transaction**:
+   - `cutSelection()` extracts the selected text, transfers it to the clipboard provider, and executes an atomic deletion of the selection in a single document rebuild transaction.
+4. **Sanitized Paste & Caret Relocation**:
+   - `pasteText(std::string_view raw)` atomically replaces active non-collapsed selections.
+   - All pasted content is strictly piped through `Invariant 14` input sanitization (normalizing CRLF to `\n`, replacing tabs with soft-spaces, filtering C0 noise and DEL, while preserving UTF-8 shaping controls).
+   - Upon completion, the selection must be collapsed, and the caret must be synchronously placed immediately after the inserted text.
+
+

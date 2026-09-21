@@ -71,6 +71,15 @@ public:
         fViewModel->setOnRedrawCallback([this]() {
             fWindow->inval();
         });
+
+        fViewModel->setClipboardHandlers(
+            [this](std::string_view text) {
+                fWindow->setClipboardText(std::string(text).c_str());
+            },
+            [this]() -> std::string {
+                const char* clip = fWindow->getClipboardText();
+                return clip ? std::string(clip) : std::string();
+            });
     }
 
     ~TextEditorApp() override {

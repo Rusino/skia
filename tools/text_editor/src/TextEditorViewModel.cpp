@@ -367,6 +367,28 @@ bool TextEditorViewModel::handleKey(skui::Key key, skui::InputState state, skui:
                 return true;
             }
             break;
+        case skui::Key::kC:
+            if (ctrlOrCmd) {
+                if (fClipboardSetter) {
+                    fClipboardSetter(copySelection());
+                }
+                return true;
+            }
+            break;
+        case skui::Key::kX:
+            if (ctrlOrCmd) {
+                cutSelection();
+                return true;
+            }
+            break;
+        case skui::Key::kV:
+            if (ctrlOrCmd) {
+                if (fClipboardGetter) {
+                    pasteText(fClipboardGetter());
+                }
+                return true;
+            }
+            break;
         case skui::Key::kOK:
             insertText("\n");
             return true;
@@ -500,6 +522,52 @@ void TextEditorViewModel::updateCursorPosition(size_t index) {
     }
     fSelection.anchor = pos;
     fSelection.focus = pos;
+}
+
+void TextEditorViewModel::setClipboardHandlers(ClipboardSetter setter, ClipboardGetter getter) {
+    fClipboardSetter = std::move(setter);
+    fClipboardGetter = std::move(getter);
+}
+
+std::string TextEditorViewModel::copySelection() const {
+    if (fSelection.is_collapsed()) {
+        return "";
+    }
+    std::string_view docText = fDocument->text();
+    if (!fSelection.ranges.empty()) {
+        std::string result;
+        for (const auto& r : fSelection.ranges) {
+            size_t start = std::min(r.start.value, docText.size());
+            size_t end = std::min(r.end.value, docText.size());
+            if (start > end) {
+                std::swap(start, end);
+            }
+            result.append(docText.substr(start, end - start));
+        }
+        return result;
+    }
+    TextRange range = fSelection.text_range();
+    size_t start = std::min(range.start.value, docText.size());
+    size_t end = std::min(range.end.value, docText.size());
+    if (start > end) {
+        std::swap(start, end);
+    }
+    return std::string(docText.substr(start, end - start));
+}
+
+void TextEditorViewModel::cutSelection() {
+    if (fSelection.is_collapsed()) {
+        return;
+    }
+    std::string copied = copySelection();
+    if (fClipboardSetter) {
+        fClipboardSetter(copied);
+    }
+    deleteBackward();
+}
+
+void TextEditorViewModel::pasteText(std::string_view raw) {
+    insertText(raw);
 }
 
 } // namespace skia::text_editor

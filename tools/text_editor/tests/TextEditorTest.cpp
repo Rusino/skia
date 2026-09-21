@@ -1315,6 +1315,61 @@ DEF_TEST(TextEditor_Invariant15_SoftWrapBoundaryCaretAffinity, reporter) {
     REPORTER_ASSERT(reporter, vm->screenCaretRect().fTop < lines[1].bounds.fTop);
 }
 
+// =============================================================================
+// TRAP 26 (Invariant 16): Headless Clipboard Interop & Sanitized Insertion
+// =============================================================================
+DEF_TEST(TextEditor_Invariant16_ClipboardCopyCutPasteSanitization, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    auto vm = std::make_unique<TextEditorViewModel>("The quick brown fox jumps over the lazy dog.", font);
+
+    std::string mockClipboard;
+    vm->setClipboardHandlers(
+        [&mockClipboard](std::string_view text) { mockClipboard = std::string(text); },
+        [&mockClipboard]() -> std::string { return mockClipboard; });
+
+    // Select "brown fox" (indices 10 to 19)
+    vm->setSelection(CaretPosition{TextIndex(10), Affinity::kDownstream, SkRect::MakeEmpty()},
+                     CaretPosition{TextIndex(19), Affinity::kDownstream, SkRect::MakeEmpty()});
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+
+    // 1. Trigger Copy (Ctrl+C / Cmd+C)
+    bool copyHandled = vm->handleKey(skui::Key::kC, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, copyHandled);
+    REPORTER_ASSERT(reporter, mockClipboard == "brown fox");
+    REPORTER_ASSERT(reporter, vm->text() == "The quick brown fox jumps over the lazy dog.");
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+
+    // 2. Trigger Cut (Ctrl+X / Cmd+X)
+    bool cutHandled = vm->handleKey(skui::Key::kX, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, cutHandled);
+    REPORTER_ASSERT(reporter, mockClipboard == "brown fox");
+    REPORTER_ASSERT(reporter, vm->text() == "The quick  jumps over the lazy dog.");
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(10));
+
+    // 3. Inject hostile external clipboard content (CRLF, tabs, C0 noise, single CR)
+    const char hostileData[] = "white\r\nwolf\t\0\x07runs\rfast";
+    mockClipboard = std::string(hostileData, sizeof(hostileData) - 1);
+
+    // Trigger Paste (Ctrl+V / Cmd+V)
+    bool pasteHandled = vm->handleKey(skui::Key::kV, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, pasteHandled);
+
+    // Sanitization expectation:
+    // \r\n -> \n
+    // \t -> soft spaces (4 spaces)
+    // \0, \x07 dropped
+    // \r -> \n
+    // "white\nwolf    runs\nfast" inserted at index 10
+    std::string expectedText = "The quick white\nwolf    runs\nfast jumps over the lazy dog.";
+    REPORTER_ASSERT(reporter, vm->text() == expectedText);
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+    size_t expectedCaret = 10 + std::string("white\nwolf    runs\nfast").size();
+    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(expectedCaret));
+    REPORTER_ASSERT(reporter, vm->document().formatted().lines().size() == 3);
+}
+
+
 
 
 
