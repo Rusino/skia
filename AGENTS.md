@@ -167,7 +167,7 @@ When operating on tasks, partition actions strictly into these distinct function
 | **The Graveyard** | *Memory* | **Anti-Pattern Memory (RAG).** Stores past crash traces, compiler stderr, and failed patches in a local SQLite/vector store. Injects them as negative prompts ("Do not use X; it previously failed due to Y"). |
 | **The Oracle** | *Judicial* | **Long-Term Drift Forecaster & Debt Clearance Auditor.** Audits git history and scans codebases at milestone finish lines for `TODO(KEEPER-DEBT)` markers. Semantically verifies whether debt assertions are still active or obsolete, audits deferred trap tests, and blocks milestone releases until all debt is reconciled or resolved. Zero rule-pruning authority. |
 | **The Coroner** | *Legislative* | **Escape Inquest & Constitutional Hardening Auditor.** Autonomously invoked upon any defect escape to physical testing/production. Executes 5 Whys root cause analysis across physical, pipeline, and constitutional tiers, drafts actionable amendments for `AGENTS.md` or `INVARIANTS.md`, and subjects proposed rules to adversarial backtesting and loophole hunting before Overgod sign-off. |
-| **The Censor** | *Legislative* | **Constitutional Hygiene & Anti-Bloat Auditor.** Autonomously invoked on entropy thresholds (milestone finish lines / ≥2 Coroner inquests). Audits `AGENTS.md` and `INVARIANTS.md` for redundancies, subsumed rules, and dead policies. Operates under The Chesterton's Fence Law (mandatory semantic equivalence mapping). Issues Constitutional Pruning RFCs for Overgod ratification. Zero code-writing or milestone-clearance authority. |
+| **The Censor** | *Legislative* | **Constitutional Hygiene & Anti-Bloat Auditor.** Autonomously invoked on entropy thresholds (milestone finish lines / ≥2 Coroner inquests). Audits `AGENTS.md` and `INVARIANTS.md` for redundancies, subsumed rules, and dead policies. Operates under The Chesterton's Fence Law, Tier-2 Eviction Protocol, and Parameterized Marker Consolidation. Submits Pruning RFCs to Inquisitor counter-audit before Overgod ratification. Zero code-writing or milestone-clearance authority. |
 
 ---
 
@@ -254,10 +254,21 @@ Graveyard]    Lead agent autonomously invokes `invoke_subagent("The Oracle")`:
 
 ### Phase 8.6: The Censor Constitutional Pruning Gate
 Whenever a milestone finish line is reached or $\ge 2$ defect inquests have amended the rules, the lead agent autonomously invokes `invoke_subagent(Role='The Censor')`.
-The Censor executes constitutional hygiene:
+The Censor executes constitutional hygiene under strict anti-fossilization and anti-truncation laws:
 1. **Redundancy & Subsumption Audit**: Identifies overlapping axioms, obsolete temporary clauses, and opportunities for unifying abstractions.
-2. **The Chesterton's Fence Equivalence Law**: For any proposed rule deletion or merge, The Censor MUST construct an exhaustive Semantic Equivalence Table proving that no negative constraint, fail-fast assertion, or test matrix degree-of-freedom was compromised.
-3. **Constitutional Pruning RFC**: Emits a formal RFC with a precise diff for Overgod ratification. Zero autonomous rule-committing authority.
+2. **The Operational Trigger Retention Mandate**:
+   - The Censor is strictly prohibited from deleting, paraphrasing, or abstracting away exact mechanical strings (e.g. `[KEEPER INVARIANT COLLISION DETECTED]`, `TODO(KEEPER-DEBT)`), numeric tolerances/timeouts, or named verification protocols.
+3. **The Tier-1 Purity & Eviction Protocol (Anti-Fossilization Law)**:
+   - To prevent Master Constitution bloat, domain-specific rules or private subsystem markers MUST NOT be stored in `AGENTS.md`. The Censor's primary hygiene action is **Eviction to Tier 2**: moving specific rules down into the target subsystem's `INVARIANTS.md` without deleting any constraints.
+4. **The Parameterized Marker Consolidation & Blast Radius Protocol**:
+   - If multiple operational markers require unification, they must be consolidated into a **Parameterized Marker Pattern** (`[PREFIX: <Category>]`) preserving regex recognizability.
+   - Any marker consolidation proposal MUST include a **Blast Radius Audit** (grep count across `src/`, `tests/`, and docs) and an automated codemod script updating dependent tests.
+5. **The Invariant Preservation Theorem ($\mathcal{N}' \supseteq \mathcal{N}$)**:
+   - For any proposed codex transformation, the set of prohibited behaviors must not decrease: $\mathcal{N}(\text{Codex}') \supseteq \mathcal{N}(\text{Codex})$.
+   - The Censor must construct an explicit **Semantic Equivalence Table** and cite historical defect lineage (proving counter-factual resistance to past bugs).
+6. **The Inquisitor Pruning Counter-Audit**:
+   - The Censor emits a Constitutional Pruning RFC. Prior to presenting it to The Overgod, The Invariant Inquisitor executes an adversarial counter-audit, generating a **Lost Constraint Ledger**. Only RFCs with a clean Inquisitor verdict may proceed to Overgod ratification. Zero autonomous rule-committing authority.
+
 
 ### Phase 10: The Interactive Hand-off Directive
 Upon completing implementation, passing tests, and committing locally:
