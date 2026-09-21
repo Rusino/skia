@@ -74,9 +74,13 @@ public:
 
         fViewModel->setClipboardHandlers(
             [this](std::string_view text) {
-                fWindow->setClipboardText(std::string(text).c_str());
+                fLocalClipboard = std::string(text);
+                fWindow->setClipboardText(fLocalClipboard.c_str());
             },
             [this]() -> std::string {
+                if (!fLocalClipboard.empty()) {
+                    return fLocalClipboard;
+                }
                 const char* clip = fWindow->getClipboardText();
                 return clip ? std::string(clip) : std::string();
             });
@@ -129,10 +133,10 @@ public:
         if (!fViewModel) {
             return false;
         }
-        if (fLastHandledKey != skui::Key::kNONE) {
-            // Event absorption: this key was already consumed as a command by onKey
+        if (fLastHandledShortcut != skui::Key::kNONE) {
+            // Event absorption: this key was already consumed as a shortcut command by onKey
             // in this same event slice from the platform window harness.
-            fLastHandledKey = skui::Key::kNONE;
+            fLastHandledShortcut = skui::Key::kNONE;
             return true;
         }
         return fViewModel->handleChar(c, modifiers);
@@ -142,9 +146,12 @@ public:
         if (!fViewModel) {
             return false;
         }
+        bool ctrlOrCmd = ((modifiers & (skui::ModifierKey::kControl | skui::ModifierKey::kCommand)) != skui::ModifierKey::kNone);
         bool handled = fViewModel->handleKey(key, state, modifiers);
-        if (handled && state == skui::InputState::kDown) {
-            fLastHandledKey = key;
+        if (handled && state == skui::InputState::kDown && ctrlOrCmd) {
+            fLastHandledShortcut = key;
+        } else {
+            fLastHandledShortcut = skui::Key::kNONE;
         }
         return handled;
     }
@@ -177,7 +184,8 @@ private:
     std::unique_ptr<TextEditorViewModel> fViewModel;
     bool fIsMouseDown;
     SkScalar fPadding;
-    skui::Key fLastHandledKey{skui::Key::kNONE};
+    std::string fLocalClipboard;
+    skui::Key fLastHandledShortcut{skui::Key::kNONE};
 };
 
 Application* Application::Create(int argc, char** argv, void* platformData) {

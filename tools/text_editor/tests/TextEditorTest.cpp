@@ -1662,6 +1662,40 @@ DEF_TEST(TextEditor_Invariant18_ModifierLatchingAndAccidentalCharImmunity, repor
     REPORTER_ASSERT(reporter, vm->text() == "First paragraph with selected word. New word.");
 }
 
+DEF_TEST(TextEditor_Invariant19_EmptyClipboardAndEnterTypingIntegrity, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    auto vm = std::make_unique<TextEditorViewModel>("", font);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+
+    vm->insertText("Keep This Selection");
+
+    // Select the word "Selection" (indices 10 to 19)
+    vm->setSelection(CaretPosition{TextIndex(10), Affinity::kDownstream, SkRect::MakeEmpty()},
+                     CaretPosition{TextIndex(19), Affinity::kDownstream, SkRect::MakeEmpty()});
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, vm->copySelection() == "Selection");
+
+    // 1. Hostile Invariant: Empty Clipboard Paste must be a NO-OP and preserve selection!
+    vm->setClipboardHandlers(nullptr, []() { return ""; });
+    bool pasteHandled = vm->handleKey(skui::Key::kV, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, pasteHandled);
+
+    // If pasteText("") ran insertText(""), "Selection" would be erased and selection collapsed!
+    REPORTER_ASSERT(reporter, vm->text() == "Keep This Selection",
+                    "Empty clipboard paste erased selected text!");
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed(),
+                    "Empty clipboard paste collapsed the active selection!");
+    REPORTER_ASSERT(reporter, vm->copySelection() == "Selection");
+
+    // 2. Non-empty clipboard paste must replace the selection
+    vm->setClipboardHandlers(nullptr, []() { return "Replacement"; });
+    bool pasteHandled2 = vm->handleKey(skui::Key::kV, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, pasteHandled2);
+    REPORTER_ASSERT(reporter, vm->text() == "Keep This Replacement");
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+}
+
+
 
 
 
