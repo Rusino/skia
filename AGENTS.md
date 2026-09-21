@@ -90,6 +90,22 @@ You are acting as an engine in **Project KEEPER**.
    (d) **Compile-Time Contract Enforcement**: Whenever a struct or class is designated as cohesive/encapsulated under Axiom 14, it MUST declare a compile-time assertion in its header:
        `static_assert(!std::is_aggregate_v<Type>, "KEEPER: Type must not be an aggregate struct; fields must be encapsulated");`
 
+17. **The Strict Encapsulation Law (Prohibition of Leaky Domain Data Structures)**:
+   To eliminate ambiguity between passive configurations and active domain models:
+   (a) **Strict Type Bifurcation**: Every data type in the codebase must belong to exactly one of two distinct categories:
+       - *Category A: Passive Configuration DTOs*: Pure aggregate configurations without internal logic, validation, or lifecycle states (e.g. `PaintOptions`, `LayoutConstraints`). Must be declared as `struct` and satisfy `std::is_aggregate_v<T> == true`.
+       - *Category B: Domain State Entities*: Any type representing domain state, text metrics, selection ranges, or editing models (e.g. `EditorSelection`, `CaretPosition`, `TextDocument`, `TextEditorViewModel`). MUST be declared as `class`, maintain strictly `private` data members, and expose access exclusively via `const&` or by-value accessors.
+   (b) **Mandatory Compile-Time Non-Aggregate Barrier**: All Category B domain entities MUST assert non-aggregate status in their public headers:
+       `static_assert(!std::is_aggregate_v<Type>, "KEEPER: Domain entity must be strictly encapsulated; raw fields are prohibited");`
+   (c) **Prohibition of Mutable Internal Escapes**: Getters must never return non-const references or raw pointers to internal containers or mutable state.
+
+18. **The Subagent Physical Isolation Mandate (Prohibition of Single-Context Role-Playing)**:
+   To eliminate self-collusion, synthetic bias, and ghost-test fabrication:
+   (a) **Prohibition of Monolithic Persona Role-Playing**: An agent is strictly prohibited from switching roles (Trapsmith $\to$ Artificer $\to$ Mimic) inside a single context window. Role simulation within one continuous prompt is classified as counterfeit verification.
+   (b) **The Orchestrator Protocol**: The lead conversational agent operates exclusively as an Orchestrator. When transitions between roles occur, the Orchestrator MUST invoke autonomous subagents via `invoke_subagent` with clean, isolated context boundaries.
+   (c) **Gate A Pre-Flight Certificate Requirement**: The Artificer subagent may NEVER be launched to write or modify implementation logic until The Trapsmith subagent has executed against unmodified code and returned an authentic, verified failing test log (`Assert: Test(Defect) == FAIL`). Launching implementation without a verified Gate A log constitutes an immediate constitutional breach.
+   (d) **The Dual-Contract Mechanical Enforcement Rule**: Every unit test validating mutations (`deleteBackward`, `deleteForward`, `insertText`, `moveCaret`) MUST explicitly assert spatial output geometry (`fLeft`, `bounds`, $X, Y$ coordinates). Any test asserting solely boolean status flags (`is_collapsed()`, `ranges().empty()`) without spatial verification is classified as a Ghost Test and immediately rejected.
+
 ### 1.5 The Two-Tier Invariant Hierarchy (Master Codex vs. Local Domain Invariants)
 
 Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:

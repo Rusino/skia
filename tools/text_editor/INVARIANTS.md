@@ -281,3 +281,15 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
      - `collapse_to(pos)` asserts `ranges.empty()` and `anchor == focus`;
      - `set_span(a, f)` asserts `ranges.empty()`;
      - `set_ranges(a, f, r)` asserts `!r.empty() || a == f`.
+
+---
+
+## Domain Invariant 21: BiDi Deletion Caret Continuity & Boundary Retention
+
+1. **Physical Deletion Boundary Retention**:
+   - When deleting a selection within or across BiDi (RTL/LTR) runs via `deleteBackward()` or `deleteForward()`, the resulting caret must remain at the exact physical visual cut boundary where the deletion occurred.
+2. **Prohibition of RTL Edge Teleportation**:
+   - Deletion of an RTL selection must NEVER teleport the caret to `ranges().front().start` if that index corresponds to the visual right edge of the Arabic run or line origin.
+   - The caret coordinate $X$ after deletion must be continuous with the remaining text boundary.
+3. **BiDi-Aware Caret Geometry Resolution**:
+   - `updateCursorPosition` and all caret coordinate resolution methods must query `ParagraphSpatialIndex` or examine cluster directionality (`is_rtl`). In RTL clusters, the logical start boundary of a cluster resides at `bounds.fRight`, and the end boundary at `bounds.fLeft`. Taking `rects[0].fLeft` for RTL text without direction inversion is strictly prohibited.

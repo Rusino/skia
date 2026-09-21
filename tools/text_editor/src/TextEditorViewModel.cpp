@@ -103,6 +103,169 @@ std::string SanitizeInputText(std::string_view raw) {
     return sanitized;
 }
 
+struct LineClusterInfo {
+    TextRange text_range;
+    SkRect bounds;
+    bool is_rtl{false};
+};
+
+std::vector<LineClusterInfo> getLineClusters(const LineBox& line,
+                                             std::string_view fullText,
+                                             SkSpan<const TextIndex> graphemeBreaks) {
+    std::vector<LineClusterInfo> clusters;
+    for (const auto& vr : line.visual_runs) {
+        SkScalar curX = vr.x_offset;
+        for (const auto& g : vr.glyphs) {
+            TextIndex endIdx = g.cluster_text_index + 1;
+            if (g.cluster_text_index.value < fullText.size()) {
+                const char* ptr = fullText.data() + g.cluster_text_index.value;
+                const char* end = fullText.data() + fullText.size();
+                SkUTF::NextUTF8(&ptr, end);
+                endIdx = TextIndex(ptr - fullText.data());
+            }
+
+            if (!graphemeBreaks.empty()) {
+                auto it = std::upper_bound(graphemeBreaks.begin(), graphemeBreaks.end(), g.cluster_text_index);
+                if (it != graphemeBreaks.end() && *it > endIdx) {
+                    endIdx = *it;
+                }
+            }
+
+            SkScalar cbWidth = g.advance.fX;
+            SkScalar cbHeight = std::abs(vr.ascent) + std::abs(vr.descent);
+            if (cbHeight <= 0) {
+                cbHeight = 16.0f;
+            }
+
+            if (!clusters.empty()) {
+                LineClusterInfo& lastCb = clusters.back();
+                if (g.is_mark || lastCb.text_range.contains(g.cluster_text_index) || g.cluster_text_index == lastCb.text_range.start) {
+                    lastCb.text_range.end = std::max(lastCb.text_range.end, endIdx);
+                    lastCb.bounds.fRight += g.advance.fX;
+                    curX += g.advance.fX;
+                    continue;
+                }
+            }
+
+            LineClusterInfo cb;
+            cb.text_range = TextRange(g.cluster_text_index, endIdx);
+            cb.is_rtl = vr.isRTL();
+            cb.bounds = SkRect::MakeXYWH(curX + g.offset.fX,
+                                         line.baseline + vr.ascent,
+                                         cbWidth,
+                                         cbHeight);
+            curX += g.advance.fX;
+            clusters.push_back(cb);
+        }
+    }
+    return clusters;
+}
+
+CaretPosition resolveCaretPosition(const TextDocument& doc, size_t index) {
+    std::string_view text = doc.text();
+    index = std::min(index, text.size());
+    CaretPosition pos;
+    pos.text_index = TextIndex(index);
+    pos.affinity = (index == text.size()) ? Affinity::kUpstream : Affinity::kDownstream;
+
+    const auto& lines = doc.formatted().lines();
+    if (lines.empty()) {
+        pos.caret_rect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
+        return pos;
+    }
+
+    const auto* targetLine = &lines[0];
+    for (const auto& line : lines) {
+        if (index >= line.text_range.start.value && index < line.text_range.end.value) {
+            targetLine = &line;
+            break;
+        }
+    }
+    if (index >= lines.back().text_range.end.value) {
+        targetLine = &lines.back();
+    }
+
+    SkScalar caretTop = targetLine->baseline + targetLine->typographic_ascent;
+    SkScalar caretHeight = std::abs(targetLine->typographic_ascent) + std::abs(targetLine->typographic_descent);
+    if (caretHeight <= 0.0f) {
+        caretHeight = 16.0f;
+    }
+
+    auto clusters = getLineClusters(*targetLine, doc.text(), doc.unicode().grapheme_breaks());
+    if (clusters.empty()) {
+        pos.caret_rect = SkRect::MakeXYWH(targetLine->bounds.fLeft, caretTop, 1.0f, caretHeight);
+        return pos;
+    }
+
+    const LineClusterInfo* lastCluster = nullptr;
+    const LineClusterInfo* lastNonWsCluster = nullptr;
+    for (const auto& cb : clusters) {
+        if (!lastCluster || cb.text_range.end > lastCluster->text_range.end) {
+            lastCluster = &cb;
+        }
+        bool isWs = true;
+        for (size_t i = cb.text_range.start.value; i < cb.text_range.end.value && i < text.size(); ++i) {
+            if (!doc.unicode().isWhitespace(TextIndex(i))) {
+                isWs = false;
+                break;
+            }
+        }
+        if (!isWs) {
+            if (!lastNonWsCluster || cb.text_range.end > lastNonWsCluster->text_range.end) {
+                lastNonWsCluster = &cb;
+            }
+        }
+    }
+
+    if (index >= targetLine->text_range.end.value || index == text.size()) {
+        if (lastCluster && lastCluster->is_rtl) {
+            pos.caret_rect = SkRect::MakeXYWH(lastCluster->bounds.fLeft, caretTop, 1.0f, caretHeight);
+        } else if (lastNonWsCluster && lastNonWsCluster->is_rtl) {
+            pos.caret_rect = SkRect::MakeXYWH(lastNonWsCluster->bounds.fLeft, caretTop, 1.0f, caretHeight);
+        } else if (lastCluster) {
+            pos.caret_rect = SkRect::MakeXYWH(lastCluster->bounds.fRight, caretTop, 1.0f, caretHeight);
+        } else {
+            pos.caret_rect = SkRect::MakeXYWH(targetLine->bounds.fRight, caretTop, 1.0f, caretHeight);
+        }
+    } else {
+        const LineClusterInfo* match = nullptr;
+        for (const auto& cb : clusters) {
+            if (cb.text_range.contains(TextIndex(index))) {
+                match = &cb;
+                break;
+            }
+        }
+        if (match) {
+            bool isTrailingWs = (lastNonWsCluster && match->text_range.start >= lastNonWsCluster->text_range.end);
+            if (isTrailingWs && lastNonWsCluster->is_rtl) {
+                pos.caret_rect = SkRect::MakeXYWH(lastNonWsCluster->bounds.fLeft, caretTop, 1.0f, caretHeight);
+            } else {
+                SkScalar x = match->is_rtl ? match->bounds.fRight : match->bounds.fLeft;
+                pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
+            }
+        } else {
+            const LineClusterInfo* firstCluster = nullptr;
+            for (const auto& cb : clusters) {
+                if (!firstCluster || cb.text_range.start < firstCluster->text_range.start) {
+                    firstCluster = &cb;
+                }
+            }
+            if (firstCluster && index <= firstCluster->text_range.start.value) {
+                SkScalar x = firstCluster->is_rtl ? firstCluster->bounds.fRight : firstCluster->bounds.fLeft;
+                pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
+            } else {
+                SkScalar x = (index > targetLine->text_range.start.value) ? targetLine->bounds.fRight : targetLine->bounds.fLeft;
+                pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
+            }
+        }
+    }
+
+    if (pos.caret_rect.isEmpty()) {
+        pos.caret_rect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
+    }
+    return pos;
+}
+
 } // namespace
 
 void TextEditorViewModel::insertText(std::string_view utf8_text) {
@@ -320,15 +483,7 @@ void TextEditorViewModel::selectAll() {
     start.text_index = TextIndex(0);
     start.affinity = Affinity::kDownstream;
 
-    CaretPosition end;
-    end.text_index = TextIndex(text.size());
-    end.affinity = Affinity::kUpstream;
-    const auto& lines = fDocument->formatted().lines();
-    if (!lines.empty()) {
-        const auto& lastLine = lines.back();
-        end.caret_rect = SkRect::MakeXYWH(lastLine.bounds.fRight, lastLine.baseline + lastLine.ascent,
-                                          1.0f, std::abs(lastLine.ascent) + std::abs(lastLine.descent));
-    }
+    CaretPosition end = resolveCaretPosition(*fDocument, text.size());
     fSelection.set_span(start, end);
     notifyRedraw();
 }
@@ -543,52 +698,7 @@ void TextEditorViewModel::visitScreenRuns(const SkRect& screenClip, RenderRunVis
 }
 
 void TextEditorViewModel::updateCursorPosition(size_t index) {
-    std::string_view text = fDocument->text();
-    index = std::min(index, text.size());
-    CaretPosition pos;
-    pos.text_index = TextIndex(index);
-    pos.affinity = (index == text.size()) ? Affinity::kUpstream : Affinity::kDownstream;
-
-    const auto& lines = fDocument->formatted().lines();
-    if (!lines.empty()) {
-        const auto* targetLine = &lines[0];
-        for (const auto& line : lines) {
-            if (index >= line.text_range.start.value && index < line.text_range.end.value) {
-                targetLine = &line;
-                break;
-            }
-        }
-        if (index >= lines.back().text_range.end.value) {
-            targetLine = &lines.back();
-        }
-
-        SkScalar caretTop = targetLine->baseline + targetLine->typographic_ascent;
-        SkScalar caretHeight = std::abs(targetLine->typographic_ascent) + std::abs(targetLine->typographic_descent);
-        if (caretHeight <= 0.0f) {
-            caretHeight = 16.0f;
-        }
-
-        if (index == text.size()) {
-            const auto& lastLine = lines.back();
-            pos.caret_rect = SkRect::MakeXYWH(lastLine.bounds.fRight,
-                                              lastLine.baseline + lastLine.typographic_ascent,
-                                              1.0f,
-                                              std::abs(lastLine.typographic_ascent) + std::abs(lastLine.typographic_descent));
-        } else {
-            std::vector<SkRect> rects;
-            fDocument->spatial_index().getSelectionRects(TextRange(TextIndex(index), TextIndex(index + 1)), rects);
-            if (!rects.empty()) {
-                SkScalar h = rects[0].height() > 0.0f ? rects[0].height() : caretHeight;
-                pos.caret_rect = SkRect::MakeXYWH(rects[0].fLeft, rects[0].fTop, 1.0f, h);
-            } else {
-                SkScalar x = (index > targetLine->text_range.start.value) ? targetLine->bounds.fRight : targetLine->bounds.fLeft;
-                pos.caret_rect = SkRect::MakeXYWH(x, caretTop, 1.0f, caretHeight);
-            }
-        }
-    }
-    if (pos.caret_rect.isEmpty()) {
-        pos.caret_rect = SkRect::MakeXYWH(0.0f, 0.0f, 1.0f, 16.0f);
-    }
+    CaretPosition pos = resolveCaretPosition(*fDocument, index);
     fSelection.collapse_to(pos);
 }
 

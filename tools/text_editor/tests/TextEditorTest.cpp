@@ -1814,6 +1814,88 @@ DEF_TEST(TextEditor_Invariant20_EncapsulatedSelectionAndIngressCohesion, reporte
     REPORTER_ASSERT(reporter, vm->selection().anchor() == vm->selection().focus());
 }
 
+// =============================================================================
+// DEFECT REPRODUCTION (Gate A): Arabic Deletion Caret Continuity Trap
+// =============================================================================
+DEF_TEST(TextEditor_Defect_ArabicDeletionCaretContinuity, reporter) {
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    LayoutConstraints constraints;
+    constraints.max_width = 760.0f;
+
+    // Text: English prefix + space + Arabic "مرحبا بالعالم" (identical to TextEditorApp line 57)
+    // "مرحبا" = \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7 (10 bytes)
+    // "بالعالم" = \xd8\xa8\xd8\xa7\xd9\x84\xd8\xb9\xd8\xa7\xd9\x84\xd9\x85 (14 bytes)
+    const std::string text = "- UAX #9 Arabic: \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7 \xd8\xa8\xd8\xa7\xd9\x84\xd8\xb9\xd8\xa7\xd9\x84\xd9\x85";
+    auto vm = std::make_unique<TextEditorViewModel>(text, font, SkColor4f{0, 0, 0, 1}, constraints);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+    REPORTER_ASSERT(reporter, vm->text() == text);
+
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, lines.size() == 1);
+    const auto& line = lines[0];
+    SkScalar y = line.bounds.centerY();
+
+    // Find the Arabic word "بالعالم"
+    const std::string word2 = "\xd8\xa8\xd8\xa7\xd9\x84\xd8\xb9\xd8\xa7\xd9\x84\xd9\x85";
+    size_t word2Pos = text.find(word2);
+    REPORTER_ASSERT(reporter, word2Pos != std::string::npos);
+    TextRange word2Range(TextIndex(word2Pos), TextIndex(word2Pos + word2.size()));
+
+    // Query spatial index for the visual bounds of "بالعالم"
+    std::vector<SkRect> word2Rects;
+    vm->document().spatial_index().getSelectionRects(word2Range, word2Rects);
+    REPORTER_ASSERT(reporter, !word2Rects.empty());
+
+    SkScalar word2Left = SK_ScalarMax;
+    SkScalar word2Right = SK_ScalarMin;
+    for (const auto& r : word2Rects) {
+        word2Left = std::min(word2Left, r.fLeft);
+        word2Right = std::max(word2Right, r.fRight);
+    }
+    REPORTER_ASSERT(reporter, word2Left < word2Right);
+
+    // Simulate mouse drag across "بالعالم" using moveCaretToPoint
+    vm->moveCaretToPoint(word2Left + 1.0f, y, false); // anchor
+    vm->moveCaretToPoint(word2Right - 1.0f, y, true);  // focus (drag)
+
+    // Selection must not be collapsed and copied text must match "بالعالم"
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+    std::string copied = vm->copySelection();
+    REPORTER_ASSERT(reporter, copied == word2, "Selected text must match Arabic word 'بالعالم'");
+
+    // Record the expected visual cut boundary where the caret should remain after deletion.
+    // In visual space, "بالعالم" is at the visual left of the Arabic run (adjacent to English prefix).
+    // The cut boundary adjacent to the remaining text (English prefix) is at word2Left.
+    SkScalar expectedCutBoundary = word2Left;
+
+    // Delete the selected Arabic word
+    vm->deleteBackward();
+
+    // 1. Dual-Contract: Assert logical state
+    const std::string expectedText = "- UAX #9 Arabic: \xd9\x85\xd8\xb1\xd8\xad\xd8\xa8\xd8\xa7 ";
+    REPORTER_ASSERT(reporter, vm->text() == expectedText,
+                    "Deleted Arabic word 'بالعالم' must be erased from logical text");
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed(),
+                    "Selection must be collapsed after deletion");
+    REPORTER_ASSERT(reporter, vm->selection().ranges().empty(),
+                    "Selection ranges must be cleared after deletion");
+
+    // 2. Dual-Contract: Assert spatial geometry (Axiom 18(d) & Invariants 1 & 21)
+    SkScalar actualCaretX = vm->selection().focus().caret_rect.fLeft;
+    const auto& newLines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, !newLines.empty());
+    SkScalar newArabicRight = newLines[0].bounds.fRight;
+
+    // The defect: Caret erroneously jumps to visual right end of Arabic run (newArabicRight)
+    // instead of staying at the physical cut boundary (expectedCutBoundary).
+    // Dual-Contract assertion: Caret X must match the physical cut boundary within a tolerance (<= 2.0f),
+    // and MUST NOT jump to the visual right edge of the Arabic text!
+    REPORTER_ASSERT(reporter, std::abs(actualCaretX - expectedCutBoundary) <= 2.0f,
+                    "KEEPER-DEFECT: Caret X (%.2f) jumped away from cut boundary (%.2f) to right edge (%.2f)!",
+                    actualCaretX, expectedCutBoundary, newArabicRight);
+}
+
+
 
 
 
