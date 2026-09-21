@@ -15,9 +15,11 @@
 #include "include/core/SkSpan.h"
 #include "include/core/SkTypes.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace skia::text_editor {
@@ -142,54 +144,76 @@ struct CaretPosition {
     }
 };
 
-struct EditorSelection {
-    CaretPosition anchor;
-    CaretPosition focus;
-    // For cross-directional BiDi selections, contains the exact discontinuous logical ranges
-    std::vector<TextRange> ranges;
+class EditorSelection {
+public:
+    EditorSelection() = default;
+    EditorSelection(CaretPosition a, CaretPosition f) : fAnchor(a), fFocus(f) {}
+    EditorSelection(CaretPosition a, CaretPosition f, std::vector<TextRange> r)
+        : fAnchor(a), fFocus(f), fRanges(std::move(r)) {}
+
+    // Read-only accessors enforcing const-correctness (Axiom 14 / Domain Invariant 20)
+    const CaretPosition& anchor() const { return fAnchor; }
+    const CaretPosition& focus() const { return fFocus; }
+    const std::vector<TextRange>& ranges() const { return fRanges; }
 
     bool is_collapsed() const {
-        if (!ranges.empty()) {
+        if (!fRanges.empty()) {
             return false;
         }
-        return anchor.text_index == focus.text_index && anchor.affinity == focus.affinity;
+        return fAnchor.text_index == fFocus.text_index && fAnchor.affinity == fFocus.affinity;
     }
 
     TextRange text_range() const {
-        if (!ranges.empty()) {
-            return TextRange(ranges.front().start, ranges.back().end);
+        if (!fRanges.empty()) {
+            return TextRange(fRanges.front().start, fRanges.back().end);
         }
-        TextIndex s = std::min(anchor.text_index, focus.text_index);
-        TextIndex e = std::max(anchor.text_index, focus.text_index);
+        TextIndex s = std::min(fAnchor.text_index, fFocus.text_index);
+        TextIndex e = std::max(fAnchor.text_index, fFocus.text_index);
         return TextRange(s, e);
     }
 
     // Cohesive State Invariant: Atomic mutators preventing broken or inconsistent ranges
     void collapse_to(CaretPosition pos) {
-        anchor = pos;
-        focus = pos;
-        ranges.clear();
+        fAnchor = pos;
+        fFocus = pos;
+        fRanges.clear();
+        SkASSERT(fRanges.empty());
+        SkASSERT(fAnchor == fFocus);
+        SkASSERT(is_collapsed());
     }
 
     void set_span(CaretPosition a, CaretPosition f) {
-        anchor = a;
-        focus = f;
-        ranges.clear();
+        fAnchor = a;
+        fFocus = f;
+        fRanges.clear();
+        SkASSERT(fRanges.empty());
     }
 
     void set_ranges(CaretPosition a, CaretPosition f, std::vector<TextRange> r) {
-        anchor = a;
-        focus = f;
-        ranges = std::move(r);
+        fAnchor = a;
+        fFocus = f;
+        fRanges = std::move(r);
+        SkASSERT(!fRanges.empty() || fAnchor == fFocus);
     }
 
     bool operator==(const EditorSelection& other) const {
-        return anchor == other.anchor && focus == other.focus && ranges == other.ranges;
+        return fAnchor == other.fAnchor && fFocus == other.fFocus && fRanges == other.fRanges;
     }
     bool operator!=(const EditorSelection& other) const {
         return !(*this == other);
     }
+
+private:
+    CaretPosition fAnchor;
+    CaretPosition fFocus;
+    // For cross-directional BiDi selections, contains the exact discontinuous logical ranges
+    std::vector<TextRange> fRanges;
 };
+
+// Axiom 16: Compile-time aggregate rejection.
+// Ensures EditorSelection cannot be used as an anemic aggregate struct with exposed raw fields.
+static_assert(!std::is_aggregate_v<EditorSelection>,
+    "KEEPER-INVARIANT-20-BREACH: EditorSelection must not be an aggregate struct; fields must be private.");
 
 } // namespace skia::text_editor
 

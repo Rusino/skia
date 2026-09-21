@@ -273,3 +273,11 @@ This document defines the binding domain-specific invariants for the 4-layer Ski
    - `EditorSelection` state transitions (`collapse_to`, `set_span`, `set_ranges`) must be executed exclusively through atomic mutator methods. Direct assignment to individual fields (`anchor`, `focus`, `ranges`) from callers is strictly prohibited.
 2. **Range Invariant Preservation**:
    - Any operation collapsing the selection (`collapse_to`) or setting a 1D span (`set_span`) must unconditionally clear `ranges`, guaranteeing that `is_collapsed()` accurately reflects the true state of the selection.
+3. **Compile-Time Aggregate Rejection & Private Encapsulation**:
+   - `EditorSelection` MUST strictly encapsulate its state members as `private`. Direct access to internal fields from external modules is prohibited; read-only access is mediated exclusively via `const` accessors (`anchor()`, `focus()`, `ranges()`).
+   - The header must assert non-aggregate status via `static_assert(!std::is_aggregate_v<EditorSelection>)`.
+4. **Postcondition Debug Invariant Assertions**:
+   - Every mutator method must defensively assert its postcondition invariants in Debug builds:
+     - `collapse_to(pos)` asserts `ranges.empty()` and `anchor == focus`;
+     - `set_span(a, f)` asserts `ranges.empty()`;
+     - `set_ranges(a, f, r)` asserts `!r.empty() || a == f`.

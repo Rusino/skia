@@ -119,17 +119,16 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
     if (!fSelection.is_collapsed()) {
         kind = EditCommand::Kind::kCutOrBlock;
         textBefore = copySelection();
-        if (!fSelection.ranges.empty()) {
-            insertPos = fSelection.ranges.front().start.value;
-            for (auto it = fSelection.ranges.rbegin(); it != fSelection.ranges.rend(); ++it) {
+        if (!fSelection.ranges().empty()) {
+            insertPos = fSelection.ranges().front().start.value;
+            for (auto it = fSelection.ranges().rbegin(); it != fSelection.ranges().rend(); ++it) {
                 fDocument->erase(*it);
             }
-            fSelection.ranges.clear();
             fDocument->insert(TextIndex(insertPos), sanitized);
             size_t finalCaret = insertPos + sanitized.size();
             updateCursorPosition(finalCaret);
             CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
-                fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
+                fSelection.focus(), CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
             if (accuratePos.text_index.value == finalCaret) {
                 fSelection.collapse_to(accuratePos);
             }
@@ -140,13 +139,13 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
             size_t finalCaret = insertPos + sanitized.size();
             updateCursorPosition(finalCaret);
             CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
-                fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
+                fSelection.focus(), CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
             if (accuratePos.text_index.value == finalCaret) {
                 fSelection.collapse_to(accuratePos);
             }
         }
     } else {
-        insertPos = std::min(fSelection.focus.text_index.value, fDocument->text().size());
+        insertPos = std::min(fSelection.focus().text_index.value, fDocument->text().size());
         if (sanitized == "\n") {
             kind = EditCommand::Kind::kNewline;
         } else if (sanitized.size() > 4) {
@@ -158,7 +157,7 @@ void TextEditorViewModel::insertText(std::string_view utf8_text) {
         size_t finalCaret = insertPos + sanitized.size();
         updateCursorPosition(finalCaret);
         CaretPosition accuratePos = fDocument->spatial_index().moveCaret(
-            fSelection.focus, CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
+            fSelection.focus(), CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical);
         if (accuratePos.text_index.value == finalCaret) {
             fSelection.collapse_to(accuratePos);
         }
@@ -187,12 +186,11 @@ void TextEditorViewModel::deleteBackward(MovementGranularity gran) {
 
     if (!fSelection.is_collapsed()) {
         textBefore = copySelection();
-        if (!fSelection.ranges.empty()) {
-            deletePos = fSelection.ranges.front().start.value;
-            for (auto it = fSelection.ranges.rbegin(); it != fSelection.ranges.rend(); ++it) {
+        if (!fSelection.ranges().empty()) {
+            deletePos = fSelection.ranges().front().start.value;
+            for (auto it = fSelection.ranges().rbegin(); it != fSelection.ranges().rend(); ++it) {
                 fDocument->erase(*it);
             }
-            fSelection.ranges.clear();
             updateCursorPosition(deletePos);
         } else {
             TextRange range = fSelection.text_range();
@@ -213,7 +211,7 @@ void TextEditorViewModel::deleteBackward(MovementGranularity gran) {
             pushEditCommand(std::move(cmd));
         }
     } else {
-        size_t cursor = fSelection.focus.text_index.value;
+        size_t cursor = fSelection.focus().text_index.value;
         std::string_view text = fDocument->text();
         if (cursor == 0 || text.empty()) {
             return;
@@ -250,7 +248,7 @@ void TextEditorViewModel::deleteForward(MovementGranularity gran) {
         deleteBackward(gran);
         return;
     }
-    size_t cursor = fSelection.focus.text_index.value;
+    size_t cursor = fSelection.focus().text_index.value;
     std::string_view text = fDocument->text();
     if (cursor >= text.size()) {
         return;
@@ -280,11 +278,11 @@ void TextEditorViewModel::deleteForward(MovementGranularity gran) {
 }
 
 void TextEditorViewModel::moveCaret(CursorDirection dir, MovementGranularity gran, NavigationMode mode, bool select) {
-    CaretPosition next = fDocument->spatial_index().moveCaret(fSelection.focus, dir, gran, mode);
+    CaretPosition next = fDocument->spatial_index().moveCaret(fSelection.focus(), dir, gran, mode);
     if (!select) {
         fSelection.collapse_to(next);
     } else {
-        fSelection.set_span(fSelection.anchor, next);
+        fSelection.set_span(fSelection.anchor(), next);
     }
     notifyRedraw();
 }
@@ -308,7 +306,7 @@ void TextEditorViewModel::moveCaretToPoint(SkScalar screenX, SkScalar screenY, b
             fDragAnchorDocPoint.fX, fDragAnchorDocPoint.fY,
             docX, docY,
             visualRects, visualRanges);
-        fSelection.set_ranges(fSelection.anchor, hit, std::move(visualRanges));
+        fSelection.set_ranges(fSelection.anchor(), hit, std::move(visualRanges));
     }
     notifyRedraw();
 }
@@ -466,7 +464,7 @@ bool TextEditorViewModel::handleKey(skui::Key key, skui::InputState state, skui:
             // Immediate Soft-Tab Normalization:
             // Calculate column offset from start of line
             std::string_view fullText = fDocument->text();
-            size_t cursor = std::min(fSelection.focus.text_index.value, fullText.size());
+            size_t cursor = std::min(fSelection.focus().text_index.value, fullText.size());
             size_t lineStart = 0;
             if (cursor > 0) {
                 size_t lastNewline = fullText.rfind('\n', cursor - 1);
@@ -514,7 +512,7 @@ bool TextEditorViewModel::handleChar(SkUnichar c, skui::ModifierKey modifiers) {
 }
 
 SkRect TextEditorViewModel::screenCaretRect() const {
-    SkRect r = fSelection.focus.caret_rect;
+    SkRect r = fSelection.focus().caret_rect;
     r.offset(-fScrollOffset.fX, -fScrollOffset.fY);
     return r;
 }
@@ -522,8 +520,8 @@ SkRect TextEditorViewModel::screenCaretRect() const {
 std::vector<SkRect> TextEditorViewModel::screenSelectionRects() const {
     std::vector<SkRect> rects;
     if (!fSelection.is_collapsed()) {
-        if (!fSelection.ranges.empty()) {
-            for (const auto& r : fSelection.ranges) {
+        if (!fSelection.ranges().empty()) {
+            for (const auto& r : fSelection.ranges()) {
                 std::vector<SkRect> subRects;
                 fDocument->spatial_index().getSelectionRects(r, subRects);
                 rects.insert(rects.end(), subRects.begin(), subRects.end());
@@ -604,9 +602,9 @@ std::string TextEditorViewModel::copySelection() const {
         return "";
     }
     std::string_view docText = fDocument->text();
-    if (!fSelection.ranges.empty()) {
+    if (!fSelection.ranges().empty()) {
         std::string result;
-        for (const auto& r : fSelection.ranges) {
+        for (const auto& r : fSelection.ranges()) {
             size_t start = std::min(r.start.value, docText.size());
             size_t end = std::min(r.end.value, docText.size());
             if (start > end) {
@@ -646,8 +644,8 @@ void TextEditorViewModel::pasteText(std::string_view raw) {
     // This allows immediate duplication via Ctrl+C -> Ctrl+V without requiring manual cursor movement!
     if (!fSelection.is_collapsed() && raw == copySelection()) {
         size_t rightEdge = 0;
-        if (!fSelection.ranges.empty()) {
-            for (const auto& r : fSelection.ranges) {
+        if (!fSelection.ranges().empty()) {
+            for (const auto& r : fSelection.ranges()) {
                 rightEdge = std::max({rightEdge, r.start.value, r.end.value});
             }
         } else {
@@ -655,7 +653,7 @@ void TextEditorViewModel::pasteText(std::string_view raw) {
             rightEdge = std::max(r.start.value, r.end.value);
         }
         updateCursorPosition(rightEdge);
-        collapseTo(fSelection.focus);
+        collapseTo(fSelection.focus());
     }
     insertText(raw);
 }
@@ -690,7 +688,7 @@ bool TextEditorViewModel::undo() {
 
     // 3. Restore selection state
     if (cmd.selectionBefore.is_collapsed()) {
-        updateCursorPosition(cmd.selectionBefore.focus.text_index.value);
+        updateCursorPosition(cmd.selectionBefore.focus().text_index.value);
     } else {
         fSelection = cmd.selectionBefore;
     }
@@ -721,7 +719,7 @@ bool TextEditorViewModel::redo() {
     }
 
     if (cmd.selectionAfter.is_collapsed()) {
-        updateCursorPosition(cmd.selectionAfter.focus.text_index.value);
+        updateCursorPosition(cmd.selectionAfter.focus().text_index.value);
     } else {
         fSelection = cmd.selectionAfter;
     }

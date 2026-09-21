@@ -307,7 +307,7 @@ DEF_TEST(TextEditor_Controller_InsertionAndDeletion, reporter) {
     // Move to end and type "!"
     editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, false);
     int safetySteps = 0;
-    while (editor->selection().focus.text_index < TextIndex(editor->text().size()) && ++safetySteps < 1000) {
+    while (editor->selection().focus().text_index < TextIndex(editor->text().size()) && ++safetySteps < 1000) {
         editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, false);
     }
     REPORTER_ASSERT(reporter, safetySteps < 1000);
@@ -334,7 +334,7 @@ DEF_TEST(TextEditor_Controller_InsertionAndDeletion, reporter) {
     editor->insertText("Skia");
     REPORTER_ASSERT(reporter, editor->text() == "Hello Skia");
     REPORTER_ASSERT(reporter, editor->selection().is_collapsed());
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(10));
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(10));
 
     // Collapse to beginning and deleteForward
     CaretPosition startPos;
@@ -369,13 +369,13 @@ DEF_TEST(TextEditor_Controller_NavigationAndWordSelection, reporter) {
 
     editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, true);
     REPORTER_ASSERT(reporter, !editor->selection().is_collapsed());
-    REPORTER_ASSERT(reporter, editor->selection().anchor.text_index == TextIndex(0));
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(1));
+    REPORTER_ASSERT(reporter, editor->selection().anchor().text_index == TextIndex(0));
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(1));
 
     // 2. Collapse navigation (select = false)
     editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, false);
     REPORTER_ASSERT(reporter, editor->selection().is_collapsed());
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(2));
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(2));
 
     // 3. Word selection at point
     // Inside "quick" (x offset of 'q' is after "The ")
@@ -437,22 +437,22 @@ DEF_TEST(TextEditor_Defect_BackspaceMaintainsCaretRectPosition, reporter) {
 
     // Move to end of "Hello World" (offset 11)
     int stepLimit = 0;
-    while (editor->selection().focus.text_index < TextIndex(editor->text().size()) && ++stepLimit < 1000) {
+    while (editor->selection().focus().text_index < TextIndex(editor->text().size()) && ++stepLimit < 1000) {
         editor->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, false);
     }
     REPORTER_ASSERT(reporter, stepLimit < 1000);
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(11));
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(11));
 
-    SkScalar beforeX = editor->selection().focus.caret_rect.fLeft;
+    SkScalar beforeX = editor->selection().focus().caret_rect.fLeft;
     REPORTER_ASSERT(reporter, beforeX > 0.0f);
 
     // Backspace deletes 'd'. New text is "Hello Worl" (length 10)
     editor->deleteBackward();
     REPORTER_ASSERT(reporter, editor->text() == "Hello Worl");
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(10));
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(10));
 
     // Hostile Invariant: Caret X position must NOT reset to 0.0f! It must sit at the end of "Worl"!
-    SkScalar afterX = editor->selection().focus.caret_rect.fLeft;
+    SkScalar afterX = editor->selection().focus().caret_rect.fLeft;
     REPORTER_ASSERT(reporter, afterX > 0.0f);
     REPORTER_ASSERT(reporter, afterX < beforeX);
 
@@ -465,9 +465,9 @@ DEF_TEST(TextEditor_Defect_BackspaceMaintainsCaretRectPosition, reporter) {
     // Delete space at index 5 -> "HelloWorl"
     editor->deleteForward();
     REPORTER_ASSERT(reporter, editor->text() == "HelloWorl");
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(5));
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(5));
     // Caret X position after deleteForward must sit at the boundary, NOT at 0.0f!
-    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft > 0.0f);
+    REPORTER_ASSERT(reporter, editor->selection().focus().caret_rect.fLeft > 0.0f);
 }
 
 // =============================================================================
@@ -526,8 +526,8 @@ DEF_TEST(TextEditor_Invariant7_HeadlessInteractionSession, reporter) {
     REPORTER_ASSERT(reporter, editor->text().empty());
 
     // Dual-Contract: Empty buffer must have valid non-zero spatial bounds
-    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.height() > 0.0f);
-    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft >= 0.0f);
+    REPORTER_ASSERT(reporter, editor->selection().focus().caret_rect.height() > 0.0f);
+    REPORTER_ASSERT(reporter, editor->selection().focus().caret_rect.fLeft >= 0.0f);
 
     // 2. Headless Typing Flow: Simulate typing "The quick brown fox jumps over the lazy dog"
     const std::string fullSentence = "The quick brown fox jumps over the lazy dog";
@@ -546,7 +546,7 @@ DEF_TEST(TextEditor_Invariant7_HeadlessInteractionSession, reporter) {
     }
 
     // Caret must be at end of text with valid non-zero spatial X
-    CaretPosition endPos = editor->selection().focus;
+    CaretPosition endPos = editor->selection().focus();
     REPORTER_ASSERT(reporter, endPos.text_index == TextIndex(fullSentence.size()));
     REPORTER_ASSERT(reporter, endPos.caret_rect.fLeft > 0.0f);
     SkScalar endX = endPos.caret_rect.fLeft;
@@ -554,11 +554,11 @@ DEF_TEST(TextEditor_Invariant7_HeadlessInteractionSession, reporter) {
     // 3. Headless Backspace Flow: Delete "dog" (3 backspaces)
     editor->deleteBackward(); // deletes 'g'
     REPORTER_ASSERT(reporter, editor->text() == "The quick brown fox jumps over the lazy do");
-    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft < endX);
-    SkScalar doX = editor->selection().focus.caret_rect.fLeft;
+    REPORTER_ASSERT(reporter, editor->selection().focus().caret_rect.fLeft < endX);
+    SkScalar doX = editor->selection().focus().caret_rect.fLeft;
 
     editor->deleteBackward(); // deletes 'o'
-    SkScalar dX = editor->selection().focus.caret_rect.fLeft;
+    SkScalar dX = editor->selection().focus().caret_rect.fLeft;
     REPORTER_ASSERT(reporter, dX < doX);
     REPORTER_ASSERT(reporter, dX > 0.0f);
 
@@ -566,7 +566,7 @@ DEF_TEST(TextEditor_Invariant7_HeadlessInteractionSession, reporter) {
     // With 'd' deleted, the wrapped line for "dog" collapses, and the caret wraps up
     // to the end of the previous line ("...lazy ").
     REPORTER_ASSERT(reporter, editor->text() == "The quick brown fox jumps over the lazy ");
-    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft > 0.0f);
+    REPORTER_ASSERT(reporter, editor->selection().focus().caret_rect.fLeft > 0.0f);
 
     // 4. Headless Selection & Navigation Flow:
     // Move left 5 times with select=true (expanding selection across "lazy")
@@ -584,8 +584,8 @@ DEF_TEST(TextEditor_Invariant7_HeadlessInteractionSession, reporter) {
     // Perform replacement of selected range
     editor->insertText("Replaced");
     REPORTER_ASSERT(reporter, editor->text() == "Replaced");
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(8));
-    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.fLeft > 0.0f);
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(8));
+    REPORTER_ASSERT(reporter, editor->selection().focus().caret_rect.fLeft > 0.0f);
 }
 
 // =============================================================================
@@ -622,7 +622,7 @@ DEF_TEST(TextEditor_Invariant7_HeadlessEventDispatch, reporter) {
     bool backHandled = editor->handleKey(skui::Key::kBack, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, backHandled);
     REPORTER_ASSERT(reporter, editor->text().empty());
-    REPORTER_ASSERT(reporter, editor->selection().focus.caret_rect.height() > 0.0f);
+    REPORTER_ASSERT(reporter, editor->selection().focus().caret_rect.height() > 0.0f);
 }
 
 // =============================================================================
@@ -683,20 +683,20 @@ DEF_TEST(TextEditor_Defect_VerticalCaretNavigationUpDown, reporter) {
     REPORTER_ASSERT(reporter, editor != nullptr);
 
     // Caret starts at index 0 (Line 0, "First Line")
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(0));
-    SkScalar startY = editor->selection().focus.caret_rect.fTop;
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(0));
+    SkScalar startY = editor->selection().focus().caret_rect.fTop;
 
     // Move right 5 characters: "First|"
     for (int i = 0; i < 5; ++i) {
         editor->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
     }
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(5));
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(5));
 
     // Hostile Invariant 1: Arrow Down must move caret to Line 1 ("Second Line")
     bool downHandled = editor->handleKey(skui::Key::kDown, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, downHandled);
 
-    CaretPosition downPos = editor->selection().focus;
+    CaretPosition downPos = editor->selection().focus();
     // Must move to line 1: Y coordinate must increase!
     REPORTER_ASSERT(reporter, downPos.caret_rect.fTop > startY);
     // Must be in "Second Line" (index >= 11, which is after "First Line\n")
@@ -706,7 +706,7 @@ DEF_TEST(TextEditor_Defect_VerticalCaretNavigationUpDown, reporter) {
     bool upHandled = editor->handleKey(skui::Key::kUp, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, upHandled);
 
-    CaretPosition upPos = editor->selection().focus;
+    CaretPosition upPos = editor->selection().focus();
     // Must return to line 0: Y coordinate must match startY!
     REPORTER_ASSERT(reporter, upPos.caret_rect.fTop == startY);
     REPORTER_ASSERT(reporter, upPos.text_index < TextIndex(11));
@@ -764,20 +764,20 @@ DEF_TEST(TextEditor_Defect_ZalgoGraphemeSingleStepNavigation, reporter) {
     REPORTER_ASSERT(reporter, editor != nullptr);
 
     // Caret starts at index 0 (left of 'e')
-    REPORTER_ASSERT(reporter, editor->selection().focus.text_index == TextIndex(0));
-    SkScalar startX = editor->selection().focus.caret_rect.fLeft;
+    REPORTER_ASSERT(reporter, editor->selection().focus().text_index == TextIndex(0));
+    SkScalar startX = editor->selection().focus().caret_rect.fLeft;
 
     // 1. Single Right Arrow MUST step across the entire extended grapheme cluster in one hit:
     bool handledRight = editor->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, handledRight);
-    CaretPosition posAfterRight = editor->selection().focus;
+    CaretPosition posAfterRight = editor->selection().focus();
     REPORTER_ASSERT(reporter, posAfterRight.text_index == TextIndex(zalgo.size()));
     REPORTER_ASSERT(reporter, posAfterRight.caret_rect.fLeft > startX);
 
     // 2. Single Left Arrow MUST step backward across the entire cluster back to 0:
     bool handledLeft = editor->handleKey(skui::Key::kLeft, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, handledLeft);
-    CaretPosition posAfterLeft = editor->selection().focus;
+    CaretPosition posAfterLeft = editor->selection().focus();
     REPORTER_ASSERT(reporter, posAfterLeft.text_index == TextIndex(0));
     REPORTER_ASSERT(reporter, posAfterLeft.caret_rect.fLeft == startX);
 
@@ -799,7 +799,7 @@ DEF_TEST(TextEditor_Defect_ZalgoGraphemeSingleStepNavigation, reporter) {
 
     // Single step forward along reading order (kTextLogical):
     CaretPosition arabicCaret = arabicEditor->spatial_index().moveCaret(
-        arabicEditor->selection().focus,
+        arabicEditor->selection().focus(),
         CursorDirection::kRight,
         MovementGranularity::kGrapheme,
         NavigationMode::kTextLogical);
@@ -819,7 +819,7 @@ DEF_TEST(TextEditor_Invariant_CrossLayerStressPropagation, reporter) {
 
         // 1. Dual-Contract Formatting Check:
         // Must never produce zero-height bounds even on empty buffer
-        CaretPosition startCaret = editor->selection().focus;
+        CaretPosition startCaret = editor->selection().focus();
         REPORTER_ASSERT(reporter, startCaret.caret_rect.height() > 0);
 
         if (tc.text.empty()) {
@@ -834,12 +834,12 @@ DEF_TEST(TextEditor_Invariant_CrossLayerStressPropagation, reporter) {
         TextIndex prevIndex = startCaret.text_index;
         SkPoint prevCaretPos = SkPoint::Make(startCaret.caret_rect.fLeft, startCaret.caret_rect.fTop);
 
-        while (editor->selection().focus.text_index.value < tc.text.size() && ++steps < kMaxSteps) {
+        while (editor->selection().focus().text_index.value < tc.text.size() && ++steps < kMaxSteps) {
             bool moved = editor->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
             if (!moved) {
                 break;
             }
-            CaretPosition cur = editor->selection().focus;
+            CaretPosition cur = editor->selection().focus();
             if (cur.text_index == prevIndex) {
                 // Reached end of line or document
                 break;
@@ -928,7 +928,7 @@ DEF_TEST(TextEditor_MVVM_ViewModel_PresentationAndVisitor, reporter) {
     // 3. Arrow movement (kTextLogical)
     vm.handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, redrawCount == 2);
-    REPORTER_ASSERT(reporter, vm.selection().focus.text_index.value == 2);
+    REPORTER_ASSERT(reporter, vm.selection().focus().text_index.value == 2);
 
     // 4. Viewport Scroll and coordinate translation
     vm.setScrollOffset(SkPoint::Make(50, 100));
@@ -1202,7 +1202,7 @@ DEF_TEST(TextEditor_Invariant14_EnterKeySplitsLineAndAdvancesCaret, reporter) {
     REPORTER_ASSERT(reporter, lines.size() == 2);
 
     // Assert caret advanced to start of second line (index 6, which is start of "World")
-    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(6));
+    REPORTER_ASSERT(reporter, vm->selection().focus().text_index == TextIndex(6));
     REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
 
     // Second line caret rect must have Y below first line
@@ -1221,18 +1221,18 @@ DEF_TEST(TextEditor_Invariant14_TabKeyInsertsSoftSpaces, reporter) {
     bool tab1 = vm->handleKey(skui::Key::kTab, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, tab1);
     REPORTER_ASSERT(reporter, vm->text() == "    ");
-    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(4));
+    REPORTER_ASSERT(reporter, vm->selection().focus().text_index == TextIndex(4));
 
     // 2. Type "a" (column becomes 5)
     vm->handleChar('a', skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, vm->text() == "    a");
-    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(5));
+    REPORTER_ASSERT(reporter, vm->selection().focus().text_index == TextIndex(5));
 
     // 3. Tab at column 5 -> (4 - (5 % 4)) = 3 soft spaces
     bool tab2 = vm->handleKey(skui::Key::kTab, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, tab2);
     REPORTER_ASSERT(reporter, vm->text() == "    a   ");
-    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(8));
+    REPORTER_ASSERT(reporter, vm->selection().focus().text_index == TextIndex(8));
 }
 
 // =============================================================================
@@ -1284,7 +1284,7 @@ DEF_TEST(TextEditor_Invariant15_SoftWrapBoundaryCaretAffinity, reporter) {
     // 1. Click far to the right of Line 0 content:
     // Caret must take Affinity::kUpstream and snap to line 0 right edge (NOT jump down to line 1)
     vm->moveCaretToPoint(lines[0].bounds.fRight + 50.0f, line0Y, false);
-    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kUpstream);
+    REPORTER_ASSERT(reporter, vm->selection().focus().affinity == Affinity::kUpstream);
     SkRect caret0 = vm->screenCaretRect();
     REPORTER_ASSERT(reporter, caret0.fTop < lines[1].bounds.fTop);
     REPORTER_ASSERT(reporter, caret0.fLeft >= lines[0].bounds.fRight - 1.0f);
@@ -1292,7 +1292,7 @@ DEF_TEST(TextEditor_Invariant15_SoftWrapBoundaryCaretAffinity, reporter) {
     // 2. Click at the start/left edge of Line 1:
     // Caret must take Affinity::kDownstream and snap to line 1 left edge (NOT jump up to line 0)
     vm->moveCaretToPoint(lines[1].bounds.fLeft, line1Y, false);
-    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kDownstream);
+    REPORTER_ASSERT(reporter, vm->selection().focus().affinity == Affinity::kDownstream);
     SkRect caret1 = vm->screenCaretRect();
     REPORTER_ASSERT(reporter, caret1.fTop >= lines[1].bounds.fTop);
     REPORTER_ASSERT(reporter, caret1.fLeft <= lines[1].bounds.fLeft + 2.0f);
@@ -1300,18 +1300,18 @@ DEF_TEST(TextEditor_Invariant15_SoftWrapBoundaryCaretAffinity, reporter) {
     // 3. Step-through horizontal navigation across soft wrap boundary:
     // Move caret back to upstream position on Line 0
     vm->moveCaretToPoint(lines[0].bounds.fRight + 50.0f, line0Y, false);
-    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kUpstream);
+    REPORTER_ASSERT(reporter, vm->selection().focus().affinity == Affinity::kUpstream);
 
     // Press Right arrow: must transition to Line 1 downstream position
     bool handled = vm->handleKey(skui::Key::kRight, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, handled);
-    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kDownstream);
+    REPORTER_ASSERT(reporter, vm->selection().focus().affinity == Affinity::kDownstream);
     REPORTER_ASSERT(reporter, vm->screenCaretRect().fTop >= lines[1].bounds.fTop);
 
     // Press Left arrow: must transition back to Line 0 upstream position
     bool leftHandled = vm->handleKey(skui::Key::kLeft, skui::InputState::kDown, skui::ModifierKey::kNone);
     REPORTER_ASSERT(reporter, leftHandled);
-    REPORTER_ASSERT(reporter, vm->selection().focus.affinity == Affinity::kUpstream);
+    REPORTER_ASSERT(reporter, vm->selection().focus().affinity == Affinity::kUpstream);
     REPORTER_ASSERT(reporter, vm->screenCaretRect().fTop < lines[1].bounds.fTop);
 }
 
@@ -1345,7 +1345,7 @@ DEF_TEST(TextEditor_Invariant16_ClipboardCopyCutPasteSanitization, reporter) {
     REPORTER_ASSERT(reporter, mockClipboard == "brown fox");
     REPORTER_ASSERT(reporter, vm->text() == "The quick  jumps over the lazy dog.");
     REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
-    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(10));
+    REPORTER_ASSERT(reporter, vm->selection().focus().text_index == TextIndex(10));
 
     // 3. Inject hostile external clipboard content (CRLF, tabs, C0 noise, single CR)
     const char hostileData[] = "white\r\nwolf\t\0\x07runs\rfast";
@@ -1365,7 +1365,7 @@ DEF_TEST(TextEditor_Invariant16_ClipboardCopyCutPasteSanitization, reporter) {
     REPORTER_ASSERT(reporter, vm->text() == expectedText);
     REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
     size_t expectedCaret = 10 + std::string("white\nwolf    runs\nfast").size();
-    REPORTER_ASSERT(reporter, vm->selection().focus.text_index == TextIndex(expectedCaret));
+    REPORTER_ASSERT(reporter, vm->selection().focus().text_index == TextIndex(expectedCaret));
     REPORTER_ASSERT(reporter, vm->document().formatted().lines().size() == 3);
 }
 
@@ -1721,7 +1721,7 @@ DEF_TEST(TextEditor_Invariant19_EmptyClipboardAndEnterTypingIntegrity, reporter)
     vm->moveCaretToPoint(lines[0].bounds.fLeft + 80.0f, y, false); // anchor
     vm->moveCaretToPoint(lines[0].bounds.fLeft + 160.0f, y, true);  // focus
     REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
-    REPORTER_ASSERT(reporter, !vm->selection().ranges.empty(), "Mouse drag must populate ranges!");
+    REPORTER_ASSERT(reporter, !vm->selection().ranges().empty(), "Mouse drag must populate ranges!");
 
     std::string draggedCopied = vm->copySelection();
     REPORTER_ASSERT(reporter, !draggedCopied.empty());
@@ -1733,6 +1733,85 @@ DEF_TEST(TextEditor_Invariant19_EmptyClipboardAndEnterTypingIntegrity, reporter)
     REPORTER_ASSERT(reporter, mousePasteHandled);
     REPORTER_ASSERT(reporter, vm->text().size() == beforeLen + draggedCopied.size(),
                     "Mouse drag selection was NOT duplicated on Ctrl+V: length did not increase!");
+}
+
+// =============================================================================
+// TRAP 24 (Invariant 20 & Axiom 15): Encapsulated Selection State & Realistic Ingress Cohesion
+// =============================================================================
+DEF_TEST(TextEditor_Invariant20_EncapsulatedSelectionAndIngressCohesion, reporter) {
+    // --- Partition 1: Compile-Time Aggregate Rejection (Axiom 16 & Invariant 20.3) ---
+    static_assert(!std::is_aggregate_v<EditorSelection>,
+                  "KEEPER-INVARIANT-20-BREACH: EditorSelection must not be an aggregate struct; fields must be private.");
+
+    SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
+    LayoutConstraints constraints;
+    constraints.max_width = 300.0f;
+
+    std::string sample = "Line 1 Latin text\nمرحبا بالعالم العربي\nLine 3 Ending";
+    auto vm = std::make_unique<TextEditorViewModel>(sample, font, SkColor4f{0, 0, 0, 1}, constraints);
+    REPORTER_ASSERT(reporter, vm != nullptr);
+
+    // Initial state: collapsed, empty ranges
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, vm->selection().ranges().empty());
+    REPORTER_ASSERT(reporter, vm->selection().anchor() == vm->selection().focus());
+
+    // --- Partition 2: Realistic Ingress Multi-Line Drag & Range Population (Axiom 15) ---
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, lines.size() >= 3);
+
+    // Drag from line 0 to line 2
+    SkScalar y0 = lines[0].bounds.centerY();
+    SkScalar y2 = lines[2].bounds.centerY();
+    vm->moveCaretToPoint(lines[0].bounds.fLeft + 20.0f, y0, false); // anchor
+    vm->moveCaretToPoint(lines[2].bounds.fLeft + 40.0f, y2, true);  // focus (drag)
+
+    // Selection must be non-collapsed and ranges must be populated
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, !vm->selection().ranges().empty(),
+                    "Realistic 2D drag must populate multi-line selection ranges!");
+    REPORTER_ASSERT(reporter, vm->selection().anchor() != vm->selection().focus());
+
+    // --- Partition 3: Atomic Invariant Invalidation on Navigation (Invariant 20.2) ---
+    // Moving the caret without select must atomically collapse selection AND clear ranges
+    vm->moveCaret(CursorDirection::kRight, MovementGranularity::kGrapheme, NavigationMode::kTextLogical, false);
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed(),
+                    "Caret navigation without selection must collapse EditorSelection!");
+    REPORTER_ASSERT(reporter, vm->selection().ranges().empty(),
+                    "Caret navigation must atomically clear visual ranges!");
+    REPORTER_ASSERT(reporter, vm->selection().anchor() == vm->selection().focus(),
+                    "Collapsed selection must have identical anchor and focus!");
+
+    // --- Partition 4: Dual-Mode Ingress Parity: Programmatic API (Axiom 15) ---
+    CaretPosition p1 = vm->document().spatial_index().hitTest(10.0f, y0);
+    CaretPosition p2 = vm->document().spatial_index().hitTest(80.0f, y0);
+
+    // 4A: set_span via setSelection must clear ranges
+    vm->setSelection(p1, p2);
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, vm->selection().ranges().empty(),
+                    "Programmatic 1D setSelection must guarantee empty ranges!");
+
+    // 4B: collapseTo must clear ranges and equate anchor and focus
+    vm->collapseTo(p2);
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, vm->selection().ranges().empty());
+    REPORTER_ASSERT(reporter, vm->selection().anchor() == vm->selection().focus());
+
+    // --- Partition 5: Discontinuous BiDi Deletion Cohesion (Invariant 12 & 20) ---
+    // Drag across Arabic line (line 1)
+    SkScalar y1 = lines[1].bounds.centerY();
+    vm->moveCaretToPoint(lines[1].bounds.fLeft + 20.0f, y1, false);
+    vm->moveCaretToPoint(lines[1].bounds.fRight - 20.0f, y1, true);
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+
+    // Deleting selection via deleteBackward must atomically erase and collapse cleanly
+    vm->deleteBackward();
+    REPORTER_ASSERT(reporter, vm->selection().is_collapsed(),
+                    "deleteBackward on discontinuous selection must leave selection collapsed!");
+    REPORTER_ASSERT(reporter, vm->selection().ranges().empty(),
+                    "deleteBackward must clear all ranges!");
+    REPORTER_ASSERT(reporter, vm->selection().anchor() == vm->selection().focus());
 }
 
 

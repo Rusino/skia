@@ -82,6 +82,14 @@ You are acting as an engine in **Project KEEPER**.
    (b) **Mandatory Realistic Ingress Traps**: Interactive state machines (selections, focus, gesture tracking, keyboard modifiers) must have characterization and regression traps driven through the identical ingress pipeline used by the production harness (e.g., simulated pointer coordinate trajectories via `moveCaretToPoint`, realistic key event sequences).
    (c) **Dual-Mode Verification**: Whenever a state mutation can be initiated programmatically or interactively, both ingress mechanisms must be tested in independent orthogonal test cases to prevent divergence between API behavior and user-driven behavior.
 
+16. **The Invariant Collision & Fail-Fast Escalation Law (Prohibition of Compromised Hybrid Contracts)**:
+   To prevent agents from making unvetted compromises when multiple system invariants appear in tension:
+   (a) **Strict Prohibition of Autonomous Compromise**: If an agent discovers that satisfying a new invariant (e.g., Axiom 14 strict encapsulation) conflicts with an existing rule (e.g., legacy ABI preservation), the agent is **strictly prohibited from inventing hybrid half-measures** (such as adding mutator methods while leaving mutable fields public).
+   (b) **Immediate Fail-Fast Escalation**: The agent must halt code generation and emit a formal `[KEEPER INVARIANT COLLISION DETECTED]` block outlining the conflicting rules, the physical dilemma, and concrete architectural alternatives for Overgod adjudication.
+   (c) **The Anti-Half-Measure Law (Prohibition of Hybrid Structs)**: A data type is either a pure passive DTO (aggregate POD without invariants) or a strictly encapsulated domain class (`class` with `private` members, const accessors, and atomic mutators). Any type that combines atomic mutators with exposed public mutable non-static data members is an invalid hybrid and constitutes an immediate constitutional violation.
+   (d) **Compile-Time Contract Enforcement**: Whenever a struct or class is designated as cohesive/encapsulated under Axiom 14, it MUST declare a compile-time assertion in its header:
+       `static_assert(!std::is_aggregate_v<Type>, "KEEPER: Type must not be an aggregate struct; fields must be encapsulated");`
+
 ### 1.5 The Two-Tier Invariant Hierarchy (Master Codex vs. Local Domain Invariants)
 
 Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
@@ -235,8 +243,9 @@ Never push directly to remote branches without The Overgod's explicit sign-off.
 
 ## 5. Critical Invariants to Always Enforce
 
-1. **The JetBrains / External Caller Rule**:
-   Never delete, rename, or change visibility of any existing method or struct field in legacy code unless explicitly commanded by The Overgod. External clients frequently inspect private internals. Restrict refactoring to statements *inside* function bodies.
+1. **The JetBrains / External Caller Rule (Scope: Frozen Core ABI)**:
+   Never delete, rename, or change visibility of any existing method or struct field in frozen legacy public ABIs (specifically `include/core/**` and external integration boundaries) unless explicitly commanded by The Overgod. External clients frequently inspect private internals. Restrict refactoring to statements *inside* function bodies.
+   *Scope Qualification*: Internal, developing subsystems (such as `tools/text_editor/**`) are NOT frozen external ABIs; when domain cohesion (Axiom 14) requires encapsulating anemic structs, Axiom 14 takes precedence, and callers across internal tools/tests must be systematically refactored rather than left in a compromised hybrid state.
 2. **Watch for Silent Test Skips**:
    Always verify whether tests rely on external assets (like asset directories, test vectors, or network mocks). If a test uses a macro or skip logic like `SKIP_IF_NOT_FOUND`, ensure the required flags or resources are actively supplied so assertions actually run.
 3. **No Warning Suppressions**:

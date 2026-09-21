@@ -61,7 +61,7 @@ void TextEditorPainter::Paint(
 
     // 3. Draw Caret
     if (options.show_caret && viewModel.isCaretVisible()) {
-        const auto& focus = viewModel.selection().focus;
+        const auto& focus = viewModel.selection().focus();
         SkRect caretRect = focus.caret_rect;
         if (caretRect.isEmpty() || caretRect.height() <= 0) {
             const auto& lines = viewModel.document().formatted().lines();
