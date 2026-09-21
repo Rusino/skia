@@ -368,6 +368,7 @@ void TextEditorViewModel::setSelection(CaretPosition anchor, CaretPosition focus
 void TextEditorViewModel::collapseTo(CaretPosition pos) {
     fSelection.anchor = pos;
     fSelection.focus = pos;
+    fSelection.ranges.clear();
     notifyRedraw();
 }
 
@@ -654,9 +655,17 @@ void TextEditorViewModel::pasteText(std::string_view raw) {
     // collapse the selection to its end (right edge) and insert the text adjacent to it.
     // This allows immediate duplication via Ctrl+C -> Ctrl+V without requiring manual cursor movement!
     if (!fSelection.is_collapsed() && raw == copySelection()) {
-        TextRange r = fSelection.text_range();
-        size_t rightEdge = std::max(r.start.value, r.end.value);
-        collapseTo(CaretPosition{TextIndex(rightEdge), Affinity::kDownstream, SkRect::MakeEmpty()});
+        size_t rightEdge = 0;
+        if (!fSelection.ranges.empty()) {
+            for (const auto& r : fSelection.ranges) {
+                rightEdge = std::max({rightEdge, r.start.value, r.end.value});
+            }
+        } else {
+            TextRange r = fSelection.text_range();
+            rightEdge = std::max(r.start.value, r.end.value);
+        }
+        updateCursorPosition(rightEdge);
+        collapseTo(fSelection.focus);
     }
     insertText(raw);
 }

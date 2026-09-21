@@ -1712,6 +1712,27 @@ DEF_TEST(TextEditor_Invariant19_EmptyClipboardAndEnterTypingIntegrity, reporter)
     std::string expectedText = "Keep This ReplacementCopyMeCopyMe";
     REPORTER_ASSERT(reporter, vm->text() == expectedText,
                     "Immediate Ctrl+V on identical selection did not duplicate!");
+
+    // 4. Mouse Dragged Selection (populates fSelection.ranges):
+    // Drag to select "Replacement"
+    const auto& lines = vm->document().formatted().lines();
+    REPORTER_ASSERT(reporter, !lines.empty());
+    SkScalar y = lines[0].bounds.centerY();
+    vm->moveCaretToPoint(lines[0].bounds.fLeft + 80.0f, y, false); // anchor
+    vm->moveCaretToPoint(lines[0].bounds.fLeft + 160.0f, y, true);  // focus
+    REPORTER_ASSERT(reporter, !vm->selection().is_collapsed());
+    REPORTER_ASSERT(reporter, !vm->selection().ranges.empty(), "Mouse drag must populate ranges!");
+
+    std::string draggedCopied = vm->copySelection();
+    REPORTER_ASSERT(reporter, !draggedCopied.empty());
+    vm->setClipboardHandlers(nullptr, [&]() { return draggedCopied; });
+
+    // Paste immediately: must duplicate dragged selection and not erase/collapse ranges without duplication
+    size_t beforeLen = vm->text().size();
+    bool mousePasteHandled = vm->handleKey(skui::Key::kV, skui::InputState::kDown, skui::ModifierKey::kControl);
+    REPORTER_ASSERT(reporter, mousePasteHandled);
+    REPORTER_ASSERT(reporter, vm->text().size() == beforeLen + draggedCopied.size(),
+                    "Mouse drag selection was NOT duplicated on Ctrl+V: length did not increase!");
 }
 
 
