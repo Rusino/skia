@@ -127,7 +127,11 @@ Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
    (a) **Prohibition of Monolithic Persona Role-Playing**: An agent is strictly prohibited from switching roles (Trapsmith $\to$ Artificer $\to$ Mimic $\to$ Coroner) inside a single context window. Role simulation within one continuous prompt is classified as counterfeit verification.
    (b) **The Orchestrator Protocol & Zero-Direct-Code Mandate**: The lead conversational agent operates exclusively as an Orchestrator. The Orchestrator is **strictly prohibited from directly modifying implementation or test files** (`src/**`, `include/**`, `tests/**`). All code modifications and characterization tests MUST be executed through autonomous subagents via `invoke_subagent` with clean, isolated context boundaries.
    (c) **The Black-Box Ingress Mandate (Anti-Collusion Test Scaffolding)**: When formulating prompts for The Trapsmith, The Orchestrator is strictly prohibited from leaking proposed implementation patches, internal helper names, or private state hooks. The Trapsmith must drive all tests strictly through public ingress channels (external coordinates, event dispatches, public API contracts) without coupling tests to future internal patches.
-   (d) **Gate A Pre-Flight Certificate Requirement**: The Artificer subagent may NEVER be launched to write or modify implementation logic until The Trapsmith subagent has executed against unmodified code and returned an authentic, verified failing test log (`Assert: Test(Defect) == FAIL`). Launching implementation without a verified Gate A log constitutes an immediate constitutional breach.
+   (d) **Gate A Pre-Flight Certificate Requirement & The Syntactic Alignment Exception**: The Artificer subagent may NEVER be launched to write or modify *domain implementation logic* until The Trapsmith subagent has executed against unmodified code and returned an authentic, verified failing test log (`Assert: Test(Defect) == FAIL`). Launching implementation without a verified Gate A log constitutes an immediate constitutional breach.
+       *Exception (Contract Migration Synchronization)*: When Phase 3 introduces a breaking API/type contract change in `include/**` that prevents binary compilation of dependent translation units, The Artificer is authorized for an isolated **Phase 3.7: Mechanical Syntactic Alignment Pass**.
+       - Scope: strictly restricted to mechanical call-site updates (`field` -> `accessor()`, constructor calls).
+       - Negative Constraint: The Artificer is STRICTLY PROHIBITED from altering control flow, algorithmic branching, or defect-inducing logic during Phase 3.7.
+       - Mandatory Inquisitor Diff Gate: The Invariant Inquisitor must audit Phase 3.7 diffs to certify that zero semantic logic was modified before The Trapsmith proceeds to Gate A.
    (e) **The Dual-Contract Mechanical Enforcement Rule**: Every unit test validating mutations (`deleteBackward`, `deleteForward`, `insertText`, `moveCaret`) MUST explicitly assert spatial output geometry (`fLeft`, `bounds`, $X, Y$ coordinates). Any test asserting solely boolean status flags (`is_collapsed()`, `ranges().empty()`) without spatial verification is classified as a Ghost Test and immediately rejected.
 
 18. **The Mutation Symmetry & Dual-Primitive Protocol (Anti-Asymmetry Law)**:
@@ -216,6 +220,14 @@ The Overgod reviews and directly modifies contracts / types.
 [Phase 3.6: The Invariant Inquisitor Counter-Audit]
 The Inquisitor audits The Overgod's diff against locked invariants.
 The Overgod re-confirms or refines.
+         │
+         ▼
+[Phase 3.7: Mechanical Syntactic Alignment (Conditional)]
+Does the Phase 3 contract change break compilation of dependent code in src/**?
+   ├── NO  ──► Proceed directly to Phase 4 (Gate A).
+   └── YES ──► The Artificer mechanically aligns call sites in src/**.
+               The Invariant Inquisitor audits the diff (Zero Semantic Mutation).
+               dm compiles cleanly with untouched domain logic.
          │
          ▼
 [Phase 4: Pre-Flight Pinning / Test Scaffolding]
