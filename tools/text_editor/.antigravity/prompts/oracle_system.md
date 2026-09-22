@@ -1,0 +1,1 @@
+/usr/local/google/home/jlavrova/Sources/Dungeons/codex/prompts/oracle_system.md
