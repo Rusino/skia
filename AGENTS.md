@@ -98,17 +98,17 @@ Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
 13. **The Upstream Milestone Synchronization Protocol**:
    To eliminate drift between the local runtime operational codex (`AGENTS.md` in active project roots) and the canonical Master Constitution:
    (a) **Local Autonomous Supremacy**: During active sprint/bugfix cycles, agents operate directly and autonomously against the root `AGENTS.md` without requiring cross-repo synchronization on every micro-turn.
-   (b) **Milestone Finish Line Alignment**: Upon reaching a designated milestone finish line, closing an escape inquest, or prior to branch merge, The Oracle (or the lead agent) MUST execute a synchronization pass copying the unified operational rules back into `Dungeons/KEEPER_INSTRUCTIONS_FOR_AGENTS.md` to preserve organizational lineage.
+   (b) **Milestone Finish Line Alignment**: Upon reaching a designated milestone finish line, closing an escape inquest, or prior to branch merge, The Oracle (or the lead agent) MUST execute a synchronization pass copying the unified operational rules back into `Dungeons/codex/AGENTS.md` to preserve organizational lineage.
 
 14. **The Strict Encapsulation & Domain Cohesion Law (Anti-Hybrid Law)**:
    To eliminate split-brain state mutations and leaky domain models:
    (a) **Strict Type Bifurcation**: Every data type in the codebase must belong to exactly one of two categories:
        - *Category A: Passive Configuration DTOs*: Pure aggregate configurations without internal logic, invariants, or lifecycle states (e.g. `PaintOptions`, `LayoutConstraints`). Declared as `struct`, MUST satisfy `std::is_aggregate_v<T> == true`.
-       - *Category B: Domain State Entities*: Any type representing domain state, metrics, selection ranges, or models (e.g. `EditorSelection`, `CaretPosition`, `TextDocument`, `TextEditorViewModel`). Declared as `class`, data members MUST be strictly `private`, accessed exclusively via const-accessors or by-value.
+       - *Category B: Domain State Entities*: Any type representing domain state, lifecycle, composite metrics, ranges, or models (e.g., in text engines: selection models, caret positions; in compilers: symbol table entries, AST nodes; in networking: connection states). Declared as `class`, data members MUST be strictly `private`, accessed exclusively via const-accessors or by-value.
    (b) **Mandatory Compile-Time Non-Aggregate Barrier**: All Category B domain entities MUST declare a compile-time assertion in their public headers:
        `static_assert(!std::is_aggregate_v<Type>, "KEEPER: Domain entity must be strictly encapsulated; raw fields are prohibited");`
    (c) **The Anti-Half-Measure Law**: Any type combining atomic mutators with exposed public mutable non-static data members is an invalid hybrid and constitutes an immediate constitutional violation.
-   (d) **Strict Encapsulation of Mutual Invariants**: Any data structure where fields maintain dependent invariants (such as `anchor`, `focus`, and `ranges` defining selection state) MUST NOT expose raw fields for disjointed external mutation. State transitions MUST be guarded behind atomic mutator methods (e.g. `collapse_to(pos)`, `set_span(a, f)`).
+   (d) **Strict Encapsulation of Mutual Invariants**: Any data structure where fields maintain dependent invariants (e.g., composite selection boundaries where active intervals depend on anchor and focus endpoints) MUST NOT expose raw fields for disjointed external mutation. State transitions MUST be guarded behind atomic mutator methods (e.g. `collapse_to(pos)`, `set_span(a, f)`).
    (e) **Postcondition State Assertions**: Mutators must defensively assert internal consistency upon exit in Debug builds (e.g. asserting that collapsed states strictly contain empty auxiliary range vectors).
 
 15. **The Invariant Collision & Fail-Fast Escalation Law (Prohibition of Autonomous Compromise)**:
@@ -132,18 +132,17 @@ Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
        - Scope: strictly restricted to mechanical call-site updates (`field` -> `accessor()`, constructor calls).
        - Negative Constraint: The Artificer is STRICTLY PROHIBITED from altering control flow, algorithmic branching, or defect-inducing logic during Phase 3.7.
        - Mandatory Inquisitor Diff Gate: The Invariant Inquisitor must audit Phase 3.7 diffs to certify that zero semantic logic was modified before The Trapsmith proceeds to Gate A.
-   (e) **The Dual-Contract Mechanical Enforcement Rule**: Every unit test validating mutations (`deleteBackward`, `deleteForward`, `insertText`, `moveCaret`) MUST explicitly assert spatial output geometry (`fLeft`, `bounds`, $X, Y$ coordinates). Any test asserting solely boolean status flags (`is_collapsed()`, `ranges().empty()`) without spatial verification is classified as a Ghost Test and immediately rejected.
+    (e) **The Dual-Contract Mechanical Enforcement Rule**: Every unit test validating internal state mutations MUST explicitly assert the corresponding projected external artifacts or geometry (e.g., spatial coordinates/bounds in visual engines, serialized wire bytes in network protocols, or AST/IR nodes in compilers; e.g., co-verifying cursor bounds alongside buffer indices on `insertText`/`deleteBackward`). Any test asserting solely internal boolean status flags (e.g. `is_valid()`, `is_collapsed()`) without verifying projected external reality is classified as a Ghost Test and immediately rejected.
 
 18. **The Mutation Symmetry & Dual-Primitive Protocol (Anti-Asymmetry Law)**:
-   To prevent operational blind spots where an invariant is fixed on one editing primitive but left broken on its symmetric dual:
-   (a) **Mandatory Mutation Quad Coverage**: Whenever a defect or spatial invariant is identified on a text-mutating operation, verification and contract updates MUST apply symmetrically across the entire Mutation Quad:
-       $$\{\text{insertText}, \text{deleteBackward}, \text{deleteForward}, \text{replaceSelection}\}$$
-   (b) **Prohibition of Asymmetric Certification**: The Trapsmith is strictly prohibited from certifying an invariant or bugfix exclusively on deletion or exclusively on insertion. The characterization trap matrix must parameterize and assert spatial continuity across both insertion and deletion operations under identical dimensional/BiDi boundary conditions.
+   To prevent operational blind spots where an invariant is fixed on one mutating primitive but left broken on its symmetric dual:
+   (a) **Mandatory Mutation Symmetry Coverage**: Whenever a defect or invariant is identified on a state-mutating operation that possesses an inverse or reciprocal dual (e.g., Insert/Delete, Allocate/Free, Push/Pop, Commit/Rollback; such as the text editing Mutation Quad $\{\text{insertText}, \text{deleteBackward}, \text{deleteForward}, \text{replaceSelection}\}$), verification and contract updates MUST apply symmetrically across the entire operational family.
+   (b) **Prohibition of Asymmetric Certification**: The Trapsmith is strictly prohibited from certifying an invariant or bugfix exclusively on forward mutation or exclusively on inverse deletion. The characterization trap matrix must parameterize and assert operational continuity across both forward and inverse operations under identical boundary conditions.
 
 19. **The Heterogeneous Boundary & Anti-Smearing Law**:
-   To prevent ghost test scaffolding where neutral characters artificially mask coordinate divergence:
-   (a) **Direct Heterogeneous Junction Mandate**: When testing spatial transitions, caret positioning, or selection continuity across directional (BiDi), font-fallback, or script boundaries, test scaffolding MUST construct direct adjacent heterogeneous junctions ($A \cdot B$) without intervening neutral buffer characters (ASCII whitespace, punctuation, formatting marks) that could collapse dual coordinates.
-   (b) **Mandatory Theoretical Delta Threshold**: Before certifying a Gate A trap on discontinuous boundaries (such as BiDi transitions where Upstream vs Downstream coordinates diverge), The Trapsmith must assert that the expected coordinate delta on broken code strictly exceeds the testing tolerance ($\Delta > \text{tolerance}$), proving that the trap is physically capable of catching the defect.
+   To prevent ghost test scaffolding where neutral elements artificially mask boundary divergence:
+   (a) **Direct Heterogeneous Junction Mandate**: When testing transitions, coordinate projections, or state continuity across domain partition boundaries (e.g., BiDi script boundaries, font-fallbacks, endianness switches, or security privilege domains), test scaffolding MUST construct direct adjacent heterogeneous junctions ($A \cdot B$) without intervening neutral buffer elements (such as ASCII whitespace, neutral padding bytes, or dummy no-op frames) that artificially smooth or collapse boundary divergence.
+   (b) **Mandatory Theoretical Delta Threshold**: Before certifying a Gate A trap on discontinuous boundaries (such as BiDi transitions where Upstream vs Downstream coordinates diverge), The Trapsmith must assert that the expected coordinate/value delta on broken code strictly exceeds the testing tolerance ($\Delta > \text{tolerance}$), proving that the trap is physically capable of catching the defect.
 
 20. **The Separation of Powers & Anti-Conflict-of-Interest Law (The Tripartite Governance Mandate)**:
    To eliminate systemic moral hazard, regulatory capture, and self-serving rule degradation:
@@ -176,7 +175,7 @@ Project KEEPER enforces a strict **Two-Tier Invariant Architecture**:
 
 ## 3. The Entity & Role Matrix
 
-When operating on tasks, partition actions strictly into these distinct functional roles via `invoke_subagent`:
+When operating on tasks, partition actions strictly into these distinct functional roles via `invoke_subagent`. Each subagent MUST be initialized with its canonical system prompt located in `codex/prompts/<role>_system.md` or `.antigravity/prompts/<role>_system.md` (via `define_subagent` or passed to `invoke_subagent`):
 
 | Role | Branch | Operational Directives |
 | :--- | :---: | :--- |
@@ -378,7 +377,7 @@ The agent is strictly forbidden from treating an escape as a localized, one-off 
    - **Process-Level Tiered Default Timeouts**:
      | Execution Category | Default Timeout | Rationale / Failure Mode |
      | :--- | :---: | :--- |
-     | **Targeted Unit Tests** (`dm --match <Suite>`) | **10 seconds** | Text editor test suite runs in 0.8–1.2s. Execution > 10s indicates deadlocks or infinite loops. |
+     | **Targeted Unit Tests** (`dm --match <Suite>`) | **10 seconds** | Targeted sub-suites typically execute in < 2.0s. Execution > 10s indicates deadlocks, livelocks, or runaway loops. |
      | **Incremental Compilation** (`ninja -C out/Debug <target>`) | **60 seconds** | Recompilation of 1–3 files takes 4–15s. 60s accommodates system load. |
      | **Instrumented Sanitizer Suite** (ASan/UBSan/TSan) | **120 seconds** | Accommodates 3x–5x instrumentation slowdown across full modules. |
      *Override Protocol*: Tasks genuinely requiring extended durations (benchmarks, full cold builds) may explicitly specify `timeout <N>s`.
@@ -387,13 +386,13 @@ The agent is strictly forbidden from treating an escape as a localized, one-off 
      `constexpr int kDefaultMaxSteps = 10'000;` (or $10 \times \text{buffer\_length}$).
      If progress stalls ($\Delta \text{index} == 0$), the loop must trigger an immediate assertion failure within milliseconds rather than hanging the test runner process.
 
-6. **The Dual-Contract Spatial Output Verification & Headless Simulation**:
-   - **Internal State + Projected Output Artifact**: Mutation tests must never assert only internal logical state (e.g. string equality, enum values). Every mutation test MUST assert the corresponding spatial geometry (`fLeft`, `bounds`, $X, Y$) of the projected output artifact.
-   - **Zero-Delta Phantom Navigation Law**: In any spatial navigation system, an input action altering internal logical state (`index++`) while producing zero spatial displacement ($\Delta X = 0, \Delta Y = 0$) without reaching a legitimate document boundary is classified as a Phantom Step defect and an automatic test failure.
-   - **Headless Interactive Flow Simulation**: Interactive subsystems, input dispatchers, and event handlers must never be left as untested glue code. The Trapsmith must construct synthetic headless user session tests that chain realistic user interaction sequences (keystrokes, drags, modifiers) verifying output geometry without requiring human manual testing to discover routine regressions.
+6. **The Dual-Contract Output Verification & Headless Simulation**:
+   - **Internal State + Projected External Artifact**: Mutation tests must never assert only internal logical state (e.g. string equality, enum values, collection size). Every mutation test MUST assert the corresponding externalized projection (e.g., spatial bounds/geometry in graphical/text systems, serialized frame bytes in network protocols, or emitted IR/AST nodes in compilers).
+   - **Zero-Delta Phantom Navigation Law**: In any spatial or state navigation system, an input action altering internal logical state (`index++`) while producing zero projected displacement ($\Delta X = 0, \Delta Y = 0$) without reaching an authentic terminal boundary is classified as a Phantom Step defect and an automatic test failure.
+   - **Headless Interactive Flow Simulation**: Interactive subsystems, input dispatchers, and event handlers must never be left as untested glue code. The Trapsmith must construct synthetic headless user session tests that chain realistic user interaction sequences (keystrokes, drags, modifiers, packet bursts) verifying output projection without requiring human manual testing to discover routine regressions.
 
 7. **The Cross-Layer Stress Propagation Invariant (No Single-Dimension Traps)**:
-   - Whenever an edge-case, boundary condition, or stress input class (e.g. multi-codepoint grapheme clusters, combining marks, BiDi RTL runs, surrogate pairs, zero-width joiners, empty buffers) is identified in any foundational layer, The Trapsmith is strictly required to propagate that identical input across all higher operational dimensions: Layout/Formatting $\rightarrow$ Spatial Navigation $\rightarrow$ Mutation/Editing $\rightarrow$ Visual Rendering. A stress input tested in only one layer is a protocol violation.
+   - Whenever an edge-case, boundary condition, or stress input class (e.g., in text engines: combining marks, BiDi runs; in serialization engines: malformed headers, nested delimiters, truncated frames; in database engines: null tuples, duplicate keys) is identified in any foundational layer, The Trapsmith is strictly required to propagate that identical input across all higher operational dimensions (e.g., Ingestion $\rightarrow$ Formatting $\rightarrow$ Navigation $\rightarrow$ Mutation $\rightarrow$ Rendering). A stress input tested in only one layer is a protocol violation.
 
 8. **The Projection Purity Law (Single Source of Render Truth)**:
    - In any layered system with a visual or presentation consumer (e.g. Painter, Renderer, View), the consumer is strictly prohibited from recalculating geometry, maintaining separate coordinate branching, or querying lower foundational models directly. The presentation layer must be a passive 1-to-1 consumer of the ViewModel projection. Every defect trap asserting interactive mutations MUST execute through the consumer harness (e.g. headless canvas / mock visualizer) to prevent divergent projection bugs.
