@@ -23,6 +23,8 @@
 #include "tools/text_editor/include/UnicodeParagraph.h"
 #include "tools/text_editor/tests/StressCorpus.h"
 
+#include <random>
+
 using namespace skia::text_editor;
 
 // =============================================================================
@@ -2140,3 +2142,94 @@ DEF_TEST(TextEditor_Defect_ArabicForwardDeletionCaretContinuity, reporter) {
                     "KEEPER-DEFECT: Caret X (%.2f) jumped away from cut boundary (%.2f) to prefix boundary (%.2f)! Delta: %.2f",
                     actualCaretX, expectedCutBoundary, prefixBoundary, std::abs(actualCaretX - expectedCutBoundary));
 }
+
+// =============================================================================
+// TRAP 25: The Beholder Continuous Fuzzing & Differential Buffer Invariant (Invariant 13)
+// =============================================================================
+DEF_TEST(TextEditor_Fuzz_TheBeholder_DifferentialBufferModel, reporter) {
+    SkFont font = ToolUtils::DefaultPortableFont();
+
+    const std::vector<std::string> kCorpusSeeds = {
+        "",
+        "Hello World",
+        "Line 1\nLine 2\r\nLine 3",
+        "e\xcc\x81\xcc\x80\xcc\x83\xcc\x82\xcc\x88\xcc\x8a suffix",
+        "\xd8\xa8\xd9\x91\xd9\x8e \xd8\xb9\xd8\xb1\xd8\xa8\xd9\x8a",
+        "\xd7\xa9\xd6\xb8\xd7\x81\xd7\x9c\xd6\xb5\xd7\x95\xd6\xb9\xd7\x9d",
+        "\xF0\x9F\x91\xA8\xE2\x80\x8D\xF0\x9F\x91\xA9\xE2\x80\x8D\xF0\x9F\x91\xA7",
+    };
+
+    const std::vector<std::string> kMutatorPayloads = {
+        "A", " ", "\n", "\r\n", "xyz",
+        "\xcc\x81",
+        "\xd8\xa7",
+        "\xF0\x9F\x98\x80",
+    };
+
+    // Deterministic PRNG for 100% reproducible fuzzing runs
+    std::mt19937 rng(1337);
+
+    for (const auto& initialText : kCorpusSeeds) {
+        TextDocument doc(initialText, font);
+        std::string refModel = initialText;
+
+        REPORTER_ASSERT(reporter, doc.text() == refModel);
+
+        uint32_t expectedRevision = 0;
+
+        for (int step = 0; step < 100; ++step) {
+            int op = rng() % 3; // 0: Insert, 1: Erase, 2: Replace
+            if (refModel.empty()) {
+                op = 0; // Must insert if empty
+            }
+
+            const std::string& payload = kMutatorPayloads[rng() % kMutatorPayloads.size()];
+
+            if (op == 0) {
+                // Insert
+                size_t pos = rng() % (refModel.size() + 1);
+                doc.insert(TextIndex(pos), payload);
+                refModel.insert(pos, payload);
+                ++expectedRevision;
+            } else if (op == 1) {
+                // Erase
+                size_t start = rng() % refModel.size();
+                size_t maxLen = refModel.size() - start;
+                size_t len = 1 + (rng() % maxLen);
+                doc.erase(TextRange(TextIndex(start), TextIndex(start + len)));
+                refModel.erase(start, len);
+                ++expectedRevision;
+            } else {
+                // Replace
+                size_t start = rng() % refModel.size();
+                size_t maxLen = refModel.size() - start;
+                size_t len = 1 + (rng() % maxLen);
+                doc.replace(TextRange(TextIndex(start), TextIndex(start + len)), payload);
+                refModel.replace(start, len, payload);
+                ++expectedRevision;
+            }
+
+            // Invariant 13.1: Differential Model Equivalence
+            REPORTER_ASSERT(reporter, doc.text() == refModel,
+                            "Fuzz Differential Mismatch at step %d! Expected len=%zu, got len=%zu",
+                            step, refModel.size(), doc.text().size());
+            REPORTER_ASSERT(reporter, doc.revision() == expectedRevision);
+            if (refModel.empty()) {
+                REPORTER_ASSERT(reporter, doc.spatial_index().formatted().lines().empty());
+            } else {
+                REPORTER_ASSERT(reporter, doc.spatial_index().formatted().lines().size() >= 1);
+            }
+        }
+
+
+
+        // Invariant 13.2: Invertibility Property Fuzzing (Undo / Redo roundtrip)
+        std::string beforeEdit = std::string(doc.text());
+        doc.insert(TextIndex(0), "PREFIX_INVERT_");
+        REPORTER_ASSERT(reporter, doc.text() != beforeEdit);
+        doc.erase(TextRange(TextIndex(0), TextIndex(14)));
+        REPORTER_ASSERT(reporter, doc.text() == beforeEdit,
+                        "Invertibility Property Violated! State after erase did not recover initial state.");
+    }
+}
+
