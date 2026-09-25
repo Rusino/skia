@@ -7,7 +7,7 @@
 
 #include "tools/text_editor/include/TextEditorViewModel.h"
 #include "include/core/SkFontMetrics.h"
-#include "src/base/SkUTF.h"
+#include "src/core/SkUTF.h"
 #include <algorithm>
 #include <cmath>
 

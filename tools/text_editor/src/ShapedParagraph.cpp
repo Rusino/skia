@@ -11,9 +11,10 @@
 #include "include/core/SkFontTypes.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkTypeface.h"
-#include "src/base/SkUTF.h"
+#include "src/core/SkUTF.h"
 #include <hb.h>
 #include <hb-ot.h>
+#include "tools/fonts/FontToolUtils.h"
 
 namespace skia::text_editor {
 
@@ -82,12 +83,27 @@ private:
             // 1. Initialize HarfBuzz buffer with strictly preserved 1-to-1 character cluster mapping
             hb_buffer_t* buf = hb_buffer_create();
             hb_buffer_set_cluster_level(buf, HB_BUFFER_CLUSTER_LEVEL_CHARACTERS);
+
+            static hb_unicode_funcs_t* sNoComposeFuncs = []() {
+                hb_unicode_funcs_t* ufuncs = hb_unicode_funcs_create(hb_unicode_funcs_get_default());
+                hb_unicode_funcs_set_compose_func(ufuncs,
+                    [](hb_unicode_funcs_t*, hb_codepoint_t, hb_codepoint_t, hb_codepoint_t*, void*) -> hb_bool_t {
+                        return false;
+                    }, nullptr, nullptr);
+                hb_unicode_funcs_make_immutable(ufuncs);
+                return ufuncs;
+            }();
+            hb_buffer_set_unicode_funcs(buf, sNoComposeFuncs);
+
             hb_buffer_add_utf8(buf, fullText.data(), fullText.size(), runStart, runLen);
             hb_buffer_set_direction(buf, item.direction == Direction::kRTL ? HB_DIRECTION_RTL : HB_DIRECTION_LTR);
             hb_buffer_guess_segment_properties(buf);
 
             // 2. Load HarfBuzz font face from SkTypeface
             sk_sp<SkTypeface> typeface = item.font.refTypeface();
+            if (!typeface) {
+                typeface = ToolUtils::DefaultTypeface();
+            }
             hb_face_t* hbFace = nullptr;
             if (typeface) {
                 int ttcIndex = 0;
@@ -145,9 +161,9 @@ private:
                     TextIndex codepointOffset(ptr - fullText.data());
                     SkUnichar u = SkUTF::NextUTF8(&ptr, end);
                     SkGlyphID gid = 0;
-                    item.font.textToGlyphs(&u, sizeof(SkUnichar), SkTextEncoding::kUTF32, &gid, 1);
+                    item.font.textToGlyphs(&u, sizeof(SkUnichar), SkTextEncoding::kUTF32, {&gid, 1});
                     SkScalar width = 0;
-                    item.font.getWidths(&gid, 1, &width);
+                    item.font.getWidths({&gid, 1}, {&width, 1});
 
                     ShapedGlyph sg;
                     sg.glyph_id = gid;
@@ -189,7 +205,7 @@ private:
                     sg.is_zero_width_control = fUnicode->isControl(sg.cluster_text_index);
 
                     SkScalar w = glyphPositions[i].x_advance / 64.0f;
-                    if (w <= 0 && !sg.is_mark && !sg.is_zero_width_control) {
+                    if ((w <= 0 || sg.glyph_id == 0) && !sg.is_mark && !sg.is_zero_width_control) {
                         w = item.font.getSize() > 0 ? item.font.getSize() * 0.6f : 8.0f;
                     }
                     sg.advance = SkPoint::Make(w, glyphPositions[i].y_advance / 64.0f);

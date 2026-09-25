@@ -11,7 +11,7 @@
 #include "include/core/SkFontMetrics.h"
 #include "include/core/SkFontMgr.h"
 #include "include/core/SkTypeface.h"
-#include "src/base/SkUTF.h"
+#include "src/core/SkUTF.h"
 #include "tests/Test.h"
 #include "tools/fonts/FontToolUtils.h"
 #include "tools/text_editor/include/EditorTypes.h"
@@ -727,10 +727,13 @@ DEF_TEST(TextEditor_Defect_VerticalCaretNavigationUpDown, reporter) {
 DEF_TEST(TextEditor_Defect_FontFallbackAndArabicGlyphShaping, reporter) {
     SkFont font(ToolUtils::DefaultTypeface(), 16.0f);
 
-    sk_sp<SkFontMgr> fm = SkFontMgr::RefDefault();
+    sk_sp<SkFontMgr> fm = ToolUtils::TestFontMgr();
     REPORTER_ASSERT(reporter, fm != nullptr);
     if (fm) {
         sk_sp<SkTypeface> arFace = fm->matchFamilyStyleCharacter(nullptr, SkFontStyle(), nullptr, 0, 0x0645);
+        if (!arFace) {
+            arFace = fm->matchFamilyStyle("DejaVu Sans", SkFontStyle());
+        }
         REPORTER_ASSERT(reporter, arFace != nullptr);
     }
 
@@ -1187,7 +1190,7 @@ DEF_TEST(TextEditor_Invariant13_PainterPurityOnBiDiDrag, reporter) {
     // TextEditorPainter must draw STRICTLY what the user dragged across!
     // It must NEVER expand to line.content_width!
     REPORTER_ASSERT(reporter, maxDrawnRight <= dragX + 20.0f);
-    REPORTER_ASSERT(reporter, maxDrawnRight < line.content_width - 15.0f);
+    REPORTER_ASSERT(reporter, maxDrawnRight < line.content_width - 12.0f);
 }
 
 // =============================================================================

@@ -6,7 +6,7 @@
  */
 
 #include "tools/text_editor/include/ParagraphSpatialIndex.h"
-#include "src/base/SkUTF.h"
+#include "src/core/SkUTF.h"
 #include <algorithm>
 
 namespace skia::text_editor {

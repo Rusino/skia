@@ -7,6 +7,7 @@ config("public_config") {
 }
 
 skia_source_set("text_editor") {
+  testonly = true
   public_configs = [ ":public_config" ]
   public = [
     "include/EditorTypes.h",
@@ -29,6 +30,7 @@ skia_source_set("text_editor") {
   ]
   deps = [
     "../..:skia",
+    "../..:tool_utils",
     "../../modules/skunicode",
     "//third_party/harfbuzz",
   ]

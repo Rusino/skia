@@ -9,7 +9,9 @@
 #include "include/core/SkFontMgr.h"
 #include "include/core/SkTypeface.h"
 #include "modules/skunicode/include/SkUnicode.h"
-#include "src/base/SkUTF.h"
+#include "modules/skunicode/include/SkUnicode_icu.h"
+#include "src/core/SkUTF.h"
+#include "tools/fonts/FontToolUtils.h"
 #include <algorithm>
 
 namespace skia::text_editor {
@@ -20,7 +22,7 @@ class UnicodeParagraphImpl : public UnicodeParagraph {
 public:
     UnicodeParagraphImpl(std::string_view utf8_text, SkSpan<const StyleSpan> styles)
         : fText(utf8_text)
-        , fUnicode(SkUnicode::Make())
+        , fUnicode(SkUnicodes::ICU::Make())
     {
         init(styles);
     }
@@ -107,7 +109,7 @@ private:
             bidiRegions.emplace_back(0, fText.size(), 0);
         }
 
-        sk_sp<SkFontMgr> fm = SkFontMgr::RefDefault();
+        sk_sp<SkFontMgr> fm = ToolUtils::TestFontMgr();
 
         for (const auto& bidi : bidiRegions) {
             SkFont baseFont;
@@ -122,6 +124,10 @@ private:
             }
 
             if (!baseFont.getTypeface()) {
+                baseFont.setTypeface(ToolUtils::DefaultTypeface());
+            }
+
+            if (!baseFont.getTypeface()) {
                 ItemizedRun run;
                 run.text_range = TextRange(TextIndex(bidi.start), TextIndex(bidi.end));
                 run.bidi_level = bidi.level;
@@ -132,8 +138,13 @@ private:
             }
 
             auto resolveFontFor = [&](SkUnichar u, const SkFont& activeFont) -> SkFont {
-                if (u <= 32 || (u >= 0x200B && u <= 0x200F)) {
-                    return activeFont; // spaces and controls stay with surrounding active font
+                if (u <= 32 || (u >= 0x200B && u <= 0x200F) ||
+                    (u >= 0x0300 && u <= 0x036F) ||
+                    (u >= 0x1AB0 && u <= 0x1AFF) ||
+                    (u >= 0x1DC0 && u <= 0x1DFF) ||
+                    (u >= 0x20D0 && u <= 0x20FF) ||
+                    (u >= 0xFE20 && u <= 0xFE2F)) {
+                    return activeFont; // spaces, controls, and combining marks stay with surrounding active font
                 }
                 if (activeFont.getTypeface() && activeFont.unicharToGlyph(u) != 0) {
                     return activeFont;
@@ -144,6 +155,22 @@ private:
                 if (fm) {
                     SkFontStyle style = baseFont.getTypeface() ? baseFont.getTypeface()->fontStyle() : SkFontStyle();
                     sk_sp<SkTypeface> fallbackFace = fm->matchFamilyStyleCharacter(nullptr, style, nullptr, 0, u);
+                    if (!fallbackFace) {
+                        fallbackFace = fm->matchFamilyStyle("DejaVu Sans", style);
+                        if (!fallbackFace || fallbackFace->unicharToGlyph(u) == 0) {
+                            fallbackFace = nullptr;
+                            const int familyCount = fm->countFamilies();
+                            for (int i = 0; i < familyCount; ++i) {
+                                sk_sp<SkFontStyleSet> set(fm->createStyleSet(i));
+                                if (!set) continue;
+                                sk_sp<SkTypeface> candidate(set->matchStyle(style));
+                                if (candidate && candidate->unicharToGlyph(u) != 0) {
+                                    fallbackFace = std::move(candidate);
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     if (fallbackFace && fallbackFace->unicharToGlyph(u) != 0) {
                         return SkFont(std::move(fallbackFace), baseFont.getSize());
                     }
@@ -216,7 +243,7 @@ private:
     }
 
     std::string fText;
-    std::unique_ptr<SkUnicode> fUnicode;
+    sk_sp<SkUnicode> fUnicode;
     std::vector<ItemizedRun> fRuns;
     std::vector<TextIndex> fGraphemeBreaks;
     std::vector<TextIndex> fWordBreaks;

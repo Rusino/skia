@@ -7,7 +7,7 @@
 
 #include "tools/text_editor/include/FormattedParagraph.h"
 #include "include/core/SkFontTypes.h"
-#include "src/base/SkUTF.h"
+#include "src/core/SkUTF.h"
 #include <algorithm>
 #include <cmath>
 
@@ -242,9 +242,9 @@ private:
                 ShapedGlyph eg;
                 SkUnichar uEllipsis = 0x2026;
                 sr.item->font.textToGlyphs(&uEllipsis, sizeof(SkUnichar), SkTextEncoding::kUTF32,
-                                           reinterpret_cast<SkGlyphID*>(&eg.glyph_id), 1);
+                                           {reinterpret_cast<SkGlyphID*>(&eg.glyph_id), 1});
                 SkScalar eWidth = 0;
-                sr.item->font.getWidths(reinterpret_cast<SkGlyphID*>(&eg.glyph_id), 1, &eWidth);
+                sr.item->font.getWidths({reinterpret_cast<SkGlyphID*>(&eg.glyph_id), 1}, {&eWidth, 1});
                 if (eWidth <= 0) {
                     eWidth = sr.item->font.getSize() > 0 ? sr.item->font.getSize() * 0.6f : 8.0f;
                 }

@@ -51,9 +51,8 @@ void TextEditorPainter::Paint(
         textPaint.setAntiAlias(true);
 
         canvas->drawGlyphs(
-            run.glyphs.size(),
-            run.glyphs.data(),
-            run.positions.data(),
+            run.glyphs,
+            run.positions,
             SkPoint::Make(0, 0),
             run.font,
             textPaint);

@@ -10,7 +10,7 @@
 #include "include/core/SkFont.h"
 #include "include/core/SkGraphics.h"
 #include "include/core/SkSurface.h"
-#include "src/base/SkUTF.h"
+#include "src/core/SkUTF.h"
 #include "tools/fonts/FontToolUtils.h"
 #include "tools/sk_app/Application.h"
 #include "tools/sk_app/Window.h"
